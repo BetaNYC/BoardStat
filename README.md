@@ -1,5 +1,5 @@
 # BoardStat
-BoardStat is an interactive tool for New York City’s community boards. It empowers users to discover issues and trends within district boundaries. The six pages of the tool provide a variety of summaries, graphs, and maps of 311 data (from 2010 through the present day). Not only does BoardStat empower community board staff and members to gain timely insights into their residents’ concerns, but it also furthers Gale A. Brewer, the Manhattan Borough President’s goal of moving beyond open data access to meaningful open data use.
+BoardStat is an interactive tool for New York City’s community boards. It empowers users to discover issues and trends within district boundaries. The six pages of the tool provide a variety of summaries, graphs, and maps of 311 data (from 2010 through the present day). Not only does BoardStat empower community board staff and members to gain timely insights into their residents’ concerns, but it also furthers Manhattan Borough President Gale A. Brewer's goal of moving beyond open data access to meaningful open data use.
 
 This github repo is to document issues and outline future features. You can discover more of BoardStat's features within our [product overview document](https://docs.google.com/document/d/1pqDS1YaAF-HR0L_Ish6h1YFweZExaN41yX6sPaFGmKE/edit#).
 
