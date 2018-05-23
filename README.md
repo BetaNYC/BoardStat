@@ -35,6 +35,22 @@ BoardStat is ingesting [NYC 311 Service Requests from 2010 to Present](https://d
 ## BoardStat v0.6a - THE BOROUGH EDITION!
  * NEW FEATURE - to support deployment to all five boroughs, we've consolidated individual community board views into a single borough view. Now, there are five dashboards. Next to the date selection field, you can select a board. if you want to look at a region, select more than one. Additionally, you can look at service request issues in parks by selecting their corresponding "board number."
  * DATA QUALITY ISSUES — ALL CB 01s seems to be getting all of the Borough's street light condition & homeless person assistance service requests. As we are pulling directly from the open data portal, this seems to be a problem with the City's geocoder. We are working with NYC 311 to address this issue.
+  - Street Light Condition
+  - Traffic Signal Condition
+  - Heat/Hot Water
+  - Street Condition
+  - Water System
+  - Rodent
+  - Noise
+  - Plumbing
+  - Unsanitary Condition
+  - Paint / Plaster
+  - Homeless Person Assistance
+  - General / Cooking Gas
+  - Flooring / Stairs 
+  - Water Leak
+  - Door / Window
+  - Elevator
  * DATA QUALITY ISSUES — Manhattan CB 08's data stream continues to include service request issues from Marble Hill, which is technically Manhattan but service by Bronx CB 08. Yet, there are some service requests from Manhattan's Marble Hill that are properly coded as Bronx CB 08.
  * Missing Data - We are not seeing any 311 service requests from Rikers Island
 
