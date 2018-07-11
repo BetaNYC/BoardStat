@@ -1,7 +1,9 @@
 # BoardStat
 BoardStat is an interactive tool for New York City’s community boards. It empowers users to discover issues and trends within district boundaries. The six pages of the tool provide a variety of summaries, graphs, and maps of 311 data (from 2010 through the present day). Not only does BoardStat empower community board staff and members to gain timely insights into their residents’ concerns, but it also furthers Manhattan Borough President Gale A. Brewer's goal of moving beyond open data access to meaningful open data use.
 
-This github repo is to document issues and outline future features. You can discover more of BoardStat's features within our [product overview document](https://docs.google.com/document/d/1pqDS1YaAF-HR0L_Ish6h1YFweZExaN41yX6sPaFGmKE/edit#).
+This github repo is to document issues and outline future features.
+
+**IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
 
 | Borough  | Bit.ly URL |
 | ------------- | ------------- |
@@ -23,6 +25,8 @@ BoardStat was created with funds and support from the Alfred P. Sloan Foundation
 ## Training Documents
 BetaNYC routinely hosts 90 min public training sessions. To find out about the next training session, join our [meetup](https://meetup.com/betanyc). If you are a Manhattan Community Board District Office staff member or Community Board member, email us at 'boardstat@manhattanbp.nyc.gov' to set up a personal one-on-one training. 
 
+**IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
+
 In the meantime, you can browse our training materials.
  * [BoardStat Training - Data Journey Worksheet](https://docs.google.com/document/d/1DHgVLrm-X1gs1rwovhpWA5En_ozcQnTWHYobmG9_B0A/edit) - This is the worksheet BetaNYC uses to teach BoardStat. You can find companion slides [here](http://bit.ly/betanyc_datajourney_manhattan).
  * [Training Videos](https://) - In development
@@ -34,7 +38,8 @@ BoardStat is ingesting [NYC 311 Service Requests from 2010 to Present](https://d
 
 ## BoardStat v0.6a - THE BOROUGH EDITION!
  * NEW FEATURE - to support deployment to all five boroughs, we've consolidated individual community board views into a single borough view. Now, there are five dashboards. Next to the date selection field, you can select a board. if you want to look at a region, select more than one. Additionally, you can look at service request issues in parks by selecting their corresponding "board number."
- * DATA QUALITY ISSUES — Manhattan CB 08's data stream continues to include service request issues from Marble Hill, which is technically Manhattan but service by Bronx CB 08. Yet, there are some service requests from Manhattan's Marble Hill that are properly coded as Bronx CB 08.
+ * ALL DATA QUALITY ISSUES HAVE BEEN ADDRESSED BY NYC'S OPEN DATA TEAM
+ ~~* DATA QUALITY ISSUES — Manhattan CB 08's data stream continues to include service request issues from Marble Hill, which is technically Manhattan but service by Bronx CB 08. Yet, there are some service requests from Manhattan's Marble Hill that are properly coded as Bronx CB 08.
  * DATA QUALITY ISSUES — In all Boroughs, Community Board 01 seems to be getting assigned ahandfull of the Borough's service requests. This service requests are listed below. As we are pulling directly from the open data portal, this seems to be a problem with the City's geocoder. We are working with MODA / DOITT / NYC 311 to address this issue.
   - Street Light Condition
   - Traffic Signal Condition
@@ -51,7 +56,7 @@ BoardStat is ingesting [NYC 311 Service Requests from 2010 to Present](https://d
   - Flooring / Stairs 
   - Water Leak
   - Door / Window
-  - Elevator
+  - Elevator~~
 
 
 ## BoardStat v0.5e
