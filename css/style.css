@@ -1,0 +1,68 @@
+/* Body, Headers, and Text*/
+* {
+	margin:0;
+	padding:0;
+}
+
+html {
+	box-sizing:border-box;
+}
+
+body {
+	background:#f2f6f9;
+  margin:20px;
+	font-family:"lato";
+	font-weight:normal;
+	-webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    text-align:center;
+}
+
+h1, h2, h3 {
+	font-family:"Playfair Display" !important;
+	font-weight:1000 !important;
+	font-size:25px !important;
+	padding-bottom: 5px;
+	margin: 0px 0px !important;
+	text-align: center;
+}
+
+.separator {
+	min-height: 1px;
+	background-color: rgba(46, 60, 67, 0.08);
+	margin: 16px 0;
+}
+
+table {
+  margin: 0px auto;
+  border-collapse: collapse;
+}
+
+table th, table td {
+  border:1px solid black;
+  padding:5px;
+}
+
+#footer {
+	text-align:center !important;
+}
+
+.footer_text {
+	font-size:11px;
+}
+
+.logo {
+	width:50px;
+	margin:auto;
+	display:block;
+}
+
+.logo_caption {
+	font-size:10px;
+	text-align:center;
+	margin-top:5px;
+}
