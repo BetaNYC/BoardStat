@@ -5,13 +5,13 @@ This github repo is to document issues and outline future features.
 
 **IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
 
-| Borough  | Bit.ly URL |
+| Borough  | URL |
 | ------------- | ------------- |
-| Bronx | https://bit.ly/BoardStat_v6a_Bronx |
-| Brooklyn | https://bit.ly/BoardStat_v6a_Brooklyn |
-| Manhattan | https://bit.ly/BoardStat_v6a_Manhattan |
-| Queens | http://bit.ly/BoardStat_v6a_Queens |
-| Staten Island | http://bit.ly/BoardStat_v6a_StatenIsland |
+| Bronx | https://boardstat.beta.nyc/bronx |
+| Brooklyn | https://boardstat.beta.nyc/brooklyn |
+| Manhattan | https://boardstat.beta.nyc/manhattan |
+| Queens | https://boardstat.beta.nyc/queens |
+| Staten Island | https://boardstat.beta.nyc/statenisland |
 
 ## File an Issue 
 We're tracking all issues via this [repo's issue cue](https://github.com/BetaNYC/BoardStat/issues).
@@ -35,6 +35,10 @@ In the meantime, you can browse our training materials.
 BoardStat is ingesting [NYC 311 Service Requests from 2010 to Present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-Present/erm2-nwe9) dataset directly from the city’s open data portal. Data is filtered by the Community Board column.
 
 # Change Log
+
+## BoardStat v0.7 - A New Look
+ * Updated all pages to have a new header from the NYC Core Framework
+ * Added a new home page which includes a description and a map with links to the BoardStat borough pages
 
 ## BoardStat v0.6b - User experance tweeks and introducting new views
 For this edit, we've made a number of user experance tweeks and modifications. You can track these improvements via our [github issue cue](https://github.com/BetaNYC/BoardStat/issues/84). Many thanks to [Prathm Juneja](https://github.com/prathmj) for spending a few weeks with us idenitifying and making these improvments.
