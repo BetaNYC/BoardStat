@@ -1,4 +1,5 @@
 # BoardStat
+## As of 2026, Boardstat's 311 data can no longer be refreshed. BetaNYC is working to deliver a new version of Boardstat in 2026.
 BoardStat is an interactive tool for New York City’s community boards. It empowers users to discover issues and trends within district boundaries. The six pages of the tool provide a variety of summaries, graphs, and maps of 311 data (from 2010 through the present day). Not only does BoardStat empower community board staff and members to gain timely insights into their residents’ concerns, but it also furthers Manhattan Borough President Gale A. Brewer's goal of moving beyond open data access to meaningful open data use.
 
 This github repo is to document issues and outline future features.
