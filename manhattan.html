@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <!-- Required meta tags -->
     <meta charset="utf-8" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://code.jquery.com/jquery-3.7.1.min.js https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js https://unpkg.com/leaflet@1.9.4/dist/leaflet.js https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js https://unpkg.com/esri-leaflet-vector@4.3.0/dist/esri-leaflet-vector.js; style-src 'self' 'unsafe-inline' https://unpkg.com https://use.fontawesome.com; font-src 'self' https://use.fontawesome.com data:; img-src 'self' data: blob: https://beta.nyc https://*.arcgis.com https://*.arcgisonline.com https://*.openstreetmap.org; connect-src 'self' https://data.cityofnewyork.us https://*.arcgis.com https://*.arcgisonline.com https://*.openstreetmap.org; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
@@ -23,26 +25,17 @@
 
     <!-- NYC Theme CSS -->
     <link rel="stylesheet" href="./css/theme.css" />
-    <link rel="stylesheet" href="./css/flex.css" />
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <!-- Google tag (gtag.js) -->
-    <script
-      async
-      src="https://www.googletagmanager.com/gtag/js?id=G-TJ936HGY1Z"
-    ></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag("js", new Date());
-
-      gtag("config", "G-TJ936HGY1Z");
-    </script>
+    <link rel="icon" href="./images/BetaNYC_short_white_on_blue.png" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" integrity="sha384-pmjIAcz2bAn0xukfxADbZIb3t8oRT9Sv0rvO+BR5Csr6Dhqq+nZs59P0pPKQJkEV" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" integrity="sha384-wgw+aLYNQ7dlhK47ZPK7FRACiq7ROZwgFNg0m04avm4CaXS+Z9Y7nMu8yNjBKYC+" crossorigin="anonymous" />
+    <link rel="stylesheet" href="./css/prototype.css?v=20260826-3" />
+    <!-- Existing aggregate page analytics; dashboard filters stay local. -->
+    <script defer src="./js/analytics.js?v=20260910-security-1"></script>
+    <link rel="stylesheet" href="./css/accessibility.css?v=20260910-1" />
   </head>
-  <body style="margin: 0px; padding: 0px">
-    <div class="row-container">
-      <div>
+  <body data-borough="manhattan" data-default-boards="all" data-route-fixed="true">
+    <a class="skip-link" href="#dashboard">Skip to dashboard</a>
         <header id="global-header" role="banner">
           <div id="nyc-top-header">
             <div class="container-fluid wide">
@@ -88,7 +81,7 @@
                   >
                     <a class="align-self-center" href="https://beta.nyc/">
                       <img
-                        src="https://beta.nyc/wp-content/uploads/Sticker_BetaNYC_long_transp_back1-e1545958875486.png"
+                        src="https://beta.nyc/wp-content/uploads/Sticker_BetaNYC_long_transp_back1-e1545958875486.png" alt="BetaNYC"
                       />
                     </a>
                   </div>
@@ -112,7 +105,7 @@
                           aria-expanded="false"
                           aria-label="Toggle navigation"
                         >
-                          <span class="fas fa-bars fa-lg" role="img"></span>
+                          <span class="fas fa-bars fa-lg" aria-hidden="true"></span>
                         </button>
                       </li>
                     </ul>
@@ -125,9 +118,7 @@
                         <a
                           class="nav-link"
                           href="https://boardstat.beta.nyc"
-                          id="nav-item-01"
-                          aria-haspopup="true"
-                          aria-expanded="false"
+                          id="nav-item-home"
                         >
                           BoardStat Home</a
                         >
@@ -135,9 +126,7 @@
                         <a
                           class="nav-link"
                           href="https://boardstat.beta.nyc/bronx"
-                          id="nav-item-01"
-                          aria-haspopup="true"
-                          aria-expanded="false"
+                          id="nav-item-bronx"
                         >
                           The Bronx</a
                         >
@@ -145,9 +134,7 @@
                         <a
                           class="nav-link"
                           href="https://boardstat.beta.nyc/brooklyn"
-                          id="nav-item-01"
-                          aria-haspopup="true"
-                          aria-expanded="false"
+                          id="nav-item-brooklyn"
                         >
                           Brooklyn</a
                         >
@@ -155,9 +142,7 @@
                         <a
                           class="nav-link"
                           href="https://boardstat.beta.nyc/manhattan"
-                          id="nav-item-01"
-                          aria-haspopup="true"
-                          aria-expanded="false"
+                          id="nav-item-manhattan"
                         >
                           <strong><u>Manhattan</u></strong></a
                         >
@@ -165,9 +150,7 @@
                         <a
                           class="nav-link"
                           href="https://boardstat.beta.nyc/queens"
-                          id="nav-item-01"
-                          aria-haspopup="true"
-                          aria-expanded="false"
+                          id="nav-item-queens"
                         >
                           Queens</a
                         >
@@ -175,9 +158,7 @@
                         <a
                           class="nav-link"
                           href="https://boardstat.beta.nyc/statenisland"
-                          id="nav-item-01"
-                          aria-haspopup="true"
-                          aria-expanded="false"
+                          id="nav-item-staten-island"
                         >
                           Staten Island</a
                         >
@@ -196,20 +177,291 @@
           </div>
           <!-- .wrap-header -->
         </header>
+
+    <main tabindex="-1" id="dashboard" class="prototype-container dashboard-shell">
+      <section class="hero" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Live NYC 311 data</p>
+          <h1 id="page-title">Manhattan 311 dashboard</h1>
+          <p class="hero-copy">Explore 311 service requests from 2010 to today.</p>
+        </div>
+        <div class="hero-tools">
+          <p class="source-badge">
+            Sources: <a href="https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-2019/76ig-c548/about_data">2010–2019</a>
+            and <a href="https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9/about_data">2020–present</a>
+          </p>
+        </div>
+      </section>
+
+      <nav class="view-nav" aria-label="Dashboard views" aria-orientation="horizontal" role="tablist">
+        <button id="tab-filters" type="button" role="tab" aria-selected="false" aria-controls="view-filters" data-view="filters">1. Set Filters</button>
+        <button id="tab-overview" type="button" role="tab" aria-selected="true" aria-controls="view-overview" data-view="overview">2. Board Overview</button>
+        <button id="tab-address" type="button" role="tab" aria-selected="false" aria-controls="view-address" data-view="address">3. Address Lookup</button>
+        <button id="tab-map" type="button" role="tab" aria-selected="false" aria-controls="view-map" data-view="map">4. Map</button>
+        <button id="tab-agency" type="button" role="tab" aria-selected="false" aria-controls="view-agency" data-view="agency">5. Agency &amp; Status</button>
+        <button id="tab-trends" type="button" role="tab" aria-selected="false" aria-controls="view-trends" data-view="trends">6. Trends</button>
+        <button id="tab-annual" type="button" role="tab" aria-selected="false" aria-controls="view-annual" data-view="annual">7. Annual</button>
+        <button id="tab-monthly" type="button" role="tab" aria-selected="false" aria-controls="view-monthly" data-view="monthly">8. Monthly</button>
+      </nav>
+
+      <details id="shared-filter-panel" class="filter-card">
+        <summary>
+          <span><span class="eyebrow">Shared filters</span><strong>Filter all views</strong></span>
+          <span id="filter-count" class="filter-count">15 active selections</span>
+        </summary>
+
+        <div class="filter-content">
+          <div class="section-heading">
+            <p class="filter-help">Select one or more values. Options and counts update with your filters.</p>
+            <button id="reset-filters" class="button-secondary" type="button">Reset filters</button>
+          </div>
+
+          <form id="filters">
+            <div class="date-filter-grid">
+              <div class="form-field">
+                <label for="start-date">Start date</label>
+                <input id="start-date" name="startDate" type="date" min="2010-01-01" required />
+              </div>
+              <div class="form-field">
+                <label for="end-date">End date</label>
+                <input id="end-date" name="endDate" type="date" min="2010-01-01" required />
+              </div>
+            </div>
+
+            <div class="filter-option-grid">
+              <fieldset class="filter-group">
+                <legend>Community Boards</legend>
+                <button type="button" class="text-button" data-clear-filter="boards">Clear</button>
+                <input class="option-search" type="search" placeholder="Find a board" aria-label="Find a Community Board option" data-option-search="board-options" />
+                <div id="board-options" class="checkbox-options"></div>
+              </fieldset>
+
+              <fieldset class="filter-group">
+                <legend>Complaint Types</legend>
+                <button type="button" class="text-button" data-clear-filter="complaints">Clear</button>
+                <input class="option-search" type="search" placeholder="Find a complaint" aria-label="Find a complaint type option" data-option-search="complaint-options" />
+                <div id="complaint-options" class="checkbox-options"></div>
+              </fieldset>
+
+              <fieldset class="filter-group">
+                <legend>Descriptors</legend>
+                <button type="button" class="text-button" data-clear-filter="descriptors">Clear</button>
+                <input class="option-search" type="search" placeholder="Find a descriptor" aria-label="Find a descriptor option" data-option-search="descriptor-options" />
+                <div id="descriptor-options" class="checkbox-options"></div>
+              </fieldset>
+
+              <fieldset class="filter-group">
+                <legend>Agencies</legend>
+                <button type="button" class="text-button" data-clear-filter="agencies">Clear</button>
+                <input class="option-search" type="search" placeholder="Find an agency" aria-label="Find an agency option" data-option-search="agency-options" />
+                <div id="agency-options" class="checkbox-options"></div>
+              </fieldset>
+
+              <fieldset class="filter-group">
+                <legend>Statuses</legend>
+                <button type="button" class="text-button" data-clear-filter="statuses">Clear</button>
+                <input class="option-search" type="search" placeholder="Find a status" aria-label="Find a status option" data-option-search="status-options" />
+                <div id="status-options" class="checkbox-options"></div>
+              </fieldset>
+
+              <fieldset class="filter-group">
+                <legend>Years</legend>
+                <button type="button" class="text-button" data-clear-filter="years">Clear</button>
+                <p class="option-note">Limit results to selected years.</p>
+                <div id="year-options" class="checkbox-options compact-options"></div>
+              </fieldset>
+            </div>
+          </form>
+          <p id="filter-options-status" class="filter-options-status" role="status" aria-live="polite"></p>
+          <p id="filter-error" class="form-error" role="alert" hidden></p>
+        </div>
+      </details>
+
+      <div class="dashboard-toolbar" role="group" aria-label="Dashboard refresh status">
+        <div class="dashboard-status-row">
+          <p id="dashboard-status" class="dashboard-status" role="status" aria-live="polite"></p>
+          <button id="retry-dashboard" class="text-button retry-button" type="button" aria-describedby="dashboard-status">Retry current view</button>
+        </div>
+        <p id="active-range" class="active-range"></p>
       </div>
 
-      <iframe
-        src="https://app.powerbi.com/view?r=eyJrIjoiNTczNzg3ZDUtOWM4NS00YmVkLTg5ODAtZjZjNDc5YTIzYzNjIiwidCI6IjdlZjYzNTczLTdmNmItNDNlZS1iZjhkLTE3ODRhYzdhZjFiNiIsImMiOjF9"
-        frameborder="0"
-        class="second-row"
-        allowfullscreen="true"
-      ></iframe>
-    </div>
+      <section id="view-filters" class="view-panel" role="tabpanel" aria-labelledby="tab-filters" tabindex="0" hidden>
+        <article class="dashboard-card guidance-card">
+          <p class="eyebrow">View 1</p>
+          <h2>Set shared filters</h2>
+          <p>Use the filters above to narrow your results. Dates include both the start and end day. Choose addresses in Address Lookup.</p>
+          <h3>Current selection</h3>
+          <ul id="active-filter-list" class="active-filter-list"></ul>
+          <p>Copy this page’s URL to bookmark or share your selection.</p>
+        </article>
+      </section>
+
+      <section id="view-overview" class="view-panel dashboard-grid" role="tabpanel" aria-labelledby="tab-overview" tabindex="0">
+        <article id="total-panel" class="dashboard-card total-card" aria-labelledby="total-heading">
+          <div class="card-heading"><div><p class="eyebrow">Service requests</p><h2 id="total-heading">Total requests</h2></div></div>
+          <p id="total-requests" class="metric" aria-live="polite">—</p>
+          <p class="panel-state" aria-live="polite"></p>
+        </article>
+
+        <article id="boards-panel" class="dashboard-card chart-card" aria-labelledby="boards-heading">
+          <div class="card-heading"><div><p class="eyebrow">Selected districts</p><h2 id="boards-heading">Requests by Community Board</h2></div></div>
+          <div class="chart-wrap"><canvas id="boards-chart" role="img" aria-label="Requests by Community Board chart" aria-describedby="boards-summary"></canvas></div>
+          <p id="boards-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+        </article>
+
+        <article id="complaints-panel" class="dashboard-card chart-card" aria-labelledby="complaints-heading">
+          <div class="card-heading"><div><p class="eyebrow">Top 10</p><h2 id="complaints-heading">Complaint types</h2></div></div>
+          <div class="chart-wrap"><canvas id="complaints-chart" role="img" aria-label="Top complaint types chart" aria-describedby="complaints-summary"></canvas></div>
+          <p id="complaints-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+        </article>
+
+        <article id="descriptors-panel" class="dashboard-card chart-card" aria-labelledby="descriptors-heading">
+          <div class="card-heading"><div><p class="eyebrow">Top 10</p><h2 id="descriptors-heading">Descriptors</h2></div></div>
+          <div class="chart-wrap"><canvas id="descriptors-chart" role="img" aria-label="Top descriptors chart" aria-describedby="descriptors-summary"></canvas></div>
+          <p id="descriptors-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+        </article>
+
+        <details id="rankings-details" class="dashboard-card disclosure-card chart-card-wide">
+          <summary><span><span class="eyebrow">Optional analysis</span><strong>Detailed complaint and address rankings</strong></span></summary>
+          <p>Use the table buttons to filter by complaint, descriptor, or address.</p>
+          <div class="detail-grid">
+            <article id="complaint-pairs-panel" class="detail-panel" aria-labelledby="complaint-pairs-heading">
+              <h2 id="complaint-pairs-heading">Complaint and descriptor pairs</h2>
+              <div class="table-scroll" role="region" tabindex="0" aria-label="Scrollable complaint and descriptor rankings table"><table><caption class="visually-hidden">Top complaint and descriptor pairs</caption><thead><tr><th scope="col">Complaint Type</th><th scope="col">Descriptor</th><th scope="col">Requests</th><th scope="col">Action</th></tr></thead><tbody id="complaint-pairs-body"></tbody></table></div>
+              <p class="panel-state" aria-live="polite"></p>
+            </article>
+            <article id="address-ranking-panel" class="detail-panel" aria-labelledby="address-ranking-heading">
+              <h2 id="address-ranking-heading">Leading incident addresses</h2>
+              <p id="address-ranking-note" class="option-note"></p>
+              <div class="table-scroll" role="region" tabindex="0" aria-label="Scrollable leading incident addresses table"><table><caption class="visually-hidden">Leading incident addresses</caption><thead><tr><th scope="col">Address</th><th scope="col">Requests</th><th scope="col">Actions</th></tr></thead><tbody id="address-ranking-body"></tbody></table></div>
+              <p class="panel-state" aria-live="polite"></p>
+            </article>
+          </div>
+        </details>
+      </section>
+
+      <section id="view-address" class="view-panel" role="tabpanel" aria-labelledby="tab-address" tabindex="0" hidden>
+        <article class="dashboard-card address-search-card" aria-labelledby="address-search-heading">
+          <div class="card-heading"><div><p class="eyebrow">Address filter</p><h2 id="address-search-heading">Lookup service requests by address</h2></div></div>
+          <label for="address-search">Search incident addresses</label>
+          <input id="address-search" type="search" autocomplete="off" placeholder="Example: 2151 Broadway" aria-describedby="address-search-help address-search-status" />
+          <p id="address-search-help" class="option-note">Type at least two characters, then select up to 10 addresses.</p>
+          <p id="address-search-status" class="filter-options-status" role="status" aria-live="polite"></p>
+          <ul id="address-suggestions" class="address-suggestions" aria-label="Address suggestions"></ul>
+          <div class="selected-address-heading"><h3>Selected addresses</h3><button id="clear-addresses" class="text-button" type="button">Clear all</button></div>
+          <div id="selected-addresses" class="filter-chips"><p class="option-note">No addresses selected.</p></div>
+        </article>
+
+        <aside id="address-analysis-guidance" class="prototype-notice">Select an address to see its charts. To include different spellings of an address, select each one.</aside>
+        <div id="address-analysis" class="dashboard-grid address-analysis" hidden>
+          <article id="address-timeline-panel" class="dashboard-card chart-card chart-card-wide" aria-labelledby="address-timeline-heading">
+            <div class="card-heading"><div><p class="eyebrow">Selected addresses</p><h2 id="address-timeline-heading">Requests over time</h2></div></div>
+            <div class="chart-wrap"><canvas id="address-timeline-chart" role="img" aria-label="Selected address requests over time chart" aria-describedby="address-timeline-summary"></canvas></div>
+            <p id="address-timeline-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+          </article>
+          <article id="address-complaints-panel" class="dashboard-card chart-card" aria-labelledby="address-complaints-heading">
+            <div class="card-heading"><div><p class="eyebrow">Selected addresses</p><h2 id="address-complaints-heading">Complaint types</h2></div></div>
+            <div class="chart-wrap"><canvas id="address-complaints-chart" role="img" aria-label="Complaint types at selected addresses chart" aria-describedby="address-complaints-summary"></canvas></div>
+            <p id="address-complaints-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+          </article>
+          <article id="address-descriptors-panel" class="dashboard-card chart-card" aria-labelledby="address-descriptors-heading">
+            <div class="card-heading"><div><p class="eyebrow">Choose a complaint type</p><h2 id="address-descriptors-heading">Descriptor trends</h2></div></div>
+            <div class="chart-wrap"><canvas id="address-descriptors-chart" role="img" aria-label="Descriptor trends at selected addresses chart" aria-describedby="address-descriptors-summary"></canvas></div>
+            <p id="address-descriptors-summary" class="chart-summary">Choose a complaint type in Shared filters to load descriptor trends.</p><p class="panel-state" aria-live="polite"></p>
+          </article>
+        </div>
+
+        <article id="address-results-panel" class="dashboard-card table-card" aria-labelledby="recent-heading">
+          <div class="card-heading"><div><p class="eyebrow">Newest first</p><h2 id="recent-heading">Matching service requests</h2></div><p class="limit-note">Up to 100 requests</p></div>
+          <div class="table-scroll" role="region" tabindex="0" aria-label="Scrollable matching service requests table">
+            <table>
+              <caption class="visually-hidden">Newest NYC 311 requests matching the shared filters</caption>
+              <thead><tr><th scope="col">Created</th><th scope="col">Closed</th><th scope="col">Board</th><th scope="col">Complaint Type</th><th scope="col">Descriptor</th><th scope="col">Agency</th><th scope="col">Address</th><th scope="col">Status</th><th scope="col">Dataset</th></tr></thead>
+              <tbody id="recent-requests-body"></tbody>
+            </table>
+          </div>
+          <p class="panel-state" aria-live="polite"></p>
+        </article>
+      </section>
+
+      <section id="view-map" class="view-panel" role="tabpanel" aria-labelledby="tab-map" tabindex="0" hidden>
+        <fieldset class="mode-control"><legend>Map mode</legend><label><input type="radio" name="map-mode" value="requests" checked /> Recent requests</label><label><input type="radio" name="map-mode" value="hotspots" /> Hotspots</label></fieldset>
+        <article id="map-panel" class="dashboard-card map-card" aria-labelledby="map-heading">
+          <div class="card-heading"><div><p id="map-eyebrow" class="eyebrow">Newest geocoded requests</p><h2 id="map-heading">Request map</h2></div><p id="map-limit-note" class="limit-note">Up to 250 points per applicable dataset</p></div>
+          <div id="request-map" role="region" aria-label="Map of recent 311 service requests" aria-describedby="map-limit-note"></div>
+          <p class="panel-state" aria-live="polite"></p>
+        </article>
+      </section>
+
+      <section id="view-agency" class="view-panel dashboard-grid" role="tabpanel" aria-labelledby="tab-agency" tabindex="0" hidden>
+        <article id="average-panel" class="dashboard-card total-card" aria-labelledby="average-heading">
+          <div class="card-heading"><div><p class="eyebrow">Closed requests</p><h2 id="average-heading">Average days to close</h2></div></div>
+          <p id="average-days" class="metric" aria-live="polite">—</p><p class="panel-state" aria-live="polite"></p>
+        </article>
+        <article id="agencies-panel" class="dashboard-card chart-card" aria-labelledby="agencies-heading">
+          <div class="card-heading"><div><p class="eyebrow">Top 10</p><h2 id="agencies-heading">Requests by agency</h2></div></div>
+          <div class="chart-wrap"><canvas id="agencies-chart" role="img" aria-label="Requests by agency chart" aria-describedby="agencies-summary"></canvas></div>
+          <p id="agencies-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+        </article>
+        <article id="statuses-panel" class="dashboard-card chart-card chart-card-wide" aria-labelledby="statuses-heading">
+          <div class="card-heading"><div><p class="eyebrow">Request state</p><h2 id="statuses-heading">Requests by status</h2></div></div>
+          <div class="chart-wrap"><canvas id="statuses-chart" role="img" aria-label="Requests by status chart" aria-describedby="statuses-summary"></canvas></div>
+          <p id="statuses-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+        </article>
+        <details id="agency-status-details" class="dashboard-card disclosure-card chart-card-wide">
+          <summary><span><span class="eyebrow">Optional analysis</span><strong>Status by agency</strong></span></summary>
+          <p>Compare request statuses for the ten leading agencies.</p>
+          <div class="chart-wrap chart-wrap-large"><canvas id="agency-status-chart" role="img" aria-label="Status by agency stacked chart" aria-describedby="agency-status-summary"></canvas></div>
+          <p id="agency-status-summary" class="chart-summary"></p>
+          <div class="table-scroll" role="region" tabindex="0" aria-label="Scrollable status by agency table"><table><caption class="visually-hidden">Exact status counts for the leading agencies</caption><thead id="agency-status-head"></thead><tbody id="agency-status-body"></tbody></table></div>
+          <p class="panel-state" aria-live="polite"></p>
+        </details>
+      </section>
+
+      <section id="view-trends" class="view-panel dashboard-grid" role="tabpanel" aria-labelledby="tab-trends" tabindex="0" hidden>
+        <article id="timeline-panel" class="dashboard-card chart-card chart-card-wide" aria-labelledby="timeline-heading">
+          <div class="card-heading"><div><p class="eyebrow">All matching requests</p><h2 id="timeline-heading">Complaints over time</h2></div></div>
+          <div class="chart-wrap"><canvas id="timeline-chart" role="img" aria-label="Complaints over time chart" aria-describedby="timeline-summary"></canvas></div>
+          <p id="timeline-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+        </article>
+        <article id="comparison-panel" class="dashboard-card chart-card chart-card-wide" aria-labelledby="comparison-heading">
+          <div class="card-heading"><div><p class="eyebrow">Selected or leading complaints</p><h2 id="comparison-heading">Compare complaint types</h2></div></div>
+          <div class="chart-wrap"><canvas id="comparison-chart" role="img" aria-label="Complaint type comparison chart" aria-describedby="comparison-summary"></canvas></div>
+          <p id="comparison-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+        </article>
+      </section>
+
+      <section id="view-annual" class="view-panel" role="tabpanel" aria-labelledby="tab-annual" tabindex="0" hidden>
+        <article id="annual-panel" class="dashboard-card chart-card" aria-labelledby="annual-heading">
+          <div class="card-heading"><div><p class="eyebrow">Calendar year</p><h2 id="annual-heading">Annual request totals</h2></div></div>
+          <div class="chart-wrap chart-wrap-large"><canvas id="annual-chart" role="img" aria-label="Annual request totals chart" aria-describedby="annual-summary"></canvas></div>
+          <p id="annual-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+        </article>
+      </section>
+
+      <section id="view-monthly" class="view-panel" role="tabpanel" aria-labelledby="tab-monthly" tabindex="0" hidden>
+        <fieldset class="mode-control"><legend>Monthly analysis</legend><label><input type="radio" name="monthly-mode" value="totals" checked /> Monthly totals</label><label><input type="radio" name="monthly-mode" value="complaints" /> Complaint mix</label></fieldset>
+        <article id="monthly-panel" class="dashboard-card chart-card" aria-labelledby="monthly-heading">
+          <div class="card-heading"><div><p class="eyebrow">Seasonality</p><h2 id="monthly-heading">Requests by calendar month</h2></div></div>
+          <div class="chart-wrap chart-wrap-large"><canvas id="monthly-chart" role="img" aria-label="Requests by calendar month chart" aria-describedby="monthly-summary"></canvas></div>
+          <p id="monthly-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+        </article>
+        <article id="monthly-complaints-panel" class="dashboard-card chart-card" aria-labelledby="monthly-complaints-heading" hidden>
+          <div class="card-heading"><div><p class="eyebrow">Optional comparison</p><h2 id="monthly-complaints-heading">Complaint mix by calendar month</h2></div></div>
+          <div class="chart-wrap chart-wrap-large"><canvas id="monthly-complaints-chart" role="img" aria-label="Complaint mix by calendar month chart" aria-describedby="monthly-complaints-summary"></canvas></div>
+          <p id="monthly-complaints-summary" class="chart-summary"></p>
+          <div class="table-scroll" role="region" tabindex="0" aria-label="Scrollable monthly complaint leaders table"><table><caption class="visually-hidden">Leading complaint type for each calendar month</caption><thead><tr><th scope="col">Month</th><th scope="col">Leading Complaint Type</th><th scope="col">Requests</th></tr></thead><tbody id="monthly-leaders-body"></tbody></table></div>
+          <p class="panel-state" aria-live="polite"></p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="prototype-footer"><div class="prototype-container"><p>BoardStat is a BetaNYC project. Data from NYC 311.</p></div></footer>
 
     <!-- jQuery (full, compressed version) -->
     <script
-      src="https://code.jquery.com/jquery-3.3.1.min.js"
-      integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+      src="https://code.jquery.com/jquery-3.7.1.min.js"
+      integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
       crossorigin="anonymous"
     ></script>
 
@@ -224,5 +476,11 @@
       integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
       crossorigin="anonymous"
     ></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js" integrity="sha384-2EpnechKmjshAhcJgZr0/dexkJdbcRJm+qsQtCjFsfBP/u5HZmrSa9lpmD7u2t5T" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/esri-leaflet-vector@4.3.0/dist/esri-leaflet-vector.js" integrity="sha384-eqNHr2L7UBNcqucrcptWuSRiPZ/mz1TNRdqXyFv9QY79vkhJhuLiCarG0K3rxKVl" crossorigin="anonymous"></script>
+    <script type="module" src="./js/dashboard.js?v=20260910-a11y-1"></script>
   </body>
 </html>

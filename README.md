@@ -1,8 +1,6 @@
 # BoardStat
-## As of 2026, Boardstat's 311 data can no longer be refreshed. BetaNYC is working to deliver a new version of Boardstat in 2026.
-BoardStat is an interactive tool for New York City’s community boards. It empowers users to discover issues and trends within district boundaries. The six pages of the tool provide a variety of summaries, graphs, and maps of 311 data (from 2010 through the present day). Not only does BoardStat empower community board staff and members to gain timely insights into their residents’ concerns, but it also furthers Manhattan Borough President Gale A. Brewer's goal of moving beyond open data access to meaningful open data use.
 
-This github repo is to document issues and outline future features.
+BoardStat helps New York City’s community boards explore 311 requests with charts, maps, and tables. The borough dashboards query NYC Open Data directly.
 
 **IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
 
@@ -13,6 +11,10 @@ This github repo is to document issues and outline future features.
 | Manhattan | https://boardstat.beta.nyc/manhattan |
 | Queens | https://boardstat.beta.nyc/queens |
 | Staten Island | https://boardstat.beta.nyc/statenisland |
+
+## Using the dashboard
+
+Choose a borough, then use the shared filters and numbered views to explore requests. The default is the last 30 days across that borough's permitted boards. Filters and the selected view are saved in the URL for sharing. **View data** opens a chart or map's table; **Reset filters** restores the defaults. If a request fails, use **Retry current view**. Any retained results are marked as stale.
 
 ## File an Issue 
 We're tracking all issues via this [repo's issue cue](https://github.com/BetaNYC/BoardStat/issues).
@@ -33,7 +35,29 @@ In the meantime, you can browse our training materials.
  * [Training Videos](https://) - In development
  
 ## Data
-BoardStat is ingesting [NYC 311 Service Requests from 2010 to Present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-Present/erm2-nwe9) dataset directly from the city’s open data portal. Data is filtered by the Community Board column.
+
+BoardStat queries NYC Open Data's [2010–2019](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-2019/76ig-c548/about_data) and [2020–present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9/about_data) 311 datasets, filtered by borough and Community Board. Dates from January 1, 2010 through today are supported. Ranges crossing 2020 query both datasets and merge their results. Responses are cached for five minutes, with no background polling.
+
+The request table and default map show the newest matching records, not every request or a representative sample. The map shows up to 250 requests per dataset; hotspot mode shows up to 100 locations. Address and hotspot rankings spanning both datasets are labeled as leading candidates because each dataset is ranked separately before merging. Totals and low-cardinality aggregates are exact. BoardStat uses the source's borough and board labels without independently geocoding them.
+
+## Development
+
+No build step is needed. Run `python3 -m http.server 8000` and open `http://localhost:8000/manhattan.html` (or another borough).
+
+```bash
+node --test tests/*.test.mjs
+node tests/live-api-validation.mjs  # optional; queries NYC Open Data
+```
+
+See [validation](VALIDATION.md), [accessibility](ACCESSIBILITY.md), and [deployment](DEPLOYMENT.md) for checks and known limitations. Production is served from `gh-pages`.
+
+Third-party libraries, maps, and fonts are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Production analytics receive a canonical page name without dashboard filters or a referrer; previews send no analytics. NYC Open Data receives the filters needed for queries. See [SECURITY.md](SECURITY.md) for details.
+
+## AI assistance and human verification
+
+OpenAI Codex assisted with code, tests, debugging, documentation, and automated browser checks, using public repository content, documentation, and NYC 311 data. AI is not used at runtime and does not alter the displayed records or statistics.
+
+**Human verification status:** in progress. A contributor walkthrough is recorded; independent review is pending. See the [validation record](VALIDATION.md) and [BetaNYC's AI Policy](https://beta.nyc/about/ai-policy).
 
 # Change Log
 

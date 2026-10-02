@@ -1,0 +1,94 @@
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -100px;
+  z-index: 10000;
+  padding: 1rem;
+  background: white;
+  color: #050560;
+}
+
+body {
+  min-width: 320px;
+}
+
+.skip-link:focus {
+  top: 1rem;
+  color: #050560;
+  background: white;
+}
+
+:focus-visible {
+  outline: 3px dashed #103fef;
+  outline-offset: 3px;
+}
+
+.mode-control legend {
+  background: white;
+  color: #1a1a1a;
+}
+
+.dashboard-shell table th, .prototype-container table th {
+  color: white;
+  background: #333;
+}
+
+.borough-map-scroll {
+  max-width: 100%;
+  overflow: auto;
+}
+
+.chart-data, .map-data {
+  margin-top: 1rem;
+  width: 100%;
+}
+
+.chart-data summary, .map-data summary {
+  cursor: pointer;
+  padding: .75rem;
+  color: #050560;
+  font-weight: bold;
+}
+
+.chart-data table {
+  min-width: 0;
+}
+
+.chart-wrap canvas {
+  max-width: 100%;
+}
+
+.chart-data th, .chart-data td {
+  white-space: nowrap;
+}
+
+.map-data button {
+  min-height: 44px;
+  min-width: 44px;
+  margin: .25rem;
+}
+
+.request-marker-shell,
+.marker-cluster {
+  display: grid;
+  place-items: center;
+}
+
+.marker-cluster {
+  color: #050560;
+  background: #b5dbff;
+  border: 2px solid #050560;
+}
+
+.leaflet-control-attribution {
+  background: white !important;
+  color: #1a1a1a;
+}
+
+.leaflet-control-attribution a {
+  color: #050560;
+}
+
+.leaflet-interactive:focus {
+  outline: 3px dashed #050560;
+}

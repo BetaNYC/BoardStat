@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <!-- Required meta tags -->
     <meta charset="utf-8" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://code.jquery.com/jquery-3.7.1.min.js https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js; style-src 'self' 'unsafe-inline' https://unpkg.com https://use.fontawesome.com; font-src 'self' https://use.fontawesome.com data:; img-src 'self' data: blob: https://beta.nyc https://*.arcgis.com https://*.arcgisonline.com https://*.openstreetmap.org; connect-src 'self' https://data.cityofnewyork.us https://*.arcgis.com https://*.arcgisonline.com https://*.openstreetmap.org; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
@@ -12,22 +14,10 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
     <title>NYC BoardStat Home</title>
+    <link rel="icon" href="./images/BetaNYC_short_white_on_blue.png" />
 
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <!-- Google tag (gtag.js) -->
-    <script
-      async
-      src="https://www.googletagmanager.com/gtag/js?id=G-TJ936HGY1Z"
-    ></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag("js", new Date());
-
-      gtag("config", "G-TJ936HGY1Z");
-    </script>
+    <!-- Existing aggregate page analytics; dashboard filters stay local. -->
+    <script defer src="./js/analytics.js?v=20260910-security-1"></script>
 
     <!-- Font Awesome -->
     <link
@@ -39,17 +29,10 @@
 
     <!-- NYC Theme CSS -->
     <link rel="stylesheet" href="./css/theme.css" />
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag("js", new Date());
-
-      gtag("config", "UA-58265408-6");
-    </script>
+    <link rel="stylesheet" href="./css/accessibility.css?v=20260910-1" />
   </head>
   <body style="margin: 0px; padding: 0px">
+    <a class="skip-link" href="#main-content">Skip to content</a>
     <header id="global-header" role="banner">
       <div id="nyc-top-header">
         <div class="container-fluid wide">
@@ -64,7 +47,7 @@
             <!-- .col -->
             <div class="col-auto">
               <p class="d-none d-md-flex">
-                <strong>As of 2025, Boardstat's 311 data can no longer be refreshed. We are working to deliver a new version of Boardstat in 2026.</strong>
+                <strong>BoardStat now queries live NYC 311 data directly from NYC Open Data.</strong>
               </p>
             </div>
 
@@ -100,7 +83,7 @@
               >
                 <a class="align-self-center" href="https://beta.nyc/">
                   <img
-                    src="https://beta.nyc/wp-content/uploads/Sticker_BetaNYC_long_transp_back1-e1545958875486.png"
+                    src="https://beta.nyc/wp-content/uploads/Sticker_BetaNYC_long_transp_back1-e1545958875486.png" alt="BetaNYC"
                   />
                 </a>
               </div>
@@ -124,7 +107,7 @@
                       aria-expanded="false"
                       aria-label="Toggle navigation"
                     >
-                      <span class="fas fa-bars fa-lg" role="img"></span>
+                      <span class="fas fa-bars fa-lg" aria-hidden="true"></span>
                     </button>
                   </li>
                 </ul>
@@ -134,9 +117,6 @@
                     <a
                       class="nav-link"
                       href="https://boardstat.beta.nyc"
-                      id="nav-item-01"
-                      aria-haspopup="true"
-                      aria-expanded="false"
                     >
                       <strong><u>BoardStat Home</u></strong></a
                     >
@@ -144,9 +124,6 @@
                     <a
                       class="nav-link"
                       href="https://boardstat.beta.nyc/bronx"
-                      id="nav-item-01"
-                      aria-haspopup="true"
-                      aria-expanded="false"
                     >
                       The Bronx</a
                     >
@@ -154,9 +131,6 @@
                     <a
                       class="nav-link"
                       href="https://boardstat.beta.nyc/brooklyn"
-                      id="nav-item-01"
-                      aria-haspopup="true"
-                      aria-expanded="false"
                     >
                       Brooklyn</a
                     >
@@ -164,9 +138,6 @@
                     <a
                       class="nav-link"
                       href="https://boardstat.beta.nyc/manhattan"
-                      id="nav-item-01"
-                      aria-haspopup="true"
-                      aria-expanded="false"
                     >
                       Manhattan</a
                     >
@@ -174,9 +145,6 @@
                     <a
                       class="nav-link"
                       href="https://boardstat.beta.nyc/queens"
-                      id="nav-item-01"
-                      aria-haspopup="true"
-                      aria-expanded="false"
                     >
                       Queens</a
                     >
@@ -184,9 +152,6 @@
                     <a
                       class="nav-link"
                       href="https://boardstat.beta.nyc/statenisland"
-                      id="nav-item-01"
-                      aria-haspopup="true"
-                      aria-expanded="false"
                     >
                       Staten Island</a
                     >
@@ -206,9 +171,9 @@
       <!-- .wrap-header -->
     </header>
 
-    <section class="py-5">
+    <main id="main-content" tabindex="-1" class="py-5">
       <div class="container">
-        <h2>BoardStat</h2>
+        <h1>BoardStat</h1>
 
         <div class="row my-3">
           <div class="col-md mb-2 mb-md-0">
@@ -227,16 +192,14 @@
               managers, board members, CUNY Service Corps, Microsoft Civic, and
               BetaNYC, we have developed a number of data dashboards that to
               provide a variety of summaries, graphs, and maps of NYC 311
-              service request data. This tool pulls directly from NYC’s open
-              data portal and turns the city’s open data into a decision making
-              tool.
+              service request data. These dashboards query NYC Open Data directly.
             </p>
           </div>
           <!-- .col -->
 
           <div class="col-md mb-2 mb-md-0">
-            <img
-              src="./images/map.png"
+            <div class="borough-map-scroll" role="region" aria-label="Borough map" tabindex="0"><img
+              src="./images/map.png" alt="New York City boroughs. Choose a borough using the links below."
               style="
                 width: 500px !important;
                 height: 500px !important;
@@ -250,45 +213,46 @@
                 shape="rect"
                 coords="214,0,336,114"
                 href="https://boardstat.beta.nyc/bronx"
-                title="The Bronx"
+                title="The Bronx" alt="The Bronx"
               />
               <area
                 shape="rect"
                 coords="214,214,321,357"
                 href="https://boardstat.beta.nyc/brooklyn"
-                title="Brooklyn"
+                title="Brooklyn" alt="Brooklyn"
               />
               <area
                 shape="rect"
                 coords="179,50,214,245"
                 href="https://boardstat.beta.nyc/manhattan"
-                title="Manhattan"
+                title="Manhattan" alt="Manhattan"
               />
               <area
                 shape="rect"
                 coords="214,114,421,214"
                 href="https://boardstat.beta.nyc/queens"
-                title="Queens"
+                title="Queens" alt="Queens"
               />
               <area
                 shape="rect"
                 coords="57,300,200,500"
                 href="https://boardstat.beta.nyc/statenisland"
-                title="Staten Island"
+                title="Staten Island" alt="Staten Island"
               />
-            </map>
+            </map></div>
+            <nav aria-label="Choose a borough"><ul><li><a href="./bronx.html">The Bronx</a></li><li><a href="./brooklyn.html">Brooklyn</a></li><li><a href="./manhattan.html">Manhattan</a></li><li><a href="./queens.html">Queens</a></li><li><a href="./statenisland.html">Staten Island</a></li></ul></nav>
           </div>
           <!-- .col -->
         </div>
         <!-- .row -->
       </div>
       <!-- .container -->
-    </section>
+    </main>
 
     <!-- jQuery (full, compressed version) -->
     <script
-      src="https://code.jquery.com/jquery-3.3.1.min.js"
-      integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+      src="https://code.jquery.com/jquery-3.7.1.min.js"
+      integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
       crossorigin="anonymous"
     ></script>
 
