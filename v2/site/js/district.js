@@ -1,7 +1,7 @@
 // District page: every query runs in DuckDB-WASM over ONE district's Parquet file.
 import {
   PLOT_URL, loadManifest, renderDataStatus, registerData, query, lit, el, table, chartWithTable,
-  setStatus, fmtInt, fmtDays, fmtPct, fmtDate, monthLabel,
+  setStatus, fmtInt, fmtDays, fmtPct, fmtDate, fmtDateTime, monthLabel,
 } from './lib.js';
 import { makeMap, addBoundaries, featureBounds } from './map.js';
 
@@ -12,6 +12,15 @@ const BLUE = '#2359a8';
 const GRAY = '#949494';
 const DARK = '#414141';
 const STATUS_COLORS = [BLUE, '#B8D6FF', DARK, GRAY, '#EEF4FF', '#F1F1F1'];
+// Status shortcut: every status other than Closed (including a missing status).
+const NOT_CLOSED = 'not_closed';
+const NOT_CLOSED_SQL = `status IS DISTINCT FROM 'Closed'`;
+// A missing descriptor is shown and filtered as "(none)", as in the descriptor table.
+const DESC_SQL = `coalesce(descriptor, '(none)')`;
+// Time to close counts only requests marked Closed. days_to_close is already NULL
+// when there is no close date or the close date is impossible (see README decision 5);
+// this also drops the few not-Closed requests that carry a close date.
+const CLOSED_DAYS = `CASE WHEN status = 'Closed' THEN days_to_close END`;
 
 const params = new URLSearchParams(window.location.search);
 const geo = params.get('geo') === 'cc' ? 'cc' : 'cd';
@@ -23,6 +32,7 @@ let page = 0;
 let total = 0;
 let mapCtx = null;
 let selectedType = null;
+let asOfSql = null; // build time as an NYC-local TIMESTAMP literal; "days open" is measured to it
 
 // ------------------------------------------------------------- state <-> URL
 
@@ -31,6 +41,8 @@ function readState() {
     start: params.get('start') || manifest.window.start,
     end: params.get('end') || manifest.window.end,
     types: (params.get('type') || '').split('|').filter(Boolean),
+    descs: (params.get('desc') || '').split('|').filter(Boolean),
+    descEx: params.get('descx') === '1',
     agency: params.get('agency') || '',
     status: params.get('status') || '',
     addr: params.get('addr') || '',
@@ -42,20 +54,23 @@ function writeUrl() {
   if (state.start !== manifest.window.start) p.set('start', state.start);
   if (state.end !== manifest.window.end) p.set('end', state.end);
   if (state.types.length) p.set('type', state.types.join('|'));
+  if (state.descs.length) p.set('desc', state.descs.join('|'));
+  if (state.descs.length && state.descEx) p.set('descx', '1');
   if (state.agency) p.set('agency', state.agency);
   if (state.status) p.set('status', state.status);
   if (state.addr) p.set('addr', state.addr);
   history.replaceState(null, '', `?${p.toString()}`);
 }
 
-function where({ skipType = false, skipDates = false } = {}) {
+function where({ skipType = false, skipDates = false, skipDesc = false, skipStatus = false } = {}) {
   const w = skipDates ? ['TRUE'] : [
     `created_date >= CAST(${lit(state.start)} AS DATE)`,
     `created_date < CAST(${lit(state.end)} AS DATE) + INTERVAL 1 DAY`,
   ];
   if (!skipType && state.types.length) w.push(`complaint_type IN (${state.types.map(lit).join(', ')})`);
   if (state.agency) w.push(`agency = ${lit(state.agency)}`);
-  if (state.status) w.push(`status = ${lit(state.status)}`);
+  if (!skipDesc && state.descs.length) w.push(`${DESC_SQL} ${state.descEx ? 'NOT IN' : 'IN'} (${state.descs.map(lit).join(', ')})`);
+  if (!skipStatus && state.status) w.push(state.status === NOT_CLOSED ? NOT_CLOSED_SQL : `status = ${lit(state.status)}`);
   if (state.addr) w.push(`address_norm = ${lit(state.addr)}`);
   return w.join(' AND ');
 }
@@ -66,8 +81,43 @@ let allTypes = [];
 function renderChips() {
   $('type-chips').replaceChildren(...state.types.map((t) => el('li', {},
     el('button', { type: 'button', 'aria-label': `Remove problem filter ${t}`, onclick: () => { state.types = state.types.filter((x) => x !== t); refresh(); } }, `${t} ×`))));
+  $('desc-chips').classList.toggle('exclude', state.descEx);
+  $('desc-chips').setAttribute('aria-label', state.descEx ? 'Excluded descriptions' : 'Selected descriptions');
+  $('desc-chips').replaceChildren(...state.descs.map((d) => el('li', {},
+    el('button', { type: 'button', 'aria-label': `Remove description filter ${d}`, onclick: () => { state.descs = state.descs.filter((x) => x !== d); refresh(); } },
+      `${state.descEx ? 'Not: ' : ''}${d} ×`))));
   $('addr-filter').hidden = !state.addr;
   $('addr-value').textContent = state.addr;
+}
+
+/** Put the form controls back in line with `state` (after a reset or a shortcut button). */
+function syncForm() {
+  $('f-start').value = state.start;
+  $('f-end').value = state.end;
+  $('f-agency').value = state.agency;
+  $('f-status').value = state.status;
+  $('f-desc-ex').checked = state.descEx;
+}
+
+let allDescs = [];
+let descOptionsKey = null;
+/** The Description list offers only descriptors of the selected problems (all if none). */
+async function updateDescOptions() {
+  const key = state.types.join('|');
+  if (key === descOptionsKey) return;
+  descOptionsKey = key;
+  const rows = await query(`
+    SELECT ${DESC_SQL} AS d, count(*) AS n FROM req
+    ${state.types.length ? `WHERE complaint_type IN (${state.types.map(lit).join(', ')})` : ''}
+    GROUP BY 1 ORDER BY 2 DESC, 1`);
+  allDescs = rows.map((r) => r.d);
+  $('desc-options').replaceChildren(...allDescs.map((d) => el('option', { value: d })));
+}
+
+function addDesc(d) {
+  const match = allDescs.find((x) => x.toLowerCase() === String(d).trim().toLowerCase());
+  if (match && !state.descs.includes(match)) { state.descs = [...state.descs, match]; refresh(); }
+  $('f-desc').value = '';
 }
 
 function addType(t) {
@@ -89,8 +139,8 @@ async function setupFilters() {
   for (const r of await query(`SELECT status, count(*) AS n FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY 2 DESC`)) {
     $('f-status').append(el('option', { value: r.status, text: r.status }));
   }
-  $('f-agency').value = state.agency;
-  $('f-status').value = state.status;
+  if (state.status && ![...$('f-status').options].some((o) => o.value === state.status)) state.status = '';
+  syncForm();
 
   $('f-start').addEventListener('change', (e) => { if (e.target.value) { state.start = e.target.value; refresh(); } });
   $('f-end').addEventListener('change', (e) => { if (e.target.value) { state.end = e.target.value; refresh(); } });
@@ -98,10 +148,12 @@ async function setupFilters() {
   $('f-status').addEventListener('change', (e) => { state.status = e.target.value; refresh(); });
   $('f-type').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addType(e.target.value); } });
   $('f-type').addEventListener('change', (e) => { if (allTypes.includes(e.target.value)) addType(e.target.value); });
+  $('f-desc').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addDesc(e.target.value); } });
+  $('f-desc').addEventListener('change', (e) => { if (allDescs.includes(e.target.value)) addDesc(e.target.value); });
+  $('f-desc-ex').addEventListener('change', (e) => { state.descEx = e.target.checked; refresh(); });
   $('addr-clear').addEventListener('click', () => { state.addr = ''; refresh(); });
   $('reset').addEventListener('click', () => {
-    state = { start, end, types: [], agency: '', status: '', addr: '' };
-    $('f-start').value = start; $('f-end').value = end; $('f-agency').value = ''; $('f-status').value = '';
+    state = { start, end, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' };
     refresh();
   });
   $('print').addEventListener('click', () => window.print());
@@ -115,7 +167,8 @@ function describeFiltersForPrint() {
   const parts = [`Requests created ${fmtDate(state.start)} to ${fmtDate(state.end)}`];
   if (state.types.length) parts.push(`problems: ${state.types.join(', ')}`);
   if (state.agency) parts.push(`agency: ${state.agency}`);
-  if (state.status) parts.push(`status: ${state.status}`);
+  if (state.descs.length) parts.push(`${state.descEx ? 'excluding descriptions' : 'descriptions'}: ${state.descs.join(', ')}`);
+  if (state.status) parts.push(`status: ${state.status === NOT_CLOSED ? 'not yet closed' : state.status}`);
   if (state.addr) parts.push(`address: ${state.addr}`);
   $('print-filters').textContent = `${parts.join('; ')}. Printed ${fmtDate(new Date())} from BoardStat 2.0 (prototype).`;
 }
@@ -126,7 +179,7 @@ async function renderKpis() {
   const [k] = await query(`
     SELECT count(*)::INTEGER AS n,
            count(*) FILTER (WHERE status IS DISTINCT FROM 'Closed')::INTEGER AS open_n,
-           median(days_to_close) AS med, avg(days_to_close) AS avg
+           median(${CLOSED_DAYS}) AS med, avg(${CLOSED_DAYS}) AS avg
     FROM req WHERE ${where()}`);
   total = k.n;
   const items = [
@@ -140,7 +193,7 @@ async function renderKpis() {
 
 async function renderTop() {
   const rows = await query(`
-    SELECT complaint_type AS t, count(*)::INTEGER AS n, median(days_to_close) AS med
+    SELECT complaint_type AS t, count(*)::INTEGER AS n, median(${CLOSED_DAYS}) AS med
     FROM req WHERE ${where()} GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10`);
   const max = Math.max(1, ...rows.map((r) => r.n));
   if (!rows.length) { $('top').replaceChildren(el('p', { text: 'No requests match these filters.' })); return; }
@@ -159,12 +212,22 @@ async function renderTop() {
 
 async function renderDescriptors() {
   if (!selectedType) { $('descriptors').replaceChildren(); return; }
+  // The description filter is left off here so every description stays visible and selectable.
   const rows = await query(`
-    SELECT coalesce(descriptor, '(none)') AS d, count(*)::INTEGER AS n
-    FROM req WHERE ${where()} AND complaint_type = ${lit(selectedType)} GROUP BY 1 ORDER BY 2 DESC LIMIT 15`);
+    SELECT ${DESC_SQL} AS d, count(*)::INTEGER AS n
+    FROM req WHERE ${where({ skipDesc: true })} AND complaint_type = ${lit(selectedType)} GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 15`);
+  const verb = state.descEx ? 'Exclude' : 'Add';
   $('descriptors').replaceChildren(
     el('h3', { text: `What people described: ${selectedType}` }),
-    table(rows, [{ key: 'd', label: 'Description (descriptor)' }, { key: 'n', label: 'Requests', num: true, fmt: fmtInt }]),
+    table(rows, [
+      {
+        key: 'd', label: 'Description (descriptor)',
+        render: (r) => (state.descs.includes(r.d)
+          ? el('span', {}, r.d, el('span', { class: 'muted', text: state.descEx ? ' (excluded)' : ' (in the filter)' }))
+          : el('button', { type: 'button', class: 'link', 'aria-label': `${verb} description ${r.d} ${state.descEx ? 'from' : 'to'} the filter`, onclick: () => { state.descs = [...state.descs, r.d]; refresh(); } }, r.d)),
+      },
+      { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
+    ], `Select a description to ${state.descEx ? 'exclude it' : 'add it to the filter'}. The description filter does not narrow this table.`),
     ...(state.types.includes(selectedType) ? []
       : [el('p', {}, el('button', { type: 'button', class: 'secondary', onclick: () => { state.types = [...state.types, selectedType]; refresh(); } }, `Filter the page to ${selectedType}`))]),
   );
@@ -215,6 +278,85 @@ async function renderMonthly() {
     const through = manifest.window.last_created ? fmtDate(manifest.window.last_created.replace(' ', 'T')) : fmtDate(manifest.window.end);
     $('monthly').append(el('p', { class: 'muted', text: `The last month is partial: the newest request in the data is from ${through}. Its year-earlier value covers the selected dates one year earlier, so it can include days the current month does not have yet.` }));
   }
+}
+
+const fmtDayNum = (v) => (v == null ? '–' : v.toFixed(1));
+
+async function renderAgencyResponse() {
+  const rows = await query(`
+    SELECT agency, any_value(agency_name) AS agency_name, count(*)::INTEGER AS n,
+           count(*) FILTER (WHERE ${NOT_CLOSED_SQL})::INTEGER AS open_n,
+           count(*) FILTER (WHERE status = 'Closed')::INTEGER AS closed_n,
+           median(${CLOSED_DAYS}) AS med, avg(${CLOSED_DAYS}) AS avg
+    FROM req WHERE ${where()} GROUP BY 1 ORDER BY 3 DESC, 1`);
+  if (!rows.length) { $('agency-resp').replaceChildren(el('p', { text: 'No requests match these filters.' })); return; }
+  $('agency-resp').replaceChildren(table(rows, [
+    {
+      key: 'agency', label: 'Agency',
+      render: (r) => el('span', {},
+        el('button', {
+          type: 'button', class: 'link', 'aria-pressed': String(state.agency === r.agency),
+          'aria-label': state.agency === r.agency ? `Stop filtering to ${r.agency}` : `Filter the page to ${r.agency}`,
+          onclick: () => { state.agency = state.agency === r.agency ? '' : r.agency; refresh(); },
+        }, r.agency),
+        r.agency_name ? el('span', { class: 'muted', text: ` ${r.agency_name}` }) : null),
+    },
+    { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
+    { key: 'open_n', label: 'Not yet closed', num: true, fmt: fmtInt },
+    { key: 'closed_n', label: 'Closed', num: true, fmt: fmtInt },
+    { key: 'med', label: 'Median days to close (closed only)', num: true, fmt: fmtDayNum },
+    { key: 'avg', label: 'Average days to close (closed only)', num: true, fmt: fmtDayNum },
+  ], 'Requests and time to close, by agency'));
+}
+
+function dayBefore(iso) {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Show the requests created before the From date that are still not closed. */
+function showBacklog(agency) {
+  const before = state.start;
+  state.end = dayBefore(before);
+  state.start = manifest.window.start;
+  state.status = NOT_CLOSED;
+  if (agency) state.agency = agency;
+  refresh();
+  $('filters-h').scrollIntoView({ block: 'start' });
+}
+
+async function renderBacklog() {
+  const first = manifest.window.start;
+  if (state.start <= first) {
+    $('backlog').replaceChildren(el('p', {
+      text: `The data starts on ${fmtDate(first)}, the same day as the From date, so there is nothing earlier to show. Move the From date later to see older requests that are still open.`,
+    }));
+    return;
+  }
+  // Every filter except From/To and Status applies.
+  const rows = await query(`
+    SELECT agency, any_value(agency_name) AS agency_name, count(*)::INTEGER AS n,
+           strftime(min(created_date), '%Y-%m-%d') AS oldest
+    FROM req WHERE ${where({ skipDates: true, skipStatus: true })}
+      AND created_date < CAST(${lit(state.start)} AS DATE) AND ${NOT_CLOSED_SQL}
+    GROUP BY 1 ORDER BY 3 DESC, 1`);
+  const n = rows.reduce((a, r) => a + r.n, 0);
+  const lead = `${fmtInt(n)} ${n === 1 ? 'request' : 'requests'} created between ${fmtDate(first)} (when the data starts) and ${fmtDate(dayBefore(state.start))} ${n === 1 ? 'was' : 'were'} still not closed when this data was built. Problem, description, agency and address filters apply.`;
+  if (!n) { $('backlog').replaceChildren(el('p', { text: lead })); return; }
+  $('backlog').replaceChildren(
+    el('p', {}, lead, ' ', el('button', { type: 'button', class: 'secondary no-print', onclick: () => showBacklog() }, 'Show these requests')),
+    table(rows, [
+      {
+        key: 'agency', label: 'Agency',
+        render: (r) => el('span', {},
+          el('button', { type: 'button', class: 'link', 'aria-label': `Show the ${fmtInt(r.n)} older requests for ${r.agency} that are still open`, onclick: () => showBacklog(r.agency) }, r.agency),
+          r.agency_name ? el('span', { class: 'muted', text: ` ${r.agency_name}` }) : null),
+      },
+      { key: 'n', label: 'Still not closed', num: true, fmt: fmtInt },
+      { key: 'oldest', label: 'Oldest created', fmt: (v) => fmtDate(v) },
+    ], 'Older requests still open, by agency'),
+  );
 }
 
 async function renderAgency() {
@@ -299,14 +441,17 @@ async function renderDetail() {
   const rows = await query(`
     SELECT strftime(created_date, '%Y-%m-%d %H:%M') AS created, complaint_type AS t, descriptor AS d, status AS s, agency AS a,
            coalesce(incident_address, intersection_street_1 || ' & ' || intersection_street_2) AS addr,
-           strftime(closed_date, '%Y-%m-%d') AS closed, days_to_close AS dtc, unique_key AS k
+           strftime(closed_date, '%Y-%m-%d') AS closed, ${CLOSED_DAYS} AS dtc,
+           CASE WHEN ${NOT_CLOSED_SQL} THEN greatest(0, epoch(${asOfSql}) - epoch(created_date)) / 86400.0 END AS dopen,
+           unique_key AS k
     FROM req WHERE ${where()} ORDER BY created_date DESC, unique_key LIMIT ${PAGE} OFFSET ${page * PAGE}`);
   $('detail').replaceChildren(table(rows, [
     { key: 'created', label: 'Created' }, { key: 't', label: 'Problem' }, { key: 'd', label: 'Description' },
     { key: 's', label: 'Status' }, { key: 'a', label: 'Agency' }, { key: 'addr', label: 'Address' },
     { key: 'closed', label: 'Closed' }, { key: 'dtc', label: 'Days to close', num: true, fmt: (v) => (v == null ? '' : v.toFixed(1)) },
+    { key: 'dopen', label: 'Days open (not closed)', num: true, fmt: (v) => (v == null ? '' : v.toFixed(1)) },
     { key: 'k', label: '311 number' },
-  ], 'Newest first'));
+  ], `Newest first. Days open are counted to when this data was built, ${fmtDateTime(manifest.generated_at)}.`));
   const from = total ? page * PAGE + 1 : 0;
   $('page-label').textContent = `Showing ${fmtInt(from)}–${fmtInt(Math.min(total, (page + 1) * PAGE))} of ${fmtInt(total)}`;
   $('prev').disabled = page === 0;
@@ -408,7 +553,8 @@ function renderAbout() {
       el('li', {}, `How often our district matches the city's own fields: council district ${fmtPct(a.council.share)} of ${fmtInt(a.council.compared)} requests; community district ${fmtPct(a.community_district.share)} of ${fmtInt(a.community_district.compared)}.` +
         ' Small differences are expected where a request sits near a boundary line. For requests made before the 2023 redistricting (not in this window yet), the city\'s council field uses the old lines, so the gap will grow once older years are added.'),
       el('li', {}, `Problem names are grouped regardless of capitalization (for example PLUMBING and Plumbing). ${manifest.complaint_types.unreviewed} of ${manifest.complaint_types.groups} groupings have not yet been reviewed by a person.`),
-      el('li', {}, `Time to close is measured from when a request was created to when it was closed. Requests closed before they were opened (${fmtInt(c.closed_before_created)} citywide) or with a close date in the future (${fmtInt(c.closed_in_future)}) are left out of those numbers.`),
+      el('li', {}, `Time to close (days to close) is the close date minus the created date, in days. It counts only requests marked Closed. Requests with no close date, closed before they were opened (${fmtInt(c.closed_before_created)} citywide) or with a close date in the future (${fmtInt(c.closed_in_future)}) are left out, and so are the few requests that carry a close date but whose status is not Closed.`),
+      el('li', {}, `"Not yet closed" means any status other than Closed (for example Open, In Progress, Assigned). Days open are counted from when a request was created to when this data was built (${fmtDateTime(manifest.generated_at)}), not to today.`),
       el('li', {}, '311 counts reflect who reports problems and how, not only how many problems exist. A higher count can mean more engaged neighbors, not a worse block.'),
     ),
   );
@@ -420,19 +566,31 @@ let refreshSeq = 0;
 async function refresh() {
   const seq = ++refreshSeq;
   writeUrl();
+  syncForm();
   renderChips();
   describeFiltersForPrint();
   page = 0;
   setStatus($('status'), 'Updating…');
   try {
+    await updateDescOptions();
     await renderKpis();
     if (seq !== refreshSeq) return;
-    await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgency(), renderAddresses(), renderCompare(), renderDetail(), renderMap()]);
+    await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgencyResponse(), renderAgency(), renderBacklog(), renderAddresses(), renderCompare(), renderDetail(), renderMap()]);
     if (seq === refreshSeq) setStatus($('status'), `${fmtInt(total)} requests match.`);
   } catch (err) {
     console.error(err);
     setStatus($('status'), `Something went wrong: ${err.message}`);
   }
+}
+
+/** An instant as NYC local "floating" time, matching how 311 timestamps are stored (README decision 14). */
+function nycLocal(iso) {
+  const f = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  });
+  const p = Object.fromEntries(f.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
 }
 
 async function main() {
@@ -452,6 +610,7 @@ async function main() {
   document.title = `${district.label} · BoardStat 2.0 (prototype)`;
   $('title').textContent = district.label;
   renderDataStatus(manifest, $('as-of'), $('stale'));
+  asOfSql = `CAST(${lit(nycLocal(manifest.generated_at))} AS TIMESTAMP)`;
   const b = geo === 'cd' ? manifest.sources.community_districts : manifest.sources.council_districts;
   $('boundary-note').textContent = `Boundary: ${geo === 'cd' ? 'Community District' : 'City Council District'} lines, Department of City Planning release ${b.version || 'unknown'}.` +
     (district.jia ? ' This is a Joint Interest Area (a park or other area outside every community district), not a community district.' : '');

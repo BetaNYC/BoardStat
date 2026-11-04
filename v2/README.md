@@ -38,6 +38,10 @@ internal reports, in Noel's private vault).
    DuckDB-WASM ── queries ONE district's Parquet file in the browser
    MapLibre GL ── self-hosted Protomaps street map, district boundaries, clustered points
    Observable Plot ── monthly line, agency × status, compare chart
+   Page features: filters (dates, problem, description with exclude, agency, status
+   incl. "not yet closed", address) in the URL; at-a-glance numbers; top problems
+   and descriptions; monthly chart; agency responsiveness table; older requests
+   still open; map; top addresses; compare; request list with days open; CSV; print
 ```
 
 ## How to run
@@ -185,10 +189,40 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 14. **Timestamps are NYC local "floating" time** as published; "now" for
     future-date checks is computed in America/New_York.
 
+15. **Board-report features (2026-11-04).** Three additions on the district page,
+    from what v1 users did by hand:
+    - **Description filter** (the 311 `descriptor` field), multi-select with an
+      "exclude these" toggle, kept in the URL (`desc=a|b`, `descx=1`) and applied
+      to every panel, the map, the request list and the CSV. Its list offers only
+      descriptions of the selected problems (all if none). A missing descriptor
+      is shown and filtered as `(none)`. Selecting a row in the "What people
+      described" table adds it. The table itself ignores the description filter
+      so every option stays visible. `descriptor_2` (a sub-description on about
+      half of all rows) is not filtered; it is in the CSV.
+    - **Agency responsiveness table**: every agency in the filtered set with
+      requests, not yet closed, closed, and median and average days to close.
+      Selecting an agency toggles the agency filter. It prints; the agency ×
+      status chart still does not.
+    - **Not yet closed**: a Status shortcut (`status=not_closed`, every status
+      other than Closed, including a missing one); a "Days open" column in the
+      request list, counted to the build time in `manifest.json` (as NYC local
+      time), not the browser clock; and a "Still open from before this period"
+      panel: requests created before the From date that are still not closed,
+      by agency, with buttons that set the filters to show them. It carries a
+      note that older months' statuses can lag (decision 6).
+16. **"Closed" means `status = 'Closed'` everywhere.** Median and average time to
+    close (headline, top problems, agency table) count only requests marked
+    Closed with a usable `days_to_close`. Some requests carry a close date while
+    their status is still Open, Assigned or In Progress (254 of 58,636 in
+    Brooklyn CD 6, 0.4%; not measured citywide); they count as not yet closed and are left out of
+    time to close, so the "Closed" count and the time-to-close numbers describe
+    the same requests. Before this change the headline median included them.
+
 ## Known limits
 
 - Prototype quality: no automated browser tests; verified by hand in Chromium
-  (Playwright) on 2026-11-04.
+  (Playwright) on 2026-11-04, including the description, agency-responsiveness
+  and still-open features (counts cross-checked against DuckDB in Python).
 - Data is a snapshot. A stale banner appears when the build is more than 48
   hours old; there is no scheduled job yet.
 - Detail files for the busiest districts are the largest downloads; on slow

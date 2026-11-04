@@ -158,3 +158,8 @@ footer.site { border-top: 1px solid var(--bnyc-border-gray); padding: 1rem 1.25r
   h2 { font-size: 13pt; }
   figure svg { max-height: 2.6in; }
 }
+
+/* Toggle-style link buttons (agency table) and description chips in exclude mode. */
+button.link[aria-pressed="true"] { font-weight: 700; text-decoration-thickness: 2px; }
+.chips.exclude button { background: var(--bnyc-white); border-style: dashed; }
+.filters .choice { margin-top: 0.35rem; }
