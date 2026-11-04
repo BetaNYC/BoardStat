@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BoardStat 2.0 (prototype)</title>
+  <meta name="description" content="311 service requests for every NYC community district and council district. A BetaNYC prototype.">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site">
+    <a class="brand" href="./">BoardStat 2.0</a><span class="tag">prototype</span>
+  </header>
+
+  <main id="main">
+    <h1>BoardStat 2.0 (prototype)</h1>
+    <p class="lede">See what New Yorkers report to 311 in your community district or council district: the most common problems, how long the city takes to close them, and where they happen.</p>
+    <p class="muted" id="as-of">Loading data status…</p>
+    <div class="banner warn" id="stale" role="status" hidden></div>
+
+    <form id="chooser" class="panel" novalidate>
+      <fieldset>
+        <legend>Step 1: What kind of district?</legend>
+        <label class="choice"><input type="radio" name="geo" value="cd" checked> Community district</label>
+        <label class="choice"><input type="radio" name="geo" value="cc"> Council district</label>
+        <p class="muted" id="cc-note" hidden>Council districts use the current lines (Department of City Planning release <span class="bver">26c</span>). Requests made before the 2023 redistricting are re-mapped to today's lines by their location, so totals may differ from the city's own <code>council_district</code> field.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Step 2: Pick your district</legend>
+        <div class="grid">
+          <div>
+            <h2>From a list</h2>
+            <label for="district-select">District</label>
+            <select id="district-select" required></select>
+            <p><button type="submit">Show this district</button></p>
+          </div>
+          <div>
+            <h2>By an address in 311 data</h2>
+            <label for="addr">Street address</label>
+            <input type="search" id="addr" autocomplete="off" placeholder="e.g. 350 5 AVENUE" aria-describedby="addr-help">
+            <p class="muted" id="addr-help">This is not a geocoder. It only finds addresses that already appear in 311 requests in this data, spelled the way the city records them (for example <code>5 AVENUE</code>, not <code>Fifth Ave</code>).</p>
+            <p class="status" id="addr-status" role="status" aria-live="polite"></p>
+            <ul class="results" id="addr-results"></ul>
+          </div>
+        </div>
+      </fieldset>
+    </form>
+
+    <section class="panel" aria-labelledby="map-h">
+      <h2 id="map-h">Or click the map</h2>
+      <div id="map" class="map" role="region" aria-label="Map of district boundaries. Clicking a district opens it. The list above offers the same choices."></div>
+      <p class="map-note">The map shows district boundaries only. Basemap: decision pending (options: OpenFreeMap or self-hosted Protomaps PMTiles).</p>
+    </section>
+
+    <section class="panel" aria-labelledby="about-h">
+      <h2 id="about-h">About this prototype</h2>
+      <p>Data comes from <a href="https://data.cityofnewyork.us/d/erm2-nwe9">311 Service Requests from 2020 to Present</a> on NYC Open Data, with district boundaries from the Department of City Planning (<a href="https://data.cityofnewyork.us/d/5crt-au7u">Community Districts</a>, <a href="https://data.cityofnewyork.us/d/872g-cjhh">City Council Districts</a>). Everything runs in your browser; nothing you type is sent anywhere.</p>
+      <p>311 counts reflect who reports problems and how, not only how many problems exist.</p>
+    </section>
+  </main>
+
+  <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. The original BoardStat lives at <a href="https://boardstat.beta.nyc">boardstat.beta.nyc</a>.</footer>
+
+  <script type="module" src="js/index.js"></script>
+</body>
+</html>
