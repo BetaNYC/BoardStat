@@ -195,7 +195,7 @@ async function renderMonthly() {
     ariaDescription: 'Line chart of requests per month for the filtered requests' + (hasPrior ? ', with the same month a year earlier where available.' : '.'),
     height: 260,
     marginLeft: 56,
-    x: { type: 'utc', label: null, ticks: 'month', tickFormat: '%b %Y' },
+    x: { type: 'utc', label: null, ticks: 6, tickFormat: '%b %Y' },
     y: { label: 'Requests', grid: true, tickFormat: '~s' },
     color: { domain: ['This period', 'Same month a year earlier'], range: [BLUE, GRAY], legend: hasPrior },
     marks: [
@@ -212,7 +212,8 @@ async function renderMonthly() {
   const end = new Date(`${manifest.window.end}T12:00:00`);
   const endIsMonthEnd = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate() === end.getDate();
   if (!endIsMonthEnd && rows.length && rows[rows.length - 1].ym === manifest.window.end.slice(0, 7)) {
-    $('monthly').append(el('p', { class: 'muted', text: `The last month is partial (through ${fmtDate(manifest.window.end)}).` }));
+    const through = manifest.window.last_created ? fmtDate(manifest.window.last_created.replace(' ', 'T')) : fmtDate(manifest.window.end);
+    $('monthly').append(el('p', { class: 'muted', text: `The last month is partial: the newest request in the data is from ${through}. Its year-earlier value covers the selected dates one year earlier, so it can include days the current month does not have yet.` }));
   }
 }
 
@@ -405,7 +406,7 @@ function renderAbout() {
       el('li', {}, `${fmtInt(c.without_coords)} of ${fmtInt(c.total)} requests citywide (${fmtPct(c.without_coords / c.total)}) have no usable location, so they are not in any district page.` +
         (unloc ? ` The city's own records assign ${fmtInt(unloc)} of those to this community district.` : '')),
       el('li', {}, `How often our district matches the city's own fields: council district ${fmtPct(a.council.share)} of ${fmtInt(a.council.compared)} requests; community district ${fmtPct(a.community_district.share)} of ${fmtInt(a.community_district.compared)}.` +
-        ' Older requests carry pre-2023 council lines in the city\'s field, which explains most council mismatches.'),
+        ' Small differences are expected where a request sits near a boundary line. For requests made before the 2023 redistricting (not in this window yet), the city\'s council field uses the old lines, so the gap will grow once older years are added.'),
       el('li', {}, `Problem names are grouped regardless of capitalization (for example PLUMBING and Plumbing). ${manifest.complaint_types.unreviewed} of ${manifest.complaint_types.groups} groupings have not yet been reviewed by a person.`),
       el('li', {}, `Time to close is measured from when a request was created to when it was closed. Requests closed before they were opened (${fmtInt(c.closed_before_created)} citywide) or with a close date in the future (${fmtInt(c.closed_in_future)}) are left out of those numbers.`),
       el('li', {}, '311 counts reflect who reports problems and how, not only how many problems exist. A higher count can mean more engaged neighbors, not a worse block.'),

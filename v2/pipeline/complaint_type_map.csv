@@ -1,0 +1,195 @@
+type_key,display,reviewed,raw_variants
+abandoned bike,Abandoned Bike,false,Abandoned Bike
+abandoned vehicle,Abandoned Vehicle,false,Abandoned Vehicle
+ahv inspection unit,AHV Inspection Unit,false,AHV Inspection Unit
+air quality,Air Quality,false,Air Quality
+animal facility - no permit,Animal Facility - No Permit,false,Animal Facility - No Permit
+animal in a park,Animal in a Park,false,Animal in a Park
+animal-abuse,Animal-Abuse,false,Animal-Abuse
+appliance,APPLIANCE,false,APPLIANCE
+asbestos,Asbestos,false,Asbestos
+beach/pool/sauna complaint,Beach/Pool/Sauna Complaint,false,Beach/Pool/Sauna Complaint
+bench,Bench,false,Bench
+best/site safety,BEST/Site Safety,false,BEST/Site Safety
+bike rack,Bike Rack,false,Bike Rack
+bike/roller/skate,Bike/Roller/Skate,false,Bike/Roller/Skate
+bike/roller/skate chronic,Bike/Roller/Skate Chronic,false,Bike/Roller/Skate Chronic
+blocked driveway,Blocked Driveway,false,Blocked Driveway
+boilers,Boilers,false,Boilers
+borough office,Borough Office,false,Borough Office
+bridge condition,Bridge Condition,false,Bridge Condition
+broken parking meter,Broken Parking Meter,false,Broken Parking Meter
+building condition,Building Condition,false,Building Condition
+building drinking water tank,Building Drinking Water Tank,false,Building Drinking Water Tank
+building marshal's office,Building Marshal's Office,false,Building Marshal's Office
+building marshals office,Building Marshals office,false,Building Marshals office
+building/use,Building/Use,false,Building/Use
+bus stop shelter complaint,Bus Stop Shelter Complaint,false,Bus Stop Shelter Complaint
+bus stop shelter placement,Bus Stop Shelter Placement,false,Bus Stop Shelter Placement
+calorie labeling,Calorie Labeling,false,Calorie Labeling
+cannabis retailer,Cannabis Retailer,false,Cannabis Retailer
+commercial disposal complaint,Commercial Disposal Complaint,false,Commercial Disposal Complaint
+construction lead dust,Construction Lead Dust,false,Construction Lead Dust
+construction safety enforcement,Construction Safety Enforcement,false,Construction Safety Enforcement
+consumer complaint,Consumer Complaint,false,Consumer Complaint
+cooling tower,Cooling Tower,false,Cooling Tower
+cranes and derricks,Cranes and Derricks,false,Cranes and Derricks
+curb condition,Curb Condition,false,Curb Condition
+damaged tree,Damaged Tree,false,Damaged Tree
+day care,Day Care,false,Day Care
+dead animal,Dead Animal,false,Dead Animal
+dead/dying tree,Dead/Dying Tree,false,Dead/Dying Tree
+dep highway condition,DEP Highway Condition,false,DEP Highway Condition
+dep sidewalk condition,DEP Sidewalk Condition,false,DEP Sidewalk Condition
+dep street condition,DEP Street Condition,false,DEP Street Condition
+dept of investigations,Dept of Investigations,false,Dept of Investigations
+derelict vehicles,Derelict Vehicles,false,Derelict Vehicles
+dirty condition,Dirty Condition,false,Dirty Condition
+disorderly youth,Disorderly Youth,false,Disorderly Youth
+door/window,DOOR/WINDOW,false,DOOR/WINDOW
+drinking,Drinking,false,Drinking
+drinking water,Drinking Water,false,Drinking Water
+drug activity,Drug Activity,false,Drug Activity
+dry weather discharge,Dry Weather Discharge,false,Dry Weather Discharge
+dsny internal,DSNY Internal,false,DSNY Internal
+dumpster complaint,Dumpster Complaint,false,Dumpster Complaint
+e-scooter,E-Scooter,false,E-Scooter
+electric,ELECTRIC,false,ELECTRIC
+electrical,Electrical,false,Electrical
+elevator,Elevator,false,ELEVATOR|Elevator
+emergency response team (ert),Emergency Response Team (ERT),false,Emergency Response Team (ERT)
+encampment,Encampment,false,Encampment
+ferry complaint,Ferry Complaint,false,Ferry Complaint
+ferry inquiry,Ferry Inquiry,false,Ferry Inquiry
+fhv licensee complaint,FHV Licensee Complaint,false,FHV Licensee Complaint
+flooring/stairs,FLOORING/STAIRS,false,FLOORING/STAIRS
+food establishment,Food Establishment,false,Food Establishment
+food poisoning,Food Poisoning,false,Food Poisoning
+for hire vehicle complaint,For Hire Vehicle Complaint,false,For Hire Vehicle Complaint
+for hire vehicle report,For Hire Vehicle Report,false,For Hire Vehicle Report
+found property,Found Property,false,Found Property
+general,GENERAL,false,GENERAL
+general construction/plumbing,General Construction/Plumbing,false,General Construction/Plumbing
+graffiti,Graffiti,false,Graffiti
+green infrastructure,Green Infrastructure,false,Green Infrastructure
+green taxi complaint,Green Taxi Complaint,false,Green Taxi Complaint
+green taxi report,Green Taxi Report,false,Green Taxi Report
+harboring bees/wasps,Harboring Bees/Wasps,false,Harboring Bees/Wasps
+hazardous material,Hazardous Material,false,Hazardous Material
+hazardous materials,Hazardous Materials,false,Hazardous Materials
+heat/hot water,HEAT/HOT WATER,false,HEAT/HOT WATER
+highway condition,Highway Condition,false,Highway Condition
+highway sign - damaged,Highway Sign - Damaged,false,Highway Sign - Damaged
+highway sign - dangling,Highway Sign - Dangling,false,Highway Sign - Dangling
+highway sign - missing,Highway Sign - Missing,false,Highway Sign - Missing
+homeless person assistance,Homeless Person Assistance,false,Homeless Person Assistance
+illegal animal kept as pet,Illegal Animal Kept as Pet,false,Illegal Animal Kept as Pet
+illegal animal sold,Illegal Animal Sold,false,Illegal Animal Sold
+illegal dumping,Illegal Dumping,false,Illegal Dumping
+illegal fireworks,Illegal Fireworks,false,Illegal Fireworks
+illegal parking,Illegal Parking,false,Illegal Parking
+illegal posting,Illegal Posting,false,Illegal Posting
+illegal tree damage,Illegal Tree Damage,false,Illegal Tree Damage
+incorrect data,Incorrect Data,false,Incorrect Data
+indoor air quality,Indoor Air Quality,false,Indoor Air Quality
+indoor sewage,Indoor Sewage,false,Indoor Sewage
+industrial waste,Industrial Waste,false,Industrial Waste
+institution disposal complaint,Institution Disposal Complaint,false,Institution Disposal Complaint
+investigations and discipline (iad),Investigations and Discipline (IAD),false,Investigations and Discipline (IAD)
+lead,Lead,false,Lead
+leaning bar,Leaning Bar,false,Leaning Bar
+lifeguard,Lifeguard,false,Lifeguard
+linknyc,LinkNYC,false,LinkNYC
+litter basket complaint,Litter Basket Complaint,false,Litter Basket Complaint
+litter basket request,Litter Basket Request,false,Litter Basket Request
+lost property,Lost Property,false,Lost Property
+lot condition,Lot Condition,false,Lot Condition
+maintenance or facility,Maintenance or Facility,false,Maintenance or Facility
+missed collection,Missed Collection,false,Missed Collection
+mobile food vendor,Mobile Food Vendor,false,Mobile Food Vendor
+mold,Mold,false,Mold
+mosquitoes,Mosquitoes,false,Mosquitoes
+municipal parking facility,Municipal Parking Facility,false,Municipal Parking Facility
+new tree request,New Tree Request,false,New Tree Request
+noise,Noise,false,Noise
+noise - commercial,Noise - Commercial,false,Noise - Commercial
+noise - helicopter,Noise - Helicopter,false,Noise - Helicopter
+noise - house of worship,Noise - House of Worship,false,Noise - House of Worship
+noise - park,Noise - Park,false,Noise - Park
+noise - residential,Noise - Residential,false,Noise - Residential
+noise - street/sidewalk,Noise - Street/Sidewalk,false,Noise - Street/Sidewalk
+noise - vehicle,Noise - Vehicle,false,Noise - Vehicle
+non-emergency police matter,Non-Emergency Police Matter,false,Non-Emergency Police Matter
+non-residential heat,Non-Residential Heat,false,Non-Residential Heat
+obstruction,Obstruction,false,Obstruction
+oil or gas spill,Oil or Gas Spill,false,Oil or Gas Spill
+outdoor dining,Outdoor Dining,false,Outdoor Dining
+outside building,OUTSIDE BUILDING,false,OUTSIDE BUILDING
+overgrown tree/branches,Overgrown Tree/Branches,false,Overgrown Tree/Branches
+paint/plaster,PAINT/PLASTER,false,PAINT/PLASTER
+panhandling,Panhandling,false,Panhandling
+pet sale,Pet Sale,false,Pet Sale
+plant,Plant,false,Plant
+plumbing,Plumbing,false,PLUMBING|Plumbing
+poison ivy,Poison Ivy,false,Poison Ivy
+posting advertisement,Posting Advertisement,false,Posting Advertisement
+public payphone complaint,Public Payphone Complaint,false,Public Payphone Complaint
+public toilet,Public Toilet,false,Public Toilet
+radioactive material,Radioactive Material,false,Radioactive Material
+real time enforcement,Real Time Enforcement,false,Real Time Enforcement
+recycling basket complaint,Recycling Basket Complaint,false,Recycling Basket Complaint
+residential disposal complaint,Residential Disposal Complaint,false,Residential Disposal Complaint
+rodent,Rodent,false,Rodent
+root/sewer/sidewalk condition,Root/Sewer/Sidewalk Condition,false,Root/Sewer/Sidewalk Condition
+safety,Safety,false,SAFETY|Safety
+sanitation worker or vehicle complaint,Sanitation Worker or Vehicle Complaint,false,Sanitation Worker or Vehicle Complaint
+scaffold safety,Scaffold Safety,false,Scaffold Safety
+school maintenance,School Maintenance,false,School Maintenance
+sewer,Sewer,false,Sewer
+sewer maintenance,Sewer Maintenance,false,Sewer Maintenance
+sidewalk condition,Sidewalk Condition,false,Sidewalk Condition
+smoking or vaping,Smoking or Vaping,false,Smoking or Vaping
+snow or ice,Snow or Ice,false,Snow or Ice
+snw,SNW,false,SNW
+special natural area district (snad),Special Natural Area District (SNAD),false,Special Natural Area District (SNAD)
+special operations,Special Operations,false,Special Operations
+special projects inspection team (spit),Special Projects Inspection Team (SPIT),false,Special Projects Inspection Team (SPIT)
+squeegee,Squeegee,false,Squeegee
+standing water,Standing Water,false,Standing Water
+street condition,Street Condition,false,Street Condition
+street light condition,Street Light Condition,false,Street Light Condition
+street sign - damaged,Street Sign - Damaged,false,Street Sign - Damaged
+street sign - dangling,Street Sign - Dangling,false,Street Sign - Dangling
+street sign - missing,Street Sign - Missing,false,Street Sign - Missing
+street sweeping complaint,Street Sweeping Complaint,false,Street Sweeping Complaint
+tanning,Tanning,false,Tanning
+tattooing,Tattooing,false,Tattooing
+taxi complaint,Taxi Complaint,false,Taxi Complaint
+taxi compliment,Taxi Compliment,false,Taxi Compliment
+taxi licensee complaint,Taxi Licensee Complaint,false,Taxi Licensee Complaint
+taxi report,Taxi Report,false,Taxi Report
+tobacco or non-tobacco sale,Tobacco or Non-Tobacco Sale,false,Tobacco or Non-Tobacco Sale
+traffic,Traffic,false,Traffic
+traffic signal condition,Traffic Signal Condition,false,Traffic Signal Condition
+transfer station complaint,Transfer Station Complaint,false,Transfer Station Complaint
+trapping pigeon,Trapping Pigeon,false,Trapping Pigeon
+tunnel condition,Tunnel Condition,false,Tunnel Condition
+unleashed dog,Unleashed Dog,false,Unleashed Dog
+unsanitary animal facility,Unsanitary Animal Facility,false,Unsanitary Animal Facility
+unsanitary animal pvt property,Unsanitary Animal Pvt Property,false,Unsanitary Animal Pvt Property
+unsanitary condition,UNSANITARY CONDITION,false,UNSANITARY CONDITION
+unsanitary pigeon condition,Unsanitary Pigeon Condition,false,Unsanitary Pigeon Condition
+uprooted stump,Uprooted Stump,false,Uprooted Stump
+urinating in public,Urinating in Public,false,Urinating in Public
+vendor enforcement,Vendor Enforcement,false,Vendor Enforcement
+violation of park rules,Violation of Park Rules,false,Violation of Park Rules
+waste water treatment plant,Waste Water Treatment Plant,false,Waste Water Treatment Plant
+water conservation,Water Conservation,false,Water Conservation
+water leak,WATER LEAK,false,WATER LEAK
+water maintenance,Water Maintenance,false,Water Maintenance
+water quality,Water Quality,false,Water Quality
+water system,Water System,false,Water System
+wayfinding,Wayfinding,false,Wayfinding
+window guard,Window Guard,false,Window Guard
+wood pile remaining,Wood Pile Remaining,false,Wood Pile Remaining
+x-ray machine/equipment,X-Ray Machine/Equipment,false,X-Ray Machine/Equipment

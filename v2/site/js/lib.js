@@ -88,7 +88,8 @@ export function renderDataStatus(manifest, asOfEl, staleEl) {
   asOfEl.textContent =
     `Data as of ${fmtDateTime(gen)} (built from NYC Open Data` +
     (portal ? `, portal last updated ${fmtDateTime(portal)}` : '') +
-    `). Requests created ${fmtDate(manifest.window.start)} to ${fmtDate(manifest.window.end)}.`;
+    `). Requests created ${fmtDate(manifest.window.start)} to ${fmtDate(manifest.window.end)}` +
+    (manifest.window.last_created ? `; the newest request in the data was created ${fmtDateTime(manifest.window.last_created.replace(' ', 'T'))}, because the city publishes 311 data with a delay of a day or more.` : '.');
   const age = hoursSince(manifest.generated_at);
   if (staleEl && age > STALE_HOURS) {
     staleEl.hidden = false;
