@@ -4,13 +4,17 @@
 //   @duckdb/duckdb-wasm 1.32.0 (MIT)        https://duckdb.org/docs/2.0/clients/wasm/instantiation
 //   maplibre-gl 6.16.0 (BSD-3-Clause)      https://maplibre.org/maplibre-gl-js/docs/
 //   @observablehq/plot 0.6.18 (ISC)        https://observablehq.com/plot/getting-started
+//   pmtiles 4.5.0 (BSD-3-Clause)           https://docs.protomaps.com/pmtiles/maplibre
+//   @protomaps/basemaps 5.7.2 (BSD-3-Clause) https://docs.protomaps.com/basemaps/maplibre
 // jsDelivr's "/+esm" endpoint serves an npm package as an ES module
 // (https://www.jsdelivr.com/documentation#id-esm); Plot's own docs use it.
 
-export const VERSIONS = { duckdb: '1.32.0', maplibre: '6.16.0', plot: '0.6.18' };
+export const VERSIONS = { duckdb: '1.32.0', maplibre: '6.16.0', plot: '0.6.18', pmtiles: '4.5.0', basemaps: '5.7.2' };
 export const DUCKDB_URL = `https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@${VERSIONS.duckdb}/+esm`;
 export const MAPLIBRE_URL = `https://cdn.jsdelivr.net/npm/maplibre-gl@${VERSIONS.maplibre}/dist/maplibre-gl.mjs`;
 export const PLOT_URL = `https://cdn.jsdelivr.net/npm/@observablehq/plot@${VERSIONS.plot}/+esm`;
+export const PMTILES_URL = `https://cdn.jsdelivr.net/npm/pmtiles@${VERSIONS.pmtiles}/+esm`;
+export const BASEMAPS_URL = `https://cdn.jsdelivr.net/npm/@protomaps/basemaps@${VERSIONS.basemaps}/+esm`;
 
 export const STALE_HOURS = 48;
 

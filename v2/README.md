@@ -36,7 +36,7 @@ internal reports, in Noel's private vault).
                 ▼
  v2/site/  index.html + district.html (ES modules, no build step)
    DuckDB-WASM ── queries ONE district's Parquet file in the browser
-   MapLibre GL ── district boundaries as the base layer, clustered points
+   MapLibre GL ── self-hosted Protomaps street map, district boundaries, clustered points
    Observable Plot ── monthly line, agency × status, compare chart
 ```
 
@@ -54,8 +54,14 @@ uv run v2/pipeline/boardstat_build.py --out v2/site/data
 #   e.g. --start 2025-11-01 --end 2026-11-04
 #   --refresh-all ignores the download cache
 
-python3 -m http.server -d v2/site 8000
-#   then open http://localhost:8000/
+bash v2/pipeline/basemap_build.sh
+#   street map: cuts NYC out of a Protomaps daily build into v2/site/data/basemap/
+#   (about 240 MB; needs the pmtiles CLI: brew install pmtiles). Optional: without
+#   it the map shows district outlines on a blank background.
+
+python3 v2/serve.py
+#   then open http://localhost:8000/   (add --bind 0.0.0.0 to reach it from other devices)
+#   Use this, not `python3 -m http.server`: the street map needs HTTP range requests.
 ```
 
 Tests (offline except for the one-time DuckDB spatial extension download):
@@ -144,16 +150,22 @@ Run on office-mac, 2026-11-04, with an app token, default window.
    refetched after 12 hours because statuses and close dates keep changing.
    Consequence: statuses on older cached months can lag until `--refresh-all`.
 7. **One Parquet file per district, loaded whole into DuckDB-WASM.** Each is a
-   few MB (zstd). The browser never touches citywide detail. Python's
-   `http.server` does not support HTTP range requests; DuckDB-WASM falls back to
-   reading the whole file, which is fine at this size.
+   few MB (zstd). The browser never touches citywide detail. `v2/serve.py`
+   answers HTTP range requests (the street map needs them); any real static host
+   does too.
 8. **Address lookup is a list of addresses that already appear in 311 data,**
    sorted so a prefix search can skip row groups. It is labeled as not a
    geocoder. No Geoclient / Geosupport call is made.
-9. **No third-party basemap.** District boundaries are the base layer and the
-   map style has no symbol layers, so no glyph/font server is needed either
-   (cluster sizes show by circle size; counts are in the tables). Basemap
-   decision is pending: OpenFreeMap or self-hosted Protomaps PMTiles.
+9. **Self-hosted Protomaps street map.** `pipeline/basemap_build.sh` extracts
+   NYC plus a margin from a [Protomaps daily build](https://docs.protomaps.com/guide/getting-started)
+   (OpenStreetMap data, ODbL) into one `nyc.pmtiles` file, and copies the
+   Noto Sans glyphs (SIL OFL) and v4 sprites from
+   [protomaps/basemaps-assets](https://github.com/protomaps/basemaps-assets).
+   The style is `@protomaps/basemaps` in the `grayscale` flavor, so district
+   colors and request dots stand out. Nothing basemap-related is fetched from
+   anyone else at runtime. District shapes sit under the street labels. If
+   `data/basemap/` is missing, the map falls back to outlines on blank.
+   Refresh the extract a few times a year.
 10. **Comparisons are located-only and whole-month.** `agg/month_type.parquet`
     counts only requests with a district, so district, borough and city shares
     use the same population. The Compare panel ignores problem/agency/status
@@ -162,7 +174,8 @@ Run on office-mac, 2026-11-04, with an app token, default window.
     most of that district's requests fall (some cross borough lines).
 12. **Pinned CDN versions:** `@duckdb/duckdb-wasm@1.32.0` (the newest
     non-prerelease; npm's `latest` tag currently points at a `-dev` build),
-    `maplibre-gl@6.16.0` (ESM-only), `@observablehq/plot@0.6.18`. The pipeline
+    `maplibre-gl@6.16.0` (ESM-only), `@observablehq/plot@0.6.18`,
+    `pmtiles@4.5.0`, `@protomaps/basemaps@5.7.2`. The pipeline
     uses `duckdb>=2.0,<3`; Parquet written by DuckDB 2.0 read fine in
     DuckDB-WASM 1.32.0 in testing.
 13. **Fonts:** brand fonts (Poppins, Roboto) are used only if installed
@@ -198,7 +211,6 @@ Run on office-mac, 2026-11-04, with an app token, default window.
   months' statuses).
 - **Hosting:** Cloudflare R2 + Pages, or GitHub Pages for the site with data on
   object storage (range requests would then let DuckDB-WASM read partial files).
-- **Basemap decision:** OpenFreeMap or self-hosted Protomaps PMTiles.
 - **License decision:** this repository has **no LICENSE file**. One was not
   added on purpose; Noel must choose the license (code and data outputs may
   want different ones).
@@ -215,5 +227,10 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 | [@duckdb/duckdb-wasm](https://github.com/duckdb/duckdb-wasm) | 1.32.0 | MIT | In-browser queries |
 | [maplibre-gl](https://maplibre.org) | 6.16.0 | BSD-3-Clause | Map |
 | [@observablehq/plot](https://observablehq.com/plot/) | 0.6.18 | ISC | Charts (pulls in D3, ISC) |
+| [pmtiles](https://docs.protomaps.com/pmtiles/) | 4.5.0 (JS), CLI 1.31.2 | BSD-3-Clause | Reading / extracting the street map file |
+| [@protomaps/basemaps](https://docs.protomaps.com/basemaps/maplibre) | 5.7.2 | BSD-3-Clause | Street map style |
+| [basemaps-assets](https://github.com/protomaps/basemaps-assets) | main | Noto Sans: SIL OFL 1.1 | Map labels' fonts and icons |
+
+Street map data: © OpenStreetMap contributors (ODbL), via Protomaps; credited in the map's attribution.
 
 Data: NYC Open Data (data.cityofnewyork.us), subject to the portal's terms of use. The exact terms page was not reachable from the build machine (HTTP 403), so it is not linked here; confirm it before publishing.
