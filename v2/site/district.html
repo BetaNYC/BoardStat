@@ -87,12 +87,15 @@
     <section class="panel no-print" aria-labelledby="detail-h">
       <h2 id="detail-h">Every request</h2>
       <p><button type="button" id="download">Download CSV</button> <span class="muted">Downloads exactly the requests that match the filters above.</span></p>
-      <div id="detail"></div>
-      <div class="pager">
-        <button type="button" class="secondary" id="prev">Previous 50</button>
-        <span id="page-label" aria-live="polite"></span>
-        <button type="button" class="secondary" id="next">Next 50</button>
-      </div>
+      <details class="as-table" id="detail-wrap">
+        <summary>Show the list of requests</summary>
+        <div id="detail"></div>
+        <div class="pager">
+          <button type="button" class="secondary" id="prev">Previous 50</button>
+          <span id="page-label" aria-live="polite"></span>
+          <button type="button" class="secondary" id="next">Next 50</button>
+        </div>
+      </details>
     </section>
 
     <section class="panel" aria-labelledby="about-h">
