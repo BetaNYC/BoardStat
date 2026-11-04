@@ -1,0 +1,20 @@
+[project]
+name = "boardstat-pipeline"
+version = "0.1.0"
+description = "BoardStat 2.0 prototype: builds per-district 311 Parquet files for a static site."
+requires-python = ">=3.11,<3.16"
+dependencies = [
+    "duckdb>=2.0,<3",
+    "requests>=2.32,<3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<10",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

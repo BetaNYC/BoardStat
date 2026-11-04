@@ -1,0 +1,9 @@
+# Generated data: never commit raw or bulk outputs.
+pipeline/.cache/
+pipeline/.venv/
+site/data/*
+!site/data/.gitkeep
+!site/data/README.md
+__pycache__/
+.pytest_cache/
+.ruff_cache/
