@@ -698,7 +698,8 @@ function renderAbout() {
 /** Address page: the ZIP code and the two districts the address is in, with links. */
 async function renderAddressLinks() {
   const [a] = await query(`
-    SELECT mode(incident_zip) AS zip, mode(cd) AS cd, mode(cc) AS cc, mode(borough) AS boro FROM req WHERE address_norm = ${lit(state.addr)}`);
+    SELECT mode(incident_zip) AS zip, mode(cd) AS cd, mode(cc) AS cc, mode(borough) AS boro,
+           median(longitude) AS lng, median(latitude) AS lat FROM req WHERE address_norm = ${lit(state.addr)}`);
   const link = (g, id) => {
     const d = manifest.districts[g]?.find((x) => String(x.id) === String(id));
     return el('a', { href: `district.html?geo=${g}&id=${encodeURIComponent(id)}` }, d ? d.label : `${g.toUpperCase()} ${id}`);
@@ -709,10 +710,12 @@ async function renderAddressLinks() {
   if (a?.cc != null) parts.push(link('cc', a.cc));
   const out = [];
   parts.forEach((p, i) => { if (i) out.push(' · '); out.push(p); });
-  // Cross-reference: BetaNYC's Boundaries Map shows the political and administrative
-  // boundary around this address (it takes "ADDRESS, Borough, ZIP").
   const boro = a?.boro && a.boro !== 'Unspecified' ? a.boro.charAt(0) + a.boro.slice(1).toLowerCase().replace(/ (\w)/g, (m, c) => ` ${c.toUpperCase()}`) : null;
+  // Cross-reference: BetaNYC's Boundaries Map (github.com/BetaNYC/nyc-boundaries) lists the
+  // political and administrative districts at a point. On load it reads lng/lat (not addr),
+  // so the link carries the middle of this address's 311 locations; addr is kept as a label.
   const bq = new URLSearchParams({ addr: [state.addr, boro, a?.zip].filter(Boolean).join(', ') });
+  if (a?.lng != null && a?.lat != null) { bq.set('lng', a.lng.toFixed(6)); bq.set('lat', a.lat.toFixed(6)); }
   const bLink = el('a', { href: `https://boundaries.beta.nyc/?${bq}`, target: '_blank', rel: 'noopener' }, 'See the boundaries around this address on the BetaNYC Boundaries Map');
   $('addr-links').replaceChildren(...(out.length ? ['In ', ...out, '. Select a district to see all of it.'] : []));
   $('addr-links').after(el('p', { class: 'no-print' }, bLink, el('span', { class: 'muted', text: ' (political and administrative districts, opens in a new tab)' })));
