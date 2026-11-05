@@ -68,12 +68,37 @@ function wireMap() {
 
 let addrReady = null;
 let addrTimer = null;
+// Common street-type abbreviations, expanded only as the last word ("ST MARKS PLACE" keeps ST).
+const SUFFIXES = {
+  AVE: 'AVENUE', AV: 'AVENUE', ST: 'STREET', STR: 'STREET', RD: 'ROAD', BLVD: 'BOULEVARD', PL: 'PLACE',
+  DR: 'DRIVE', PKWY: 'PARKWAY', LN: 'LANE', CT: 'COURT', TER: 'TERRACE', TERR: 'TERRACE', HWY: 'HIGHWAY',
+  EXPY: 'EXPRESSWAY', SQ: 'SQUARE', PLZ: 'PLAZA', CIR: 'CIRCLE', TPKE: 'TURNPIKE', BLV: 'BOULEVARD',
+};
+const DIRECTIONS = { E: 'EAST', W: 'WEST', N: 'NORTH', S: 'SOUTH' };
+
+/**
+ * Turn what people type into the city's spelling: "114 Nassau Ave, Brooklyn, NY 11222"
+ * becomes { street: "114 NASSAU AVENUE", zip: "11222" }. Ordinals lose their ending
+ * (5th → 5), and E/W/N/S right after the house number are spelled out.
+ */
 function normalizeAddress(s) {
-  return s.trim().toUpperCase().replace(/\s+/g, ' ');
+  let t = s.toUpperCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
+  const zip = (t.match(/\b(\d{5})(?:-\d{4})?\s*$/) || [])[1] || null;
+  t = t.split(',')[0].trim();
+  if (zip) t = t.replace(new RegExp(`\\s*${zip}(?:-\\d{4})?$`), '').trim();
+  const words = t.split(' ').filter(Boolean).map((w) => w.replace(/^(\d+)(ST|ND|RD|TH)$/, '$1'));
+  if (words.length > 2 && /^\d/.test(words[0]) && DIRECTIONS[words[1]]) words[1] = DIRECTIONS[words[1]];
+  // Only a finished word is expanded (one followed by a space or ending a comma-cut address),
+  // so typing "114 NASSAU AV" still prefix-matches while the user is mid-word.
+  const finished = s.includes(',') || /\s$/.test(s) || zip;
+  const last = words.length - 1;
+  if (last > 0 && finished && SUFFIXES[words[last]]) words[last] = SUFFIXES[words[last]];
+  else if (last > 0 && SUFFIXES[words[last]] && words[last].length > 2) words[last] = SUFFIXES[words[last]];
+  return { street: words.join(' '), zip };
 }
 
 async function searchAddress() {
-  const q = normalizeAddress(addrInput.value);
+  const { street: q, zip } = normalizeAddress(addrInput.value);
   addrResults.replaceChildren();
   if (q.length < 4) { setStatus(addrStatus, q ? 'Type at least 4 characters.' : ''); return; }
   setStatus(addrStatus, 'Searching addresses in 311 data…');
@@ -82,7 +107,7 @@ async function searchAddress() {
   // The file is sorted by address, so a prefix range lets DuckDB skip row groups.
   const rows = await query(`
     SELECT address, zip, cd, cc, borough, n FROM 'addresses.parquet'
-    WHERE address >= ${lit(q)} AND address < ${lit(q + '￿')}
+    WHERE address >= ${lit(q)} AND address < ${lit(q + '￿')}${zip ? ` AND zip = ${lit(zip)}` : ''}
     ORDER BY n DESC LIMIT 15`);
   if (!rows.length) {
     setStatus(addrStatus, `No 311 request in this data uses an address starting with “${q}”. Try the city's spelling (for example 5 AVENUE, WEST 4 STREET) or pick from the list.`);
@@ -91,7 +116,8 @@ async function searchAddress() {
   setStatus(addrStatus, `${rows.length} matching address${rows.length === 1 ? '' : 'es'} found.`);
   for (const r of rows) {
     addrResults.append(el('li', {},
-      el('strong', { text: `${r.address}${r.zip ? ` (${r.zip})` : ''}` }), ` · ${fmtInt(r.n)} requests · `,
+      el('a', { class: 'addr-main', href: `address.html?geo=cd&id=${encodeURIComponent(r.cd)}&addr=${encodeURIComponent(r.address)}` },
+        `${r.address}${r.zip ? ` (${r.zip})` : ''}`), ` · ${fmtInt(r.n)} requests · in `,
       el('a', { href: districtUrl('cd', r.cd) + `&addr=${encodeURIComponent(r.address)}` }, districtLabel(manifest, 'cd', r.cd) || `CD ${r.cd}`),
       ' · ',
       el('a', { href: districtUrl('cc', r.cc) + `&addr=${encodeURIComponent(r.address)}` }, districtLabel(manifest, 'cc', r.cc) || `Council District ${r.cc}`),

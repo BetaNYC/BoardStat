@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Address · BoardStat 2.0 (prototype)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css?v=c78c82815c">
+  <!-- importmap:start -->
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=a2465b7f7d","./js/index.js":"./js/index.js?v=6ff395629b","./js/lib.js":"./js/lib.js?v=5b03d7e396","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <!-- importmap:end -->
+</head>
+<body data-mode="address">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site">
+    <a class="brand" href="./">BoardStat 2.0</a><span class="tag">prototype</span>
+    <nav class="site-nav" aria-label="Site"><a href="./">Districts</a> <a href="about.html">About</a> <a href="glossary.html">Glossary</a></nav>
+  </header>
+
+  <main id="main">
+    <p class="no-print"><a href="./#addr">← Search another address</a></p>
+    <h1 id="title">Loading address…</h1>
+    <p id="addr-links"></p>
+    <p class="muted" id="as-of"></p>
+    <p class="muted" id="boundary-note"></p>
+    <div class="banner warn" id="stale" role="status" hidden></div>
+    <div class="banner info" id="cc-banner" hidden>Council district view uses the current Department of City Planning lines (release <span class="bver"></span>). Older requests are re-mapped to today's lines by where they happened.</div>
+    <p class="print-only" id="print-filters"></p>
+
+    <form id="filters" class="panel no-print" aria-labelledby="filters-h">
+      <h2 id="filters-h">Filter requests</h2>
+      <div class="filters">
+        <div><label for="f-start">From</label><input type="date" id="f-start" name="start"></div>
+        <div><label for="f-end">To</label><input type="date" id="f-end" name="end"></div>
+        <div>
+          <label for="f-type">Problem (formerly Complaint Type)</label>
+          <input type="text" id="f-type" list="type-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="type-help">
+          <datalist id="type-options"></datalist>
+          <span class="sr-only" id="type-help">Choose one or more problems. Selected problems are listed below with remove buttons.</span>
+          <ul class="chips" id="type-chips" aria-label="Selected problems"></ul>
+        </div>
+        <div>
+          <label for="f-desc">Description (formerly Descriptor)</label>
+          <input type="text" id="f-desc" list="desc-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="desc-help">
+          <datalist id="desc-options"></datalist>
+          <span class="sr-only" id="desc-help">Lists the descriptions used for the selected problems, or for every problem if none is selected. Selected descriptions are listed below with remove buttons.</span>
+          <label class="choice" for="f-desc-ex"><input type="checkbox" id="f-desc-ex"> Exclude these descriptions</label>
+          <ul class="chips" id="desc-chips" aria-label="Selected descriptions"></ul>
+        </div>
+        <div><label for="f-agency">Agency</label><select id="f-agency" name="agency"><option value="">All agencies</option></select></div>
+        <div><label for="f-status">Status</label><select id="f-status" name="status"><option value="">Any status</option><option value="not_closed">Not yet closed (any status but Closed)</option></select></div>
+        <div id="addr-filter" hidden><span class="label">Address</span> <span id="addr-value"></span> <button type="button" class="link" id="addr-clear">Clear address</button></div>
+        <div><button type="button" class="secondary" id="reset">Reset filters</button> <button type="button" id="print">Print summary</button></div>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </form>
+
+    <section class="panel" aria-labelledby="kpi-h">
+      <h2 id="kpi-h">At a glance</h2>
+      <div class="kpis" id="kpis"></div>
+    </section>
+
+    <div class="grid">
+      <section class="panel" aria-labelledby="top-h">
+        <h2 id="top-h">Top 10 problems</h2>
+        <p class="muted no-print">Select a problem to see what people described.</p>
+        <div id="top"></div>
+        <div id="descriptors" class="no-print" aria-live="polite"></div>
+      </section>
+      <section class="panel" aria-labelledby="month-h">
+        <h2 id="month-h">Requests per month</h2>
+        <div id="monthly"></div>
+      </section>
+    </div>
+
+    <section class="panel" aria-labelledby="timeline-h">
+      <h2 id="timeline-h">Problems over time</h2>
+      <p class="muted">Requests at this address each month, split by problem. The five most common problems get their own color; the rest are grouped.</p>
+      <div id="timeline"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="agency-h">
+      <h2 id="agency-h">Agency responsiveness</h2>
+      <p class="muted">Every agency with requests that match the filters, most requests first. Days to close count only requests marked Closed that have a usable close date. <span class="no-print">Select an agency to filter the page to it.</span></p>
+      <div id="agency-resp"></div>
+      <div class="no-print">
+        <h3 id="agency-status-h">Requests by agency and status</h3>
+        <div id="agency"></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="backlog-h">
+      <h2 id="backlog-h">Still open from before this period</h2>
+      <div id="backlog"></div>
+      <p class="muted">Statuses of older months can lag: the build reuses its download of any month that ended more than 60 days ago, so some of these may have closed since.</p>
+    </section>
+
+    <section class="panel no-print" aria-labelledby="map-h">
+      <h2 id="map-h">Map of requests</h2>
+      <p class="muted">311 places each request where it was reported, so points for one address can sit a little apart.</p>
+      <div id="map" class="map" role="region" aria-label="Map of request locations, grouped into circles where many are close together. The tables on this page carry the same information."></div>
+      <p class="map-note" id="map-note">Circles group nearby requests; select one to zoom in, or select a single point for details.</p>
+    </section>
+
+     <section class="panel no-print" aria-labelledby="detail-h">
+      <h2 id="detail-h">Every request</h2>
+      <p><button type="button" id="download">Download CSV</button> <span class="muted">Downloads exactly the requests that match the filters above.</span></p>
+      <details class="as-table" id="detail-wrap" open>
+        <summary>Show the list of requests</summary>
+        <div id="detail"></div>
+        <div class="pager">
+          <button type="button" class="secondary" id="prev">Previous 50</button>
+          <span id="page-label" aria-live="polite"></span>
+          <button type="button" class="secondary" id="next">Next 50</button>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="about-h">
+      <h2 id="about-h">About this data</h2>
+      <div id="about"></div>
+    </section>
+  </main>
+
+  <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product.</footer>
+  <script type="module" src="js/district.js?v=a2465b7f7d"></script>
+</body>
+</html>

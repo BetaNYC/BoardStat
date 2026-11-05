@@ -12,6 +12,8 @@ const BLUE = '#2359a8';
 const GRAY = '#949494';
 const DARK = '#414141';
 const STATUS_COLORS = [BLUE, '#B8D6FF', DARK, GRAY, '#EEF4FF', '#F1F1F1'];
+// Problems over time (address page): six colors that stay visible as bar fills; the last is "Other".
+const PROBLEM_COLORS = [BLUE, '#7fa8e0', DARK, '#c27c0e', '#3f8f5b', '#c8c8c8'];
 // Status shortcut: every status other than Closed (including a missing status).
 const NOT_CLOSED = 'not_closed';
 const NOT_CLOSED_SQL = `status IS DISTINCT FROM 'Closed'`;
@@ -25,6 +27,9 @@ const CLOSED_DAYS = `CASE WHEN status = 'Closed' THEN days_to_close END`;
 const params = new URLSearchParams(window.location.search);
 const geo = params.get('geo') === 'cc' ? 'cc' : 'cd';
 const geoId = params.get('id');
+// address.html reuses this page for one address: the address filter is fixed,
+// and the district-wide panels (top addresses, compare) are left out.
+const ADDRESS_MODE = document.body.dataset.mode === 'address';
 
 let manifest, district, Plot;
 let state = {};
@@ -86,7 +91,7 @@ function renderChips() {
   $('desc-chips').replaceChildren(...state.descs.map((d) => el('li', {},
     el('button', { type: 'button', 'aria-label': `Remove description filter ${d}`, onclick: () => { state.descs = state.descs.filter((x) => x !== d); refresh(); } },
       `${state.descEx ? 'Not: ' : ''}${d} ×`))));
-  $('addr-filter').hidden = !state.addr;
+  $('addr-filter').hidden = ADDRESS_MODE || !state.addr;
   $('addr-value').textContent = state.addr;
 }
 
@@ -153,7 +158,7 @@ async function setupFilters() {
   $('f-desc-ex').addEventListener('change', (e) => { state.descEx = e.target.checked; refresh(); });
   $('addr-clear').addEventListener('click', () => { state.addr = ''; refresh(); });
   $('reset').addEventListener('click', () => {
-    state = { start, end, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' };
+    state = { start, end, types: [], descs: [], descEx: false, agency: '', status: '', addr: ADDRESS_MODE ? state.addr : '' };
     refresh();
   });
   $('print').addEventListener('click', () => window.print());
@@ -250,6 +255,9 @@ function partialSpan(ym, from, to) {
   return a === first && b === last ? null : [a, b];
 }
 
+/** Y-axis ticks for small counts: whole numbers only (no "0.5 requests"). */
+const countY = (max) => (max <= 8 ? { ticks: Array.from({ length: Math.max(1, max) + 1 }, (_, i) => i), tickFormat: 'd' } : { tickFormat: '~s' });
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 // Newest year first: strong blue, then lighter, so the newest year stands out.
 const YEAR_COLORS = [BLUE, '#6f9bd6', GRAY, '#c8c8c8'];
@@ -285,7 +293,7 @@ function yearChart(rows, title, spanText) {
     height: 280,
     marginLeft: 56,
     x: { type: 'point', domain: MONTHS, label: null },
-    y: { label: 'Requests', grid: true, tickFormat: '~s' },
+    y: { label: 'Requests', grid: true, ...countY(Math.max(...pts.map((d) => d.n))) },
     color: { type: 'ordinal', domain: years, range, legend: true },
     marks,
   });
@@ -305,8 +313,14 @@ async function renderMonthly() {
     ? `created_date <= CAST(${lit(lc)} AS TIMESTAMP) - INTERVAL 12 MONTH`
     : `created_date < CAST(${lit(effEnd)} AS DATE) + INTERVAL 1 DAY - INTERVAL 12 MONTH`;
   const rows = await query(`
-    WITH m AS (
+    WITH months AS (
+      -- Every month in the range, so a month with no requests shows as 0, not a gap.
+      SELECT strftime(d, '%Y-%m') AS ym FROM range(date_trunc('month', CAST(${lit(state.start)} AS DATE)),
+        CAST(${lit(effEnd)} AS DATE) + INTERVAL 1 DAY, INTERVAL 1 MONTH) AS t(d)
+    ), counts AS (
       SELECT year_month AS ym, count(*)::INTEGER AS n FROM req WHERE ${where()} GROUP BY 1
+    ), m AS (
+      SELECT ym, coalesce(n, 0)::INTEGER AS n FROM months LEFT JOIN counts USING (ym)
     ), prev_year AS (
       SELECT strftime(created_date + INTERVAL 12 MONTH, '%Y-%m') AS ym, count(*)::INTEGER AS n_prior
       FROM req WHERE ${where({ skipDates: true })}
@@ -348,7 +362,7 @@ async function renderMonthly() {
     height: 260,
     marginLeft: 56,
     x: { type: 'utc', label: null, ticks: 6, tickFormat: '%b %Y' },
-    y: { label: 'Requests', grid: true, tickFormat: '~s' },
+    y: { label: 'Requests', grid: true, ...countY(Math.max(0, ...data.map((d) => d.n))) },
     color: { domain: ['This period', 'Same month a year earlier'], range: [BLUE, GRAY], legend: hasPrior },
     marks: [
       Plot.ruleY([0]),
@@ -478,6 +492,40 @@ async function renderAgency() {
   chartWithTable($('agency'), chart, rows, [
     { key: 'agency', label: 'Agency' }, { key: 'status', label: 'Status' }, { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
   ], 'Requests by agency and status (top 8 agencies)');
+}
+
+/** Address page: requests per month, split by the five most common problems. */
+async function renderTimeline() {
+  const OTHER = 'Other problems';
+  const rows = await query(`
+    WITH top AS (SELECT complaint_type AS t FROM req WHERE ${where()} GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 5)
+    SELECT year_month AS ym, CASE WHEN complaint_type IN (SELECT t FROM top) THEN complaint_type ELSE ${lit(OTHER)} END AS t, count(*)::INTEGER AS n
+    FROM req WHERE ${where()} GROUP BY ALL ORDER BY 1, 2`);
+  if (!rows.length) { $('timeline').replaceChildren(el('p', { text: 'No requests match these filters.' })); return; }
+  const totals = new Map();
+  for (const r of rows) totals.set(r.t, (totals.get(r.t) || 0) + r.n);
+  const types = [...totals].sort((a, b) => (a[0] === OTHER ? 1 : b[0] === OTHER ? -1 : b[1] - a[1])).map(([t]) => t);
+  const data = rows.map((r) => ({ ...r, date: new Date(`${r.ym}-01T00:00:00Z`) }));
+  const d3sum = (ds) => { const m = new Map(); for (const d of ds) m.set(d.ym, (m.get(d.ym) || 0) + d.n); return m.values(); };
+  const chart = Plot.plot({
+    ariaLabel: 'Requests at this address per month, by problem',
+    ariaDescription: `Stacked bars, one per month, split into ${types.join(', ')}.`,
+    height: 280,
+    marginLeft: 56,
+    x: { type: 'utc', label: null, tickFormat: '%b %Y', ticks: 6 },
+    y: { label: 'Requests', grid: true, ...countY(Math.max(...[...d3sum(data)])) },
+    color: { domain: types, range: types.map((t, i) => (t === OTHER ? PROBLEM_COLORS[5] : PROBLEM_COLORS[Math.min(i, 4)])), legend: true },
+    marks: [
+      Plot.rectY(data, { x: 'date', interval: 'month', y: 'n', fill: 't', stroke: DARK, strokeWidth: 0.5, inset: 0.5, tip: true,
+        title: (d) => `${monthLabel(d.ym)}: ${fmtInt(d.n)} ${d.t}` }),
+      Plot.ruleY([0]),
+    ],
+  });
+  chartWithTable($('timeline'), chart, rows, [
+    { key: 'ym', label: 'Month', fmt: (v) => monthLabel(v) },
+    { key: 't', label: 'Problem' },
+    { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
+  ], 'Requests at this address per month, by problem');
 }
 
 async function renderAddresses() {
@@ -625,6 +673,7 @@ async function renderMap() {
            strftime(created_date, '%Y-%m-%d') AS created,
            coalesce(incident_address, intersection_street_1 || ' & ' || intersection_street_2) AS addr
     FROM req WHERE ${where()} AND latitude IS NOT NULL ORDER BY created_date DESC LIMIT ${MAP_CAP}`);
+  if (ADDRESS_MODE && rows.length) mapCtx.map.jumpTo({ center: [rows[0].x, rows[0].y], zoom: 17 });
   mapCtx.map.getSource('req').setData({
     type: 'FeatureCollection',
     features: rows.map((r) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [r.x, r.y] }, properties: { t: r.t, d: r.d, s: r.s, created: r.created, addr: r.addr } })),
@@ -636,14 +685,32 @@ async function renderMap() {
 // ------------------------------------------------------------- about
 
 function renderAbout() {
-  const unloc = geo === 'cd' ? district.unlocated_city_assigned : null;
+  const unloc = geo === 'cd' && !ADDRESS_MODE ? district.unlocated_city_assigned : null;
   $('about').replaceChildren(
-    el('p', {}, 'Every request with a location was placed in this district by BoardStat, using where it happened and today\'s boundary lines.' +
+    el('p', {}, ADDRESS_MODE ? 'This page shows only requests whose address matches exactly, as the city spelled it. ' : '', 'Every request with a location was placed in this district by BoardStat, using where it happened and today\'s boundary lines.' +
       (unloc ? ` ${fmtInt(unloc)} requests that have no usable location are assigned to this community district by the city's own records; they are not counted on this page.` : '')),
     el('ul', { class: 'more-links' },
       el('li', {}, el('a', { class: 'button', href: 'about.html', text: 'About BoardStat: sources and history' })),
       el('li', {}, el('a', { class: 'button secondary', href: 'glossary.html', text: 'Glossary: terms and how numbers are counted' }))),
   );
+}
+
+/** Address page: the ZIP code and the two districts the address is in, with links. */
+async function renderAddressLinks() {
+  const [a] = await query(`
+    SELECT mode(incident_zip) AS zip, mode(cd) AS cd, mode(cc) AS cc FROM req WHERE address_norm = ${lit(state.addr)}`);
+  const link = (g, id) => {
+    const d = manifest.districts[g]?.find((x) => String(x.id) === String(id));
+    return el('a', { href: `district.html?geo=${g}&id=${encodeURIComponent(id)}` }, d ? d.label : `${g.toUpperCase()} ${id}`);
+  };
+  const parts = [];
+  if (a?.zip) parts.push(`ZIP ${a.zip}`);
+  if (a?.cd != null) parts.push(link('cd', a.cd));
+  if (a?.cc != null) parts.push(link('cc', a.cc));
+  const out = [];
+  parts.forEach((p, i) => { if (i) out.push(' · '); out.push(p); });
+  $('addr-links').replaceChildren(...(out.length ? ['In ', ...out, '. Select a district to see all of it.'] : []));
+  $('boundary-note').textContent = 'Every request whose address matches this one exactly, as the city spelled it. Requests that gave only a cross street are not included.';
 }
 
 // ------------------------------------------------------------- refresh / boot
@@ -661,7 +728,8 @@ async function refresh() {
     await updateDescOptions();
     await renderKpis();
     if (seq !== refreshSeq) return;
-    await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgencyResponse(), renderAgency(), renderBacklog(), renderAddresses(), renderCompare(), renderDetail(), renderMap()]);
+    await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgencyResponse(), renderAgency(), renderBacklog(), renderDetail(), renderMap(),
+      ...(ADDRESS_MODE ? [renderTimeline()] : [renderAddresses(), renderCompare()])]);
     if (seq === refreshSeq) setStatus($('status'), `${fmtInt(total)} requests match.`);
   } catch (err) {
     console.error(err);
@@ -693,8 +761,14 @@ async function main() {
     $('as-of').replaceChildren('No data for this district. ', el('a', { href: './', text: 'Choose another district.' }));
     return;
   }
-  document.title = `${district.label} · BoardStat 2.0 (prototype)`;
-  $('title').textContent = district.label;
+  if (ADDRESS_MODE && !params.get('addr')) {
+    $('title').textContent = 'No address chosen';
+    $('as-of').replaceChildren(el('a', { href: './#addr', text: 'Search for an address.' }));
+    return;
+  }
+  const label = ADDRESS_MODE ? params.get('addr') : district.label;
+  document.title = `${label} · BoardStat 2.0 (prototype)`;
+  $('title').textContent = label;
   renderDataStatus(manifest, $('as-of'), $('stale'));
   asOfSql = `CAST(${lit(nycLocal(manifest.generated_at))} AS TIMESTAMP)`;
   const b = geo === 'cd' ? manifest.sources.community_districts : manifest.sources.council_districts;
@@ -710,6 +784,7 @@ async function main() {
     registerData('agg.parquet', 'data/agg/month_type.parquet'),
   ]);
   state = readState();
+  if (ADDRESS_MODE) await renderAddressLinks();
   await setupFilters();
   try { await setupMap(); } catch (err) {
     console.error(err);

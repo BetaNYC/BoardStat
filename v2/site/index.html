@@ -9,7 +9,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css?v=c78c82815c">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=5abdff20fc","./js/index.js":"./js/index.js?v=7046a547bb","./js/lib.js":"./js/lib.js?v=5b03d7e396","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=a2465b7f7d","./js/index.js":"./js/index.js?v=6ff395629b","./js/lib.js":"./js/lib.js?v=5b03d7e396","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
   <!-- importmap:end -->
 </head>
 <body>
@@ -46,7 +46,7 @@
             <h2>By an address in 311 data</h2>
             <label for="addr">Street address</label>
             <input type="search" id="addr" autocomplete="off" placeholder="e.g. 350 5 AVENUE" aria-describedby="addr-help">
-            <p class="muted" id="addr-help">This is not a geocoder. It only finds addresses that already appear in 311 requests in this data, spelled the way the city records them (for example <code>5 AVENUE</code>, not <code>Fifth Ave</code>).</p>
+            <p class="muted" id="addr-help">Select an address to see every request there over time. This is not a geocoder: it only finds addresses that already appear in 311 requests in this data. Common short forms work (<code>114 Nassau Ave, Brooklyn, NY 11222</code>), but write numbered streets with numbers (<code>5 Ave</code>, not <code>Fifth Ave</code>).</p>
             <p class="status" id="addr-status" role="status" aria-live="polite"></p>
             <ul class="results" id="addr-results"></ul>
           </div>
@@ -72,6 +72,6 @@
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. The original BoardStat lives at <a href="https://boardstat.beta.nyc">boardstat.beta.nyc</a>.</footer>
 
-  <script type="module" src="js/index.js?v=7046a547bb"></script>
+  <script type="module" src="js/index.js?v=6ff395629b"></script>
 </body>
 </html>

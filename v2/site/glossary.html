@@ -8,7 +8,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css?v=c78c82815c">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=5abdff20fc","./js/index.js":"./js/index.js?v=7046a547bb","./js/lib.js":"./js/lib.js?v=5b03d7e396","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=a2465b7f7d","./js/index.js":"./js/index.js?v=6ff395629b","./js/lib.js":"./js/lib.js?v=5b03d7e396","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
   <!-- importmap:end -->
 </head>
 <body>
@@ -117,7 +117,7 @@
         </dd>
 
         <dt id="address-lookup">Address lookup</dt>
-        <dd><p>The address box on the first page. It is not a geocoder (a tool that finds any address on a map). It only finds addresses that already appear in 311 requests in this data, spelled the city's way, and needs at least 4 characters.</p></dd>
+        <dd><p>The address box on the first page. It is not a geocoder (a tool that finds any address on a map). It only finds addresses that already appear in 311 requests in this data, spelled the city's way, and needs at least 4 characters. It accepts common short forms: it drops the city, state and comma part, uses a ZIP code if you give one, turns <code>Ave</code>, <code>St</code>, <code>Blvd</code> and similar at the end into the full word, <code>5th</code> into <code>5</code>, and <code>E</code> or <code>W</code> after the house number into <code>EAST</code> or <code>WEST</code>.</p></dd>
 
         <dt id="311-number">311 number</dt>
         <dd><p>The request's unique number (<code>unique_key</code>). You can look it up on 311's own site to see its full history.</p></dd>
@@ -212,6 +212,9 @@
 
         <dt id="top-addresses">Addresses with the most requests</dt>
         <dd><p>The 15 <a href="#address">addresses</a> with the most matching requests, with the problem reported most often at each one. Requests with only cross streets are not in this list.</p></dd>
+
+        <dt id="address-page">Address page</dt>
+        <dd><p>Every request at one <a href="#address">address</a>, over the whole data window. Open it by selecting an address in the <a href="#address-lookup">address lookup</a>. It has the same filters and panels as a district page, plus <strong>Problems over time</strong>: one bar per month, split into the five most common problems at that address, with the rest grouped. It matches the address exactly as the city spelled it, so requests that gave only a cross street are not included.</p></dd>
 
         <dt id="compare">Compare</dt>
         <dd><p>This district's 10 biggest problems, as a <a href="#share">share</a> of its located requests, next to the same share in its <a href="#borough-compare">borough</a> and the whole city. It uses whole months from your From and To dates. Only the dates apply: problem, description, agency, status and address filters do not.</p></dd>
