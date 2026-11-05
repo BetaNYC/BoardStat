@@ -1,10 +1,16 @@
 # BoardStat
-## As of 2026, Boardstat's 311 data can no longer be refreshed. BetaNYC is working to deliver a new version of Boardstat in 2026.
+## BoardStat 2.0 (prototype) is live: https://www.beta.nyc/boardstat/v2/
+
+The original Power BI BoardStat stopped refreshing in 2026. **BoardStat 2.0** replaces it: an open-source, browser-based tool for 311 data by community district, council district, or a single address, with about three years of data refreshed every night. Its code and documentation are in [`v2/`](v2/README.md). The old addresses at boardstat.beta.nyc now send visitors to the new prototype.
+
+The rest of this page describes the original BoardStat (v0.x), kept for history.
 BoardStat is an interactive tool for New York City’s community boards. It empowers users to discover issues and trends within district boundaries. The six pages of the tool provide a variety of summaries, graphs, and maps of 311 data (from 2010 through the present day). Not only does BoardStat empower community board staff and members to gain timely insights into their residents’ concerns, but it also furthers Manhattan Borough President Gale A. Brewer's goal of moving beyond open data access to meaningful open data use.
 
 This github repo is to document issues and outline future features.
 
 **IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
+
+These original borough addresses now redirect to BoardStat 2.0.
 
 | Borough  | URL |
 | ------------- | ------------- |
@@ -36,6 +42,11 @@ In the meantime, you can browse our training materials.
 BoardStat is ingesting [NYC 311 Service Requests from 2010 to Present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-Present/erm2-nwe9) dataset directly from the city’s open data portal. Data is filtered by the Community Board column.
 
 # Change Log
+
+## BoardStat 2.0 (prototype) - 2026
+ * A rebuild that no longer depends on Power BI: a Python + DuckDB pipeline and a static site that queries the data in your browser. See [`v2/README.md`](v2/README.md).
+ * Community districts, council districts and address pages; about three years of 311 data, refreshed nightly.
+ * boardstat.beta.nyc (GitHub Pages) now redirects to https://www.beta.nyc/boardstat/v2/.
 
 ## BoardStat v0.7 - A New Look
  * Updated all pages to have a new header from the NYC Core Framework

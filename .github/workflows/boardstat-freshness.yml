@@ -1,0 +1,26 @@
+# Daily check that the live BoardStat 2.0 data is fresh (issue #107).
+# The nightly rebuild runs at 5:30 AM Eastern on the office Mac; this runs on
+# GitHub so a Mac that is off still gets noticed. It opens one issue labeled
+# "data-freshness" while the data is stale and closes it when fresh again.
+name: BoardStat data freshness
+
+on:
+  schedule:
+    - cron: "0 14 * * *" # 14:00 UTC = 9 AM EST / 10 AM EDT
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the live manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 v2/pipeline/check/freshness.py

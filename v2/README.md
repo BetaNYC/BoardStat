@@ -127,6 +127,17 @@ launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/nyc.betanyc.boardstat-nigh
 
 Run it by hand without publishing: `uv run v2/pipeline/boardstat_nightly.py`.
 
+**If the Mac is off, the job can't alert anyone, so a second check runs on
+GitHub.** `.github/workflows/boardstat-freshness.yml` runs every day at 14:00 UTC
+(9 AM EST / 10 AM EDT) and reads the live `manifest.json`. If the data is more
+than 26 hours old (or the manifest can't be read), it opens one issue labeled
+`data-freshness` (repo watchers are notified), comments daily while it stays
+stale, and closes it when the data is fresh again. Run it by hand from the
+Actions tab ("BoardStat data freshness" → Run workflow). The script is
+`pipeline/check/freshness.py` (standard library plus `gh`). GitHub pauses
+scheduled workflows after 60 days with no repository activity; re-enable it
+from the Actions tab if that happens.
+
 Tests (offline except for the one-time DuckDB spatial extension download):
 
 ```sh
@@ -290,8 +301,9 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 - Prototype quality: no automated browser tests; verified by hand in Chromium
   (Playwright) on 2026-11-04, including the description, agency-responsiveness
   and still-open features (counts cross-checked against DuckDB in Python).
-- The nightly job depends on one Mac being on. A stale banner appears when the
-  build is more than 48 hours old.
+- The nightly job depends on one Mac being on. A GitHub check opens an issue
+  when the data is more than 26 hours old, and the site shows a stale banner
+  after 48 hours.
 - Detail files for the busiest districts are the largest downloads; on slow
   connections the first load of a district takes a few seconds.
 - The map shows at most the 60,000 most recent matching requests.
