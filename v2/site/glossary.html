@@ -8,7 +8,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css?v=c78c82815c">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=39658bdbe9","./js/index.js":"./js/index.js?v=506d3a7772","./js/lib.js":"./js/lib.js?v=5b03d7e396","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=889a56c4ec","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=7c26b37530","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
   <!-- importmap:end -->
 </head>
 <body>
@@ -229,6 +229,9 @@
       <dl class="glossary">
         <dt id="data-as-of">Data as of</dt>
         <dd><p>When BoardStat last downloaded the data and rebuilt its files.</p></dd>
+
+        <dt id="what-changed">What changed since …</dt>
+        <dd><p>BoardStat updates every night. The city changes old requests as well as adding new ones: a request closes, a status changes, a date is fixed. So each night BoardStat asks NYC Open Data for every request that changed since the last update, not just new ones, and swaps in the new version. This line counts, since the last update: <strong>new</strong> requests, <strong>updated</strong> requests (ones BoardStat already had), and <strong>closed</strong> requests (now Closed and not Closed before, including new requests that arrive already closed). On a district page it also shows that district; on an address page, the address's community district. Once a week BoardStat also compares its monthly counts with the city's and downloads any month that does not match, which catches requests the city removed.</p></dd>
 
         <dt id="portal-updated">Portal last updated</dt>
         <dd><p>When the city last updated the 311 dataset on NYC Open Data.</p></dd>
