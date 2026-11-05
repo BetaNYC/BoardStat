@@ -195,3 +195,7 @@ dl.glossary dd p { margin: 0.3rem 0; }
   table.stack td::before { content: attr(data-label); font-weight: 600; }
   table.stack td:empty { display: none; }
 }
+
+/* Keep each menu item on one line ("Help & feedback" wraps as a unit). */
+header.site .site-nav { flex-wrap: wrap; row-gap: 0.25rem; }
+header.site .site-nav a { white-space: nowrap; }
