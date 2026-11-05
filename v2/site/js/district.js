@@ -250,6 +250,47 @@ function partialSpan(ym, from, to) {
   return a === first && b === last ? null : [a, b];
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// Newest year first: strong blue, then lighter, so the newest year stands out.
+const YEAR_COLORS = [BLUE, '#6f9bd6', GRAY, '#c8c8c8'];
+
+/** Requests per month as one line per calendar year (used for ranges over 13 months). */
+function yearChart(rows, title, spanText) {
+  const pts = rows.map((r) => ({
+    year: r.ym.slice(0, 4), month: MONTHS[Number(r.ym.slice(5, 7)) - 1], ym: r.ym, n: r.n,
+    partial: !!r.span, span: r.span, series: r.ym.slice(0, 4),
+  }));
+  const years = [...new Set(pts.map((d) => d.year))].sort().reverse();
+  const range = years.map((_, i) => YEAR_COLORS[Math.min(i, YEAR_COLORS.length - 1)]);
+  const full = pts.filter((d) => !d.partial);
+  const part = pts.filter((d) => d.partial);
+  const marks = [Plot.ruleY([0])];
+  // Oldest first, so the newest year is drawn on top.
+  for (const y of [...years].reverse()) {
+    const newest = y === years[0];
+    const line = full.filter((d) => d.year === y);
+    marks.push(
+      Plot.lineY(line, { x: 'month', y: 'n', stroke: 'year', strokeWidth: newest ? 3 : 1.5 }),
+      Plot.dot(line, { x: 'month', y: 'n', stroke: 'year', fill: 'white', r: newest ? 3.5 : 2.5, tip: true, title }),
+    );
+  }
+  marks.push(
+    Plot.dot(part, { x: 'month', y: 'n', stroke: 'year', fill: 'none', strokeDasharray: '2,2', r: 5, tip: true, title }),
+    Plot.text(part, { x: 'month', y: 'n', text: () => 'partial', textAnchor: 'end', dx: -8, dy: -8, fill: DARK, fontSize: 11 }),
+  );
+  return Plot.plot({
+    ariaLabel: 'Requests per month, one line per year',
+    ariaDescription: `Line chart with one line per calendar year (${[...years].reverse().join(', ')}), months January to December along the bottom. The newest year is the thickest line.` +
+      (part.length ? ' Months with only some days are shown as separate hollow dots, not joined to the line.' : ''),
+    height: 280,
+    marginLeft: 56,
+    x: { type: 'point', domain: MONTHS, label: null },
+    y: { label: 'Requests', grid: true, tickFormat: '~s' },
+    color: { type: 'ordinal', domain: years, range, legend: true },
+    marks,
+  });
+}
+
 async function renderMonthly() {
   // A month is "partial" when the From/To dates or the end of the data cut it short.
   // Partial months are shown as hollow dots off the line, so a short month never
@@ -297,7 +338,10 @@ async function renderMonthly() {
   const part = data.filter((d) => d.partial);
   const hasPrior = data.some((d) => d.series !== 'This period');
   const title = (d) => `${monthLabel(d.ym)}: ${fmtInt(d.n)} (${d.series}${d.partial ? `; ${spanText(d.span)}` : ''})`;
-  const chart = Plot.plot({
+  // More than 13 months: one line per calendar year, Jan to Dec along the bottom,
+  // so years sit on top of each other instead of one long line plus a shifted copy.
+  const byYear = rows.length > 13;
+  const chart = byYear ? yearChart(rows, title, spanText) : Plot.plot({
     ariaLabel: 'Requests per month',
     ariaDescription: 'Line chart of requests per month for the filtered requests' + (hasPrior ? ', with the same month a year earlier where available' : '') +
       (part.length ? '. Months with only some days are shown as separate hollow dots, not joined to the line.' : '.'),
@@ -319,6 +363,7 @@ async function renderMonthly() {
     { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
     { key: 'n_prior', label: 'Same days a year earlier', num: true, fmt: (v) => (v == null ? 'not in data' : fmtInt(v)) },
   ], 'Requests per month');
+  if (byYear) $('monthly').append(el('p', { class: 'muted', text: 'Each line is one calendar year, so you can compare the same month across years. The newest year is the thickest line. The table lists every month.' }));
   if (part.length) {
     const list = rows.filter((r) => r.span).map((r) => `${monthLabel(r.ym)} (${spanText(r.span).replace('partial month: ', '')})`).join(' and ');
     $('monthly').append(el('p', { class: 'muted', text: `Hollow dots are partial months, so they are lower than a full month would be: ${list}. The newest request in the data is from ${lc ? fmtDateTime(lc.replace(' ', 'T')) : fmtDate(lastDataDay())}, because the city publishes 311 data with a delay. Year-earlier values cover the same days, up to the same time, one year earlier.` }));
