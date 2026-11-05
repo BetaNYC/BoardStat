@@ -6,12 +6,16 @@
   <title>District · BoardStat 2.0 (prototype)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=c78c82815c">
+  <!-- importmap:start -->
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=7f996983c3","./js/index.js":"./js/index.js?v=7046a547bb","./js/lib.js":"./js/lib.js?v=5b03d7e396","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <!-- importmap:end -->
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site">
     <a class="brand" href="./">BoardStat 2.0</a><span class="tag">prototype</span>
+    <nav class="site-nav" aria-label="Site"><a href="./">Districts</a> <a href="about.html">About</a> <a href="glossary.html">Glossary</a></nav>
   </header>
 
   <main id="main">
@@ -88,7 +92,7 @@
     <section class="panel no-print" aria-labelledby="map-h">
       <h2 id="map-h">Map of requests</h2>
       <div id="map" class="map" role="region" aria-label="Map of request locations, grouped into circles where many are close together. The tables on this page carry the same information."></div>
-      <p class="map-note" id="map-note">Circles group nearby requests; select one to zoom in, or select a single point for details. Basemap: decision pending.</p>
+      <p class="map-note" id="map-note">Circles group nearby requests; select one to zoom in, or select a single point for details.</p>
     </section>
 
     <div class="grid no-print">
@@ -124,6 +128,6 @@
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product.</footer>
-  <script type="module" src="js/district.js"></script>
+  <script type="module" src="js/district.js?v=7f996983c3"></script>
 </body>
 </html>

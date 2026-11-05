@@ -7,3 +7,7 @@ site/data/*
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+
+# Local 3-year build and preview (uploaded to the server, never committed).
+data-3yr/
+preview-3yr/

@@ -1,17 +1,19 @@
 type_key,display,reviewed,raw_variants
 abandoned bike,Abandoned Bike,false,Abandoned Bike
 abandoned vehicle,Abandoned Vehicle,false,Abandoned Vehicle
+adopt-a-basket,Adopt-A-Basket,false,Adopt-A-Basket
 ahv inspection unit,AHV Inspection Unit,false,AHV Inspection Unit
 air quality,Air Quality,false,Air Quality
 animal facility - no permit,Animal Facility - No Permit,false,Animal Facility - No Permit
 animal in a park,Animal in a Park,false,Animal in a Park
 animal-abuse,Animal-Abuse,false,Animal-Abuse
 appliance,APPLIANCE,false,APPLIANCE
-asbestos,Asbestos,false,Asbestos
+asbestos,Asbestos,false,ASBESTOS|Asbestos
 beach/pool/sauna complaint,Beach/Pool/Sauna Complaint,false,Beach/Pool/Sauna Complaint
 bench,Bench,false,Bench
 best/site safety,BEST/Site Safety,false,BEST/Site Safety
 bike rack,Bike Rack,false,Bike Rack
+bike rack condition,Bike Rack Condition,false,Bike Rack Condition
 bike/roller/skate,Bike/Roller/Skate,false,Bike/Roller/Skate
 bike/roller/skate chronic,Bike/Roller/Skate Chronic,false,Bike/Roller/Skate Chronic
 blocked driveway,Blocked Driveway,false,Blocked Driveway
@@ -46,6 +48,7 @@ dept of investigations,Dept of Investigations,false,Dept of Investigations
 derelict vehicles,Derelict Vehicles,false,Derelict Vehicles
 dirty condition,Dirty Condition,false,Dirty Condition
 disorderly youth,Disorderly Youth,false,Disorderly Youth
+dispatched taxi complaint,Dispatched Taxi Complaint,false,Dispatched Taxi Complaint
 door/window,DOOR/WINDOW,false,DOOR/WINDOW
 drinking,Drinking,false,Drinking
 drinking water,Drinking Water,false,Drinking Water
@@ -59,6 +62,8 @@ electrical,Electrical,false,Electrical
 elevator,Elevator,false,ELEVATOR|Elevator
 emergency response team (ert),Emergency Response Team (ERT),false,Emergency Response Team (ERT)
 encampment,Encampment,false,Encampment
+executive inspections,Executive Inspections,false,Executive Inspections
+facade insp safety pgm,Facade Insp Safety Pgm,false,Facade Insp Safety Pgm
 ferry complaint,Ferry Complaint,false,Ferry Complaint
 ferry inquiry,Ferry Inquiry,false,Ferry Inquiry
 fhv licensee complaint,FHV Licensee Complaint,false,FHV Licensee Complaint
@@ -128,7 +133,9 @@ outside building,OUTSIDE BUILDING,false,OUTSIDE BUILDING
 overgrown tree/branches,Overgrown Tree/Branches,false,Overgrown Tree/Branches
 paint/plaster,PAINT/PLASTER,false,PAINT/PLASTER
 panhandling,Panhandling,false,Panhandling
+peeling paint,Peeling Paint,false,Peeling Paint
 pet sale,Pet Sale,false,Pet Sale
+pet shop,Pet Shop,false,Pet Shop
 plant,Plant,false,Plant
 plumbing,Plumbing,false,PLUMBING|Plumbing
 poison ivy,Poison Ivy,false,Poison Ivy
@@ -139,15 +146,18 @@ radioactive material,Radioactive Material,false,Radioactive Material
 real time enforcement,Real Time Enforcement,false,Real Time Enforcement
 recycling basket complaint,Recycling Basket Complaint,false,Recycling Basket Complaint
 residential disposal complaint,Residential Disposal Complaint,false,Residential Disposal Complaint
+retailer complaint,Retailer Complaint,false,Retailer Complaint
 rodent,Rodent,false,Rodent
 root/sewer/sidewalk condition,Root/Sewer/Sidewalk Condition,false,Root/Sewer/Sidewalk Condition
 safety,Safety,false,SAFETY|Safety
 sanitation worker or vehicle complaint,Sanitation Worker or Vehicle Complaint,false,Sanitation Worker or Vehicle Complaint
 scaffold safety,Scaffold Safety,false,Scaffold Safety
 school maintenance,School Maintenance,false,School Maintenance
+seasonal collection,Seasonal Collection,false,Seasonal Collection
 sewer,Sewer,false,Sewer
 sewer maintenance,Sewer Maintenance,false,Sewer Maintenance
 sidewalk condition,Sidewalk Condition,false,Sidewalk Condition
+smoking,Smoking,false,Smoking
 smoking or vaping,Smoking or Vaping,false,Smoking or Vaping
 snow or ice,Snow or Ice,false,Snow or Ice
 snw,SNW,false,SNW
@@ -155,6 +165,7 @@ special natural area district (snad),Special Natural Area District (SNAD),false,
 special operations,Special Operations,false,Special Operations
 special projects inspection team (spit),Special Projects Inspection Team (SPIT),false,Special Projects Inspection Team (SPIT)
 squeegee,Squeegee,false,Squeegee
+stalled sites,Stalled Sites,false,Stalled Sites
 standing water,Standing Water,false,Standing Water
 street condition,Street Condition,false,Street Condition
 street light condition,Street Light Condition,false,Street Light Condition
@@ -162,6 +173,7 @@ street sign - damaged,Street Sign - Damaged,false,Street Sign - Damaged
 street sign - dangling,Street Sign - Dangling,false,Street Sign - Dangling
 street sign - missing,Street Sign - Missing,false,Street Sign - Missing
 street sweeping complaint,Street Sweeping Complaint,false,Street Sweeping Complaint
+sustainability enforcement,Sustainability Enforcement,false,Sustainability Enforcement
 tanning,Tanning,false,Tanning
 tattooing,Tattooing,false,Tattooing
 taxi complaint,Taxi Complaint,false,Taxi Complaint
@@ -175,10 +187,12 @@ transfer station complaint,Transfer Station Complaint,false,Transfer Station Com
 trapping pigeon,Trapping Pigeon,false,Trapping Pigeon
 tunnel condition,Tunnel Condition,false,Tunnel Condition
 unleashed dog,Unleashed Dog,false,Unleashed Dog
+unlicensed dog,Unlicensed Dog,false,Unlicensed Dog
 unsanitary animal facility,Unsanitary Animal Facility,false,Unsanitary Animal Facility
 unsanitary animal pvt property,Unsanitary Animal Pvt Property,false,Unsanitary Animal Pvt Property
 unsanitary condition,UNSANITARY CONDITION,false,UNSANITARY CONDITION
 unsanitary pigeon condition,Unsanitary Pigeon Condition,false,Unsanitary Pigeon Condition
+unspecified,Unspecified,false,Unspecified
 uprooted stump,Uprooted Stump,false,Uprooted Stump
 urinating in public,Urinating in Public,false,Urinating in Public
 vendor enforcement,Vendor Enforcement,false,Vendor Enforcement

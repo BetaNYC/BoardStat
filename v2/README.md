@@ -68,6 +68,20 @@ python3 v2/serve.py
 #   Use this, not `python3 -m http.server`: the street map needs HTTP range requests.
 ```
 
+Publishing to the demo at https://www.beta.nyc/boardstat/v2/ (DreamPress; access in
+the workspace's `team/engineering/hosting/README.md`):
+
+```sh
+python3 v2/stamp_assets.py
+#   adds ?v=<hash> to CSS/JS links and writes an import map. beta.nyc tells browsers
+#   to keep .js/.css for 120 days, so without this visitors keep old code.
+rsync -a --chmod=D755,F644 --exclude .gitkeep -e "ssh -i ~/.ssh/id_ed25519_betanyc_dreampress" \
+  v2/site/ wp_iz4gh3@dp-6803fc88d2.dreamhostps.com:beta.nyc/boardstat/v2/
+```
+
+Data files keep the same names on every rebuild, so a nightly refresh (#107) also
+needs versioned data paths or a no-cache rule for `data/`.
+
 Tests (offline except for the one-time DuckDB spatial extension download):
 
 ```sh
@@ -160,7 +174,15 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 8. **Address lookup is a list of addresses that already appear in 311 data,**
    sorted so a prefix search can skip row groups. It is labeled as not a
    geocoder. No Geoclient / Geosupport call is made.
-9. **Self-hosted Protomaps street map.** `pipeline/basemap_build.sh` extracts
+9. **Street map: the City's own, with a self-hosted fallback.** Since 2026-11-04 the
+   map first loads NYC OTI's vector basemap (`NYC_Basemap_v3`, hosted by the City on
+   ArcGIS; credited "Street map: NYC OTI"). Its published style uses relative URLs,
+   which `map.js` makes absolute. If the City's style does not load within 6 seconds,
+   the map uses the self-hosted Protomaps street map below. Terms: the ArcGIS item
+   points to the NYC.gov Terms of Use; Noel decided on 2026-11-04 that BoardStat can
+   use it.
+
+   **Fallback: self-hosted Protomaps street map.** `pipeline/basemap_build.sh` extracts
    NYC plus a margin from a [Protomaps daily build](https://docs.protomaps.com/guide/getting-started)
    (OpenStreetMap data, ODbL) into one `nyc.pmtiles` file, and copies the
    Noto Sans glyphs (SIL OFL) and v4 sprites from

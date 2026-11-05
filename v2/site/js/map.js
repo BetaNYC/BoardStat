@@ -1,6 +1,8 @@
-// MapLibre helpers. Street basemap: a self-hosted Protomaps extract of NYC
-// (OpenStreetMap data), built by pipeline/basemap_build.sh into data/basemap/.
-// If that folder is missing, the map falls back to boundaries on a blank background.
+// MapLibre helpers. Street basemap, in order of preference:
+// 1. NYC OTI's own vector basemap (NYC_Basemap_v3, hosted by the City on ArcGIS).
+// 2. A self-hosted Protomaps extract of NYC (OpenStreetMap data), built by
+//    pipeline/basemap_build.sh into data/basemap/, if the City's service fails.
+// 3. Boundaries on a blank background, if neither is available.
 // v6 ships as ES modules only; the worker is found from the module URL
 // (https://maplibre.org/maplibre-gl-js/docs/).
 import { MAPLIBRE_URL, PMTILES_URL, BASEMAPS_URL } from './lib.js';
@@ -23,9 +25,41 @@ const BLANK_STYLE = {
   layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#F9FAFF' } }],
 };
 
+// The City's service publishes a version-8 style with relative URLs; MapLibre needs
+// absolute ones. Service metadata: NYC_SVC + '?f=json' (copyrightText "SOURCE: NYC OTI").
+const NYC_SVC = 'https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/NYC_Basemap_v3/VectorTileServer';
+const NYC_ATTRIBUTION = 'Street map: <a href="https://www.nyc.gov/content/oti/pages/">NYC OTI</a>';
+
+async function nycStyle() {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 6000);
+  try {
+    const r = await fetch(`${NYC_SVC}/resources/styles/root.json`, { signal: ctl.signal });
+    if (!r.ok) return null;
+    const style = await r.json();
+    if (style.version !== 8 || !style.sources || !Array.isArray(style.layers)) return null;
+    for (const src of Object.values(style.sources)) {
+      delete src.url;
+      src.tiles = [`${NYC_SVC}/tile/{z}/{y}/{x}.pbf`];
+      src.attribution = NYC_ATTRIBUTION;
+    }
+    style.glyphs = `${NYC_SVC}/resources/fonts/{fontstack}/{range}.pbf`;
+    style.sprite = `${NYC_SVC}/resources/sprites/sprite`;
+    return style;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function basemapStyle(ml) {
+  return (await nycStyle()) || (await protomapsStyle(ml));
+}
+
 let protocolAdded = false;
 /** Protomaps style per https://docs.protomaps.com/basemaps/maplibre, all assets self-hosted. */
-async function basemapStyle(ml) {
+async function protomapsStyle(ml) {
   const base = new URL('data/basemap/', location.href).href;
   const head = await fetch(base + 'basemap.json', { method: 'HEAD' }).catch(() => null);
   if (!head || !head.ok) return BLANK_STYLE;

@@ -7,12 +7,16 @@
   <meta name="description" content="311 service requests for every NYC community district and council district. A BetaNYC prototype.">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=c78c82815c">
+  <!-- importmap:start -->
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=7f996983c3","./js/index.js":"./js/index.js?v=7046a547bb","./js/lib.js":"./js/lib.js?v=5b03d7e396","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <!-- importmap:end -->
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site">
     <a class="brand" href="./">BoardStat 2.0</a><span class="tag">prototype</span>
+    <nav class="site-nav" aria-label="Site"><a href="./">Districts</a> <a href="about.html">About</a> <a href="glossary.html">Glossary</a></nav>
   </header>
 
   <main id="main">
@@ -53,18 +57,21 @@
     <section class="panel" aria-labelledby="map-h">
       <h2 id="map-h">Or click the map</h2>
       <div id="map" class="map" role="region" aria-label="Map of district boundaries. Clicking a district opens it. The list above offers the same choices."></div>
-      <p class="map-note">The map shows district boundaries only. Basemap: decision pending (options: OpenFreeMap or self-hosted Protomaps PMTiles).</p>
+      <p class="map-note">The map shows district boundaries only.</p>
     </section>
 
     <section class="panel" aria-labelledby="about-h">
-      <h2 id="about-h">About this prototype</h2>
-      <p>Data comes from <a href="https://data.cityofnewyork.us/d/erm2-nwe9">311 Service Requests from 2020 to Present</a> on NYC Open Data, with district boundaries from the Department of City Planning (<a href="https://data.cityofnewyork.us/d/5crt-au7u">Community Districts</a>, <a href="https://data.cityofnewyork.us/d/872g-cjhh">City Council Districts</a>). Everything runs in your browser; nothing you type is sent anywhere.</p>
-      <p>311 counts reflect who reports problems and how, not only how many problems exist.</p>
+      <h2 id="about-h">About</h2>
+      <p>Data comes from NYC Open Data's 311 service requests and the Department of City Planning's district boundaries. Everything runs in your browser; nothing you type is sent anywhere.</p>
+      <ul class="more-links">
+        <li><a class="button" href="about.html">About BoardStat: sources and history</a></li>
+        <li><a class="button secondary" href="glossary.html">Glossary: terms and how numbers are counted</a></li>
+      </ul>
     </section>
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. The original BoardStat lives at <a href="https://boardstat.beta.nyc">boardstat.beta.nyc</a>.</footer>
 
-  <script type="module" src="js/index.js"></script>
+  <script type="module" src="js/index.js?v=7046a547bb"></script>
 </body>
 </html>

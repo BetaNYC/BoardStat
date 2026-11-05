@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About · BoardStat 2.0 (prototype)</title>
+  <meta name="description" content="Where BoardStat's data comes from, how BoardStat has changed since 2017, and how AI tools were used to build this prototype.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css?v=c78c82815c">
+  <!-- importmap:start -->
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=7f996983c3","./js/index.js":"./js/index.js?v=7046a547bb","./js/lib.js":"./js/lib.js?v=5b03d7e396","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <!-- importmap:end -->
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site">
+    <a class="brand" href="./">BoardStat 2.0</a><span class="tag">prototype</span>
+    <nav class="site-nav" aria-label="Site"><a href="./">Districts</a> <a href="about.html" aria-current="page">About</a> <a href="glossary.html">Glossary</a></nav>
+  </header>
+
+  <main id="main">
+    <h1>About BoardStat</h1>
+    <p class="lede">BoardStat shows what New Yorkers report to 311 in each community district and council district. It was built with community boards, for community boards.</p>
+    <nav class="panel toc" aria-label="On this page">
+      <ul>
+        <li><a href="#data-h">Where the data comes from</a></li>
+        <li><a href="#history-h">History</a></li>
+        <li><a href="#ai-h">How we used AI tools</a></li>
+        <li><a href="#tools-h">Open-source tools</a></li>
+      </ul>
+    </nav>
+
+    <section class="panel" aria-labelledby="data-h">
+      <h2 id="data-h">Where the data comes from</h2>
+      <p class="muted" id="as-of">Loading data status…</p>
+      <div class="banner warn" id="stale" role="status" hidden></div>
+      <div id="about"><p class="muted">Loading…</p></div>
+      <p>Everything runs in your browser. Nothing you type is sent anywhere.</p>
+      <p>Every term and calculation, step by step, is in the <a href="glossary.html">Glossary</a>.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="history-h">
+      <h2 id="history-h">History</h2>
+      <p>This history comes from BoardStat's public <a href="https://github.com/BetaNYC/BoardStat">GitHub repository</a>: its README, commits, and the 100+ issues and pull requests filed since 2017. Issue numbers link to the original discussion.</p>
+
+      <h3>2016–2017: Built with Manhattan's community boards</h3>
+      <p>BoardStat began as a simple 311 analysis tool, conceived with the office of then-Manhattan Borough President Gale A. Brewer. Its goal was to move beyond open data access to meaningful open data use. BetaNYC's Civic Innovation Fellows researched what community boards needed. Then, in the spring semester of 2016–2017, fellows and BetaNYC staff built a prototype in Microsoft Power BI, with help from Microsoft Civic in Chicago and New York. Borough President's office staff, community district staff and board members shaped it in group and one-on-one sessions.</p>
+      <p>The GitHub repository opened on May 18, 2017. The first wave of issues, in June 2017, records page-by-page feedback BetaNYC gathered from district offices: bar charts for Community Board 5 (<a href="https://github.com/BetaNYC/BoardStat/issues/1">#1</a>), a top 10 complaint types view (<a href="https://github.com/BetaNYC/BoardStat/issues/3">#3</a>), average days to close by agency (<a href="https://github.com/BetaNYC/BoardStat/issues/10">#10</a>), and a map of complaint types (<a href="https://github.com/BetaNYC/BoardStat/issues/12">#12</a>).</p>
+      <p>BoardStat was created with funds and support from the Alfred P. Sloan Foundation, the Fund for the City of New York, and Microsoft Civic.</p>
+
+      <h3>2017–2018: Live data and the first data problems</h3>
+      <p>BoardStat pulled 311 data straight from NYC Open Data through an OData feed (<a href="https://github.com/BetaNYC/BoardStat/issues/14">#14</a>), set up by Briana Vecchione. Version 0.5e synced the date filter across pages and streamed data 10,000 rows per query through 12 special views of the dataset. Using it surfaced problems in the city's own data. Requests from Marble Hill showed up under Manhattan Community Board 8 (<a href="https://github.com/BetaNYC/BoardStat/issues/24">#24</a>). Community Board 1 in each borough received requests that belonged elsewhere (<a href="https://github.com/BetaNYC/BoardStat/issues/36">#36</a>). BetaNYC reported these to the city, and NYC's Open Data team later fixed them. Some limits came from Power BI itself, and were tracked in <a href="https://github.com/BetaNYC/BoardStat/issues/31">#31</a>.</p>
+
+      <h3>2018: All five boroughs, training and tutorials</h3>
+      <p>Version 0.6a, "the Borough Edition," replaced one dashboard per community board with five borough dashboards. Each had a board picker, so you could compare several boards at once or look at parks. Version 0.6b (August 2018, <a href="https://github.com/BetaNYC/BoardStat/issues/84">#84</a>) reworked the pages for usability. Prathm Juneja spent a few weeks with BetaNYC finding and making those improvements. It added clear-all buttons, multi-address selection, and new "Complaints Over Time" and "Compare Complaint Types" pages.</p>
+      <p>That summer, BetaNYC produced page-by-page tutorial videos (<a href="https://github.com/BetaNYC/BoardStat/issues/67">#67</a>–<a href="https://github.com/BetaNYC/BoardStat/issues/70">#70</a>) and "data journey" worksheets. These walked people through real questions about sanitation, illegal conversions and pedestrian safety (<a href="https://github.com/BetaNYC/BoardStat/issues/64">#64</a>–<a href="https://github.com/BetaNYC/BoardStat/issues/66">#66</a>). BetaNYC ran public training sessions, and Manhattan district offices could request one-on-one training through the Borough President's office.</p>
+      <p>Some ideas stayed open. One was a page that follows the City Charter's monthly 311 report to community boards (<a href="https://github.com/BetaNYC/BoardStat/issues/34">#34</a>, <a href="https://github.com/BetaNYC/BoardStat/issues/46">#46</a>). Another was a way to save a view (<a href="https://github.com/BetaNYC/BoardStat/issues/85">#85</a>).</p>
+
+      <h3>2019–2020: A new look</h3>
+      <p>Version 0.7 (July 2019) moved every page to the NYC Core Framework design and added a landing page with a borough map (<a href="https://github.com/BetaNYC/BoardStat/issues/89">#89</a>, <a href="https://github.com/BetaNYC/BoardStat/issues/90">#90</a>). In 2019 and 2020, small fixes and usage analytics followed. The last requests from district offices asked for things like a "de-select all" button (<a href="https://github.com/BetaNYC/BoardStat/issues/95">#95</a>).</p>
+
+      <h3>2025–2026: The data stops refreshing</h3>
+      <p>In January 2026, the city's Office of Technology and Innovation let BetaNYC know that BoardStat's connection to NYC Open Data had stopped working. The data had not refreshed since early 2025, and BetaNYC added a notice to the site (<a href="https://github.com/BetaNYC/BoardStat/issues/99">#99</a>). By November 2026, the five borough views of the dataset that BoardStat read from had been removed. The city had also split 311 data into two datasets: one for 2010–2019 and one for 2020 to the present.</p>
+
+      <h3>November 2026: BoardStat 2.0</h3>
+      <p>BoardStat 2.0 is a rebuild that does not depend on Power BI. A small program downloads 311 data from NYC Open Data and places each request that has a location in today's community district and council district lines. It then saves the data as compact files that your browser can query directly. It covers council districts as well as community districts. It brings back features people used most in the first BoardStat, like problem and description filters, agency response times, and address lookups. It is open source, and it needs no special servers: it is a folder of web pages and data files. It is a prototype: for now it covers about the last three years, starting November 1, 2023, and we are testing it with community boards.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="ai-h">
+      <h2 id="ai-h">How we used AI tools</h2>
+      <p>We are telling you this under BetaNYC's <a href="https://beta.nyc/about/ai-policy">AI policy</a>.</p>
+      <ul>
+        <li><strong>Writing code.</strong> BetaNYC staff built BoardStat 2.0 with the help of Claude, an AI coding assistant made by Anthropic. BetaNYC staff set the goals and made the design decisions. The AI tool drafted the code, tests and documentation, including this page. Staff directed and reviewed the work, and we compared its district results against the city's own district fields.</li>
+        <li><strong>Learning from the first BoardStat.</strong> To bring back what people used most, we transcribed the 2018 tutorial videos with Whisper, OpenAI's open-source speech-to-text model. It ran on our own computer, so no recordings were sent to an AI service. Claude helped summarize those transcripts and our old training documents into a list of features.</li>
+        <li><strong>No AI on this site.</strong> Every number you see is counted directly from the city's 311 data by ordinary code, using current district lines from the Department of City Planning. Nothing here is generated, guessed or predicted by AI. Nothing you type is sent to an AI service.</li>
+      </ul>
+      <p>The full code, and the record of how it changed, is public on <a href="https://github.com/BetaNYC/BoardStat/tree/v2">GitHub</a>.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="tools-h">
+      <h2 id="tools-h">Open-source tools</h2>
+      <p>BoardStat 2.0 is built on <a href="https://duckdb.org">DuckDB</a> (MIT), <a href="https://maplibre.org">MapLibre GL</a> (BSD-3-Clause), <a href="https://observablehq.com/plot/">Observable Plot</a> (ISC), <a href="https://docs.protomaps.com/">Protomaps</a> (BSD-3-Clause) and the Noto Sans fonts (SIL OFL 1.1).</p>
+      <p>Street map: the City's own NYC basemap from the Office of Technology and Innovation (NYC OTI). If it can't load, the map switches to a Protomaps street map built from © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> data.</p>
+    </section>
+  </main>
+
+  <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. The original BoardStat lives at <a href="https://boardstat.beta.nyc">boardstat.beta.nyc</a>.</footer>
+
+  <script type="module" src="js/about.js?v=331aabc32e"></script>
+</body>
+</html>

@@ -233,8 +233,36 @@ async function renderDescriptors() {
   );
 }
 
+/** Last calendar day with data: the newest created date, or the window end. */
+function lastDataDay() {
+  const lc = manifest.window.last_created;
+  const d = lc ? lc.slice(0, 10) : manifest.window.end;
+  return d < manifest.window.end ? d : manifest.window.end;
+}
+
+/** Days of a month (YYYY-MM) that the chosen dates and the data cover, or null if the whole month. */
+function partialSpan(ym, from, to) {
+  const [y, m] = ym.split('-').map(Number);
+  const first = `${ym}-01`;
+  const last = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+  const a = from > first ? from : first;
+  const b = to < last ? to : last;
+  return a === first && b === last ? null : [a, b];
+}
+
 async function renderMonthly() {
-  // The year-earlier series applies every filter except From/To, shifted back 12 months.
+  // A month is "partial" when the From/To dates or the end of the data cut it short.
+  // Partial months are shown as hollow dots off the line, so a short month never
+  // looks like a drop. The year-earlier series uses exactly the same days, shifted
+  // back 12 months (every filter except From/To applies).
+  const effEnd = state.end < lastDataDay() ? state.end : lastDataDay();
+  // When the dates reach the end of the data, the year-earlier series stops at the
+  // same minute as the newest request, since the last day is usually only partly in.
+  const lc = manifest.window.last_created;
+  const cutAtNewest = lc && effEnd === lastDataDay();
+  const prevEndSql = cutAtNewest
+    ? `created_date <= CAST(${lit(lc)} AS TIMESTAMP) - INTERVAL 12 MONTH`
+    : `created_date < CAST(${lit(effEnd)} AS DATE) + INTERVAL 1 DAY - INTERVAL 12 MONTH`;
   const rows = await query(`
     WITH m AS (
       SELECT year_month AS ym, count(*)::INTEGER AS n FROM req WHERE ${where()} GROUP BY 1
@@ -242,20 +270,37 @@ async function renderMonthly() {
       SELECT strftime(created_date + INTERVAL 12 MONTH, '%Y-%m') AS ym, count(*)::INTEGER AS n_prior
       FROM req WHERE ${where({ skipDates: true })}
         AND created_date >= CAST(${lit(state.start)} AS DATE) - INTERVAL 12 MONTH
-        AND created_date < CAST(${lit(state.end)} AS DATE) + INTERVAL 1 DAY - INTERVAL 12 MONTH
+        AND ${prevEndSql}
+        AND created_date >= CAST(${lit(manifest.window.start)} AS DATE)
       GROUP BY 1
     )
     SELECT m.ym, m.n, prev_year.n_prior FROM m LEFT JOIN prev_year USING (ym) ORDER BY m.ym`);
+  // A year-earlier month is only shown if the data covers all of its matching days.
+  const priorCovered = (ym) => {
+    const [y, mo] = ym.split('-').map(Number);
+    const span = partialSpan(ym, state.start, effEnd) || [`${ym}-01`, null];
+    const priorStart = `${y - 1}-${String(mo).padStart(2, '0')}-${span[0].slice(8)}`;
+    return priorStart >= manifest.window.start;
+  };
+  for (const r of rows) {
+    r.span = partialSpan(r.ym, state.start, effEnd);
+    if (!priorCovered(r.ym)) r.n_prior = null;
+  }
+  const spanText = (sp) => (sp ? `partial month: ${fmtDate(sp[0])}${sp[0] === sp[1] ? '' : ` to ${fmtDate(sp[1])}`} only` : '');
   const data = [];
   for (const r of rows) {
     const date = new Date(`${r.ym}-01T12:00:00`);
-    data.push({ date, ym: r.ym, series: 'This period', n: r.n });
-    if (r.n_prior != null) data.push({ date, ym: r.ym, series: 'Same month a year earlier', n: r.n_prior });
+    data.push({ date, ym: r.ym, series: 'This period', n: r.n, partial: !!r.span, span: r.span });
+    if (r.n_prior != null) data.push({ date, ym: r.ym, series: 'Same month a year earlier', n: r.n_prior, partial: !!r.span, span: r.span });
   }
+  const full = data.filter((d) => !d.partial);
+  const part = data.filter((d) => d.partial);
   const hasPrior = data.some((d) => d.series !== 'This period');
+  const title = (d) => `${monthLabel(d.ym)}: ${fmtInt(d.n)} (${d.series}${d.partial ? `; ${spanText(d.span)}` : ''})`;
   const chart = Plot.plot({
     ariaLabel: 'Requests per month',
-    ariaDescription: 'Line chart of requests per month for the filtered requests' + (hasPrior ? ', with the same month a year earlier where available.' : '.'),
+    ariaDescription: 'Line chart of requests per month for the filtered requests' + (hasPrior ? ', with the same month a year earlier where available' : '') +
+      (part.length ? '. Months with only some days are shown as separate hollow dots, not joined to the line.' : '.'),
     height: 260,
     marginLeft: 56,
     x: { type: 'utc', label: null, ticks: 6, tickFormat: '%b %Y' },
@@ -263,20 +308,20 @@ async function renderMonthly() {
     color: { domain: ['This period', 'Same month a year earlier'], range: [BLUE, GRAY], legend: hasPrior },
     marks: [
       Plot.ruleY([0]),
-      Plot.lineY(data, { x: 'date', y: 'n', stroke: 'series', strokeWidth: 2 }),
-      Plot.dot(data, { x: 'date', y: 'n', stroke: 'series', fill: 'white', symbol: 'series', tip: true, title: (d) => `${monthLabel(d.ym)}: ${fmtInt(d.n)} (${d.series})` }),
+      Plot.lineY(full, { x: 'date', y: 'n', stroke: 'series', strokeWidth: 2 }),
+      Plot.dot(full, { x: 'date', y: 'n', stroke: 'series', fill: 'white', symbol: 'series', tip: true, title }),
+      Plot.dot(part, { x: 'date', y: 'n', stroke: 'series', fill: 'none', strokeDasharray: '2,2', r: 5, tip: true, title }),
+      Plot.text(part.filter((d) => d.series === 'This period'), { x: 'date', y: 'n', text: () => 'partial', textAnchor: 'end', dx: -8, dy: -8, fill: DARK, fontSize: 11 }),
     ],
   });
   chartWithTable($('monthly'), chart, rows, [
-    { key: 'ym', label: 'Month', fmt: monthLabel },
+    { key: 'ym', label: 'Month', fmt: (v, r) => (r.span ? `${monthLabel(v)} (${spanText(r.span)})` : monthLabel(v)) },
     { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
-    { key: 'n_prior', label: 'Same month a year earlier', num: true, fmt: (v) => (v == null ? 'not in data' : fmtInt(v)) },
+    { key: 'n_prior', label: 'Same days a year earlier', num: true, fmt: (v) => (v == null ? 'not in data' : fmtInt(v)) },
   ], 'Requests per month');
-  const end = new Date(`${manifest.window.end}T12:00:00`);
-  const endIsMonthEnd = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate() === end.getDate();
-  if (!endIsMonthEnd && rows.length && rows[rows.length - 1].ym === manifest.window.end.slice(0, 7)) {
-    const through = manifest.window.last_created ? fmtDate(manifest.window.last_created.replace(' ', 'T')) : fmtDate(manifest.window.end);
-    $('monthly').append(el('p', { class: 'muted', text: `The last month is partial: the newest request in the data is from ${through}. Its year-earlier value covers the selected dates one year earlier, so it can include days the current month does not have yet.` }));
+  if (part.length) {
+    const list = rows.filter((r) => r.span).map((r) => `${monthLabel(r.ym)} (${spanText(r.span).replace('partial month: ', '')})`).join(' and ');
+    $('monthly').append(el('p', { class: 'muted', text: `Hollow dots are partial months, so they are lower than a full month would be: ${list}. The newest request in the data is from ${lc ? fmtDateTime(lc.replace(' ', 'T')) : fmtDate(lastDataDay())}, because the city publishes 311 data with a delay. Year-earlier values cover the same days, up to the same time, one year earlier.` }));
   }
 }
 
@@ -364,7 +409,14 @@ async function renderAgency() {
     WITH top_agencies AS (SELECT agency FROM req WHERE ${where()} GROUP BY 1 ORDER BY count(*) DESC LIMIT 8)
     SELECT agency, coalesce(status, 'Unknown') AS status, count(*)::INTEGER AS n
     FROM req WHERE ${where()} AND agency IN (SELECT agency FROM top_agencies) GROUP BY ALL ORDER BY agency, status`);
-  const statuses = [...new Set(rows.map((r) => r.status))].sort((a, b) => (a === 'Closed' ? -1 : b === 'Closed' ? 1 : a.localeCompare(b)));
+  // Only 6 colors can be told apart, so keep Closed plus the 4 most common other
+  // statuses and group the rest as "Other statuses" (the table keeps every status).
+  const totals = new Map();
+  for (const r of rows) totals.set(r.status, (totals.get(r.status) || 0) + r.n);
+  const keep = new Set(['Closed', ...[...totals].filter(([st]) => st !== 'Closed').sort((x, y) => y[1] - x[1]).slice(0, STATUS_COLORS.length - 2).map(([st]) => st)]);
+  const OTHER = 'Other statuses';
+  const chartRows = rows.map((r) => (keep.has(r.status) ? r : { ...r, status: OTHER }));
+  const statuses = [...new Set(chartRows.map((r) => r.status))].sort((a, b) => (a === 'Closed' ? -1 : b === 'Closed' ? 1 : a === OTHER ? 1 : b === OTHER ? -1 : a.localeCompare(b)));
   const chart = Plot.plot({
     ariaLabel: 'Requests by agency and status',
     ariaDescription: 'Stacked horizontal bars: one bar per agency (top 8), split by request status.',
@@ -374,7 +426,7 @@ async function renderAgency() {
     y: { label: null },
     color: { domain: statuses, range: STATUS_COLORS, legend: true },
     marks: [
-      Plot.barX(rows, { y: 'agency', x: 'n', fill: 'status', stroke: DARK, strokeWidth: 0.5, sort: { y: '-x' }, tip: true }),
+      Plot.barX(chartRows, { y: 'agency', x: 'n', fill: 'status', stroke: DARK, strokeWidth: 0.5, sort: { y: '-x' }, tip: true }),
       Plot.ruleX([0]),
     ],
   });
@@ -533,30 +585,19 @@ async function renderMap() {
     features: rows.map((r) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [r.x, r.y] }, properties: { t: r.t, d: r.d, s: r.s, created: r.created, addr: r.addr } })),
   });
   $('map-note').textContent = (total > MAP_CAP ? `Showing the ${fmtInt(MAP_CAP)} most recent of ${fmtInt(total)} matching requests. ` : `Showing all ${fmtInt(rows.length)} matching requests. `) +
-    'Circles group nearby requests; select one to zoom in, or select a single point for details. Basemap: decision pending (OpenFreeMap or self-hosted Protomaps PMTiles).';
+    'Circles group nearby requests; select one to zoom in, or select a single point for details.';
 }
 
 // ------------------------------------------------------------- about
 
 function renderAbout() {
-  const c = manifest.counts;
-  const a = manifest.agreement;
-  const s = manifest.sources;
   const unloc = geo === 'cd' ? district.unlocated_city_assigned : null;
   $('about').replaceChildren(
-    el('ul', {},
-      el('li', {}, 'Source: ', el('a', { href: s.service_requests.url, text: s.service_requests.name || '311 Service Requests' }), ` (dataset ${s.service_requests.id}) on NYC Open Data.`),
-      el('li', {}, `Boundaries: Department of City Planning Community Districts (${s.community_districts.id}, release ${s.community_districts.version || 'unknown'}) and City Council Districts (${s.council_districts.id}, release ${s.council_districts.version || 'unknown'}).`),
-      el('li', {}, `Every request with a location was placed in a district by BoardStat, using where it happened and today's boundary lines. Requests are re-mapped to current lines even if they were made under older ones.`),
-      el('li', {}, `${fmtInt(c.without_coords)} of ${fmtInt(c.total)} requests citywide (${fmtPct(c.without_coords / c.total)}) have no usable location, so they are not in any district page.` +
-        (unloc ? ` The city's own records assign ${fmtInt(unloc)} of those to this community district.` : '')),
-      el('li', {}, `How often our district matches the city's own fields: council district ${fmtPct(a.council.share)} of ${fmtInt(a.council.compared)} requests; community district ${fmtPct(a.community_district.share)} of ${fmtInt(a.community_district.compared)}.` +
-        ' Small differences are expected where a request sits near a boundary line. For requests made before the 2023 redistricting (not in this window yet), the city\'s council field uses the old lines, so the gap will grow once older years are added.'),
-      el('li', {}, `Problem names are grouped regardless of capitalization (for example PLUMBING and Plumbing). ${manifest.complaint_types.unreviewed} of ${manifest.complaint_types.groups} groupings have not yet been reviewed by a person.`),
-      el('li', {}, `Time to close (days to close) is the close date minus the created date, in days. It counts only requests marked Closed. Requests with no close date, closed before they were opened (${fmtInt(c.closed_before_created)} citywide) or with a close date in the future (${fmtInt(c.closed_in_future)}) are left out, and so are the few requests that carry a close date but whose status is not Closed.`),
-      el('li', {}, `"Not yet closed" means any status other than Closed (for example Open, In Progress, Assigned). Days open are counted from when a request was created to when this data was built (${fmtDateTime(manifest.generated_at)}), not to today.`),
-      el('li', {}, '311 counts reflect who reports problems and how, not only how many problems exist. A higher count can mean more engaged neighbors, not a worse block.'),
-    ),
+    el('p', {}, 'Every request with a location was placed in this district by BoardStat, using where it happened and today\'s boundary lines.' +
+      (unloc ? ` ${fmtInt(unloc)} requests that have no usable location are assigned to this community district by the city's own records; they are not counted on this page.` : '')),
+    el('ul', { class: 'more-links' },
+      el('li', {}, el('a', { class: 'button', href: 'about.html', text: 'About BoardStat: sources and history' })),
+      el('li', {}, el('a', { class: 'button secondary', href: 'glossary.html', text: 'Glossary: terms and how numbers are counted' }))),
   );
 }
 

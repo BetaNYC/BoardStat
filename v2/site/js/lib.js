@@ -138,16 +138,19 @@ export function el(tag, attrs = {}, ...children) {
 
 /**
  * Build an accessible table. columns: [{key, label, num?, fmt?}]
+ * On narrow screens CSS turns each row into a card (class "stack"; each cell's
+ * data-label is its column name). Changing a table's CSS display drops its table
+ * meaning in some browsers, so the ARIA table roles are set explicitly.
  */
 export function table(rows, columns, caption) {
   return el('div', { class: 'table-wrap' },
-    el('table', {},
+    el('table', { class: 'stack', role: 'table' },
       caption ? el('caption', { text: caption }) : null,
-      el('thead', {}, el('tr', {}, columns.map((c) => el('th', { scope: 'col', class: c.num ? 'num' : null, text: c.label })))),
-      el('tbody', {}, rows.map((r) => el('tr', {}, columns.map((c) => {
+      el('thead', { role: 'rowgroup' }, el('tr', { role: 'row' }, columns.map((c) => el('th', { scope: 'col', role: 'columnheader', class: c.num ? 'num' : null, text: c.label })))),
+      el('tbody', { role: 'rowgroup' }, rows.map((r) => el('tr', { role: 'row' }, columns.map((c) => {
         const v = r[c.key];
         const content = c.render ? c.render(r) : (c.fmt ? c.fmt(v, r) : (v ?? ''));
-        return el('td', { class: c.num ? 'num' : null }, content);
+        return el('td', { role: 'cell', class: c.num ? 'num' : null, 'data-label': c.label }, content);
       }))))));
 }
 
