@@ -698,7 +698,7 @@ function renderAbout() {
 /** Address page: the ZIP code and the two districts the address is in, with links. */
 async function renderAddressLinks() {
   const [a] = await query(`
-    SELECT mode(incident_zip) AS zip, mode(cd) AS cd, mode(cc) AS cc FROM req WHERE address_norm = ${lit(state.addr)}`);
+    SELECT mode(incident_zip) AS zip, mode(cd) AS cd, mode(cc) AS cc, mode(borough) AS boro FROM req WHERE address_norm = ${lit(state.addr)}`);
   const link = (g, id) => {
     const d = manifest.districts[g]?.find((x) => String(x.id) === String(id));
     return el('a', { href: `district.html?geo=${g}&id=${encodeURIComponent(id)}` }, d ? d.label : `${g.toUpperCase()} ${id}`);
@@ -709,7 +709,13 @@ async function renderAddressLinks() {
   if (a?.cc != null) parts.push(link('cc', a.cc));
   const out = [];
   parts.forEach((p, i) => { if (i) out.push(' · '); out.push(p); });
+  // Cross-reference: BetaNYC's Boundaries Map shows the political and administrative
+  // boundary around this address (it takes "ADDRESS, Borough, ZIP").
+  const boro = a?.boro && a.boro !== 'Unspecified' ? a.boro.charAt(0) + a.boro.slice(1).toLowerCase().replace(/ (\w)/g, (m, c) => ` ${c.toUpperCase()}`) : null;
+  const bq = new URLSearchParams({ addr: [state.addr, boro, a?.zip].filter(Boolean).join(', ') });
+  const bLink = el('a', { href: `https://boundaries.beta.nyc/?${bq}`, target: '_blank', rel: 'noopener' }, 'See the boundaries around this address on the BetaNYC Boundaries Map');
   $('addr-links').replaceChildren(...(out.length ? ['In ', ...out, '. Select a district to see all of it.'] : []));
+  $('addr-links').after(el('p', { class: 'no-print' }, bLink, el('span', { class: 'muted', text: ' (political and administrative districts, opens in a new tab)' })));
   $('boundary-note').textContent = 'Every request whose address matches this one exactly, as the city spelled it. Requests that gave only a cross street are not included.';
 }
 
