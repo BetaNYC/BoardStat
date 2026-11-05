@@ -1,0 +1,13 @@
+# Generated data: never commit raw or bulk outputs.
+pipeline/.cache/
+pipeline/.venv/
+site/data/*
+!site/data/.gitkeep
+!site/data/README.md
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Local 3-year build and preview (uploaded to the server, never committed).
+data-3yr/
+preview-3yr/

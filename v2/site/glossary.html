@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Glossary · BoardStat 2.0 (prototype)</title>
+  <meta name="description" content="The terms BoardStat uses, how each number is calculated, and where to find the datasets behind it.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css?v=c78c82815c">
+  <!-- importmap:start -->
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=39658bdbe9","./js/index.js":"./js/index.js?v=506d3a7772","./js/lib.js":"./js/lib.js?v=5b03d7e396","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <!-- importmap:end -->
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site">
+    <a class="brand" href="./">BoardStat 2.0</a><span class="tag">prototype</span>
+    <nav class="site-nav" aria-label="Site"><a href="./">Districts</a> <a href="about.html">About</a> <a href="glossary.html" aria-current="page">Glossary</a></nav>
+  </header>
+
+  <main id="main">
+    <h1>Glossary</h1>
+    <p class="lede">The words BoardStat uses, how each number on a district page is counted, and where to find the data yourself.</p>
+    <nav class="panel toc" aria-label="On this page">
+      <ul>
+        <li><a href="#places-h">Places and district lines</a></li>
+        <li><a href="#fields-h">What a 311 request contains</a></li>
+        <li><a href="#calc-h">How the numbers are counted</a></li>
+        <li><a href="#panels-h">Each part of a district page</a></li>
+        <li><a href="#timing-h">Dates and how fresh the data is</a></li>
+        <li><a href="#datasets-h">Datasets and where to find them</a></li>
+      </ul>
+    </nav>
+
+    <section class="panel" aria-labelledby="places-h">
+      <h2 id="places-h">Places and district lines</h2>
+      <dl class="glossary">
+        <dt id="community-district">Community district</dt>
+        <dd>
+          <p>One of New York City's 59 community districts. Each one has a community board. BoardStat numbers them the way the Department of City Planning does: the first digit is the borough (1 Manhattan, 2 Bronx, 3 Brooklyn, 4 Queens, 5 Staten Island) and the last two are the district. So 306 is Brooklyn Community District 6.</p>
+        </dd>
+
+        <dt id="council-district">Council district</dt>
+        <dd>
+          <p>One of the 51 City Council districts. Some council districts cross a borough line.</p>
+        </dd>
+
+        <dt id="jia">Joint Interest Area</dt>
+        <dd>
+          <p>A large park or airport that the Department of City Planning keeps outside every community district, such as Central Park (164). BoardStat lists these as their own "districts", because requests made there are not in any neighboring community district.</p>
+        </dd>
+
+        <dt id="boundary-release">District lines (boundary release)</dt>
+        <dd>
+          <p>The district shapes come from the Department of City Planning. The city updates them a few times a year, and each update has a release name, like <strong>26c</strong>. BoardStat uses today's lines for every request, including old ones.</p>
+        </dd>
+
+        <dt id="placed">Placed in a district (re-mapped)</dt>
+        <dd>
+          <p>BoardStat does not use the district written on each request. It takes the request's map location and checks which district shape contains that point. This is called a point-in-polygon check: "which shape is this dot inside?"</p>
+          <p>We do this because the city's own council district field keeps the old, pre-2023 lines on older requests. Re-mapping puts every request on the same map. If a point sits exactly on a line between two districts, it goes to the district with the lower number, so the result is always the same.</p>
+        </dd>
+
+        <dt id="located">Located / no usable location</dt>
+        <dd>
+          <p>A request is <strong>located</strong> if it has a latitude and longitude inside New York City. A request with no location, or with one far outside the city, has <strong>no usable location</strong>. Those requests are counted citywide but are not on any district page. A few requests with a location also fall outside every district's lines. The <a href="about.html">About page</a> shows how many.</p>
+        </dd>
+
+        <dt id="agreement">Agreement with the city's district fields</dt>
+        <dd>
+          <p>How often BoardStat's district matches the district the city wrote on the request.</p>
+          <span class="formula">Agreement = requests where both match ÷ requests where both have a district</span>
+          <p>Small differences are normal near a boundary line. The current numbers are on the <a href="about.html">About page</a>.</p>
+        </dd>
+
+        <dt id="borough-compare">Borough (for comparisons)</dt>
+        <dd>
+          <p>For a community district, its own borough. For a council district, the borough where most of that district's requests are.</p>
+        </dd>
+      </dl>
+    </section>
+
+    <section class="panel" aria-labelledby="fields-h">
+      <h2 id="fields-h">What a 311 request contains</h2>
+      <p>Each row in the city's 311 data is one service request: one report to 311 by phone, app, text or website. These are the fields BoardStat shows.</p>
+      <dl class="glossary">
+        <dt id="request">Request (service request)</dt>
+        <dd><p>One report to 311. One problem can lead to several requests if several people report it.</p></dd>
+
+        <dt id="problem">Problem (formerly "Complaint Type")</dt>
+        <dd>
+          <p>The kind of problem, like Noise - Residential or Illegal Parking. The city's field is <code>complaint_type</code>.</p>
+          <p>The city sometimes spells the same problem in different ways, like PLUMBING and Plumbing. BoardStat groups spellings that differ only in capital letters or spaces, and shows the most common spelling that is not in ALL CAPS. It does not merge problems with different words. The original spelling is kept in the CSV download as <code>complaint_type_raw</code>.</p>
+        </dd>
+
+        <dt id="description">Description (formerly "Descriptor")</dt>
+        <dd>
+          <p>More detail about the problem, like Loud Music/Party under Noise - Residential. The city's field is <code>descriptor</code>. When a request has no description, BoardStat shows <strong>(none)</strong>. The city's second description field, <code>descriptor_2</code>, is in the CSV download but cannot be filtered.</p>
+        </dd>
+
+        <dt id="agency">Agency</dt>
+        <dd><p>The city agency the request was sent to, shown by its short code (like NYPD or DSNY) and full name.</p></dd>
+
+        <dt id="status">Status</dt>
+        <dd><p>Where the request stands, as the city reports it: for example Open, In Progress, Assigned or Closed.</p></dd>
+
+        <dt id="created-date">Created date</dt>
+        <dd><p>When the request was made. Every date filter, and every month, uses the created date.</p></dd>
+
+        <dt id="closed-date">Closed date</dt>
+        <dd><p>When the agency closed the request. Some requests have no closed date. A few have an impossible one: before the request was made, or in the future.</p></dd>
+
+        <dt id="address">Address</dt>
+        <dd>
+          <p>The street address the city recorded (<code>incident_address</code>). When there is none, the request list shows the two cross streets instead.</p>
+          <p>To count requests by address, BoardStat cleans the address a little: extra spaces are removed and letters are made capitals. It does not fix spellings, so <code>5 AVENUE</code> and <code>FIFTH AVENUE</code> count as two different addresses.</p>
+        </dd>
+
+        <dt id="address-lookup">Address lookup</dt>
+        <dd><p>The address box on the first page: choose <strong>An address</strong> in Step 1. Selecting a match (or pressing Enter for the first one) opens its <a href="#address-page">address page</a>. It is not a geocoder (a tool that finds any address on a map). It only finds addresses that already appear in 311 requests in this data, spelled the city's way, and needs at least 4 characters. It accepts common short forms: it drops the city, state and comma part, uses a ZIP code if you give one, turns <code>Ave</code>, <code>St</code>, <code>Blvd</code> and similar at the end into the full word, <code>5th</code> into <code>5</code>, and <code>E</code> or <code>W</code> after the house number into <code>EAST</code> or <code>WEST</code>.</p></dd>
+
+        <dt id="311-number">311 number</dt>
+        <dd><p>The request's unique number (<code>unique_key</code>). You can look it up on 311's own site to see its full history.</p></dd>
+      </dl>
+    </section>
+
+    <section class="panel" aria-labelledby="calc-h">
+      <h2 id="calc-h">How the numbers are counted</h2>
+      <p>Every number is counted directly from the 311 data by ordinary code, in your browser, for the filters you chose. Nothing is estimated or predicted.</p>
+      <dl class="glossary">
+        <dt id="requests">Requests</dt>
+        <dd>
+          <span class="formula">Requests = how many requests match every filter</span>
+        </dd>
+
+        <dt id="closed">Closed</dt>
+        <dd><p>A request whose status is exactly <strong>Closed</strong>. A few requests have a closed date but a status like Open; BoardStat does not count those as closed.</p></dd>
+
+        <dt id="not-closed">Not yet closed</dt>
+        <dd>
+          <p>Any status other than Closed, including a missing status.</p>
+          <span class="formula">Not yet closed = requests − closed requests</span>
+        </dd>
+
+        <dt id="time-to-close">Time to close (days to close)</dt>
+        <dd>
+          <p>How long one request took to close, in days, including parts of a day.</p>
+          <span class="formula">Days to close = (closed date and time − created date and time) ÷ 24 hours</span>
+          <p>A request closed 36 hours after it was made took 1.5 days. Time to close only counts requests that are Closed and have a usable closed date. Requests with no closed date, closed before they were made, or closed in the future are left out.</p>
+        </dd>
+
+        <dt id="median">Median time to close</dt>
+        <dd>
+          <p>Line up every closed request from fastest to slowest. The median is the one in the middle: half closed faster, half closed slower. It is the best single "typical" number, because a few very slow requests do not pull it up.</p>
+        </dd>
+
+        <dt id="average">Average time to close</dt>
+        <dd>
+          <span class="formula">Average = total days to close ÷ number of closed requests</span>
+          <p>A few requests that took months can pull the average far above the median. When the average is much bigger than the median, most requests closed fast but some took a long time.</p>
+        </dd>
+
+        <dt id="days-open">Days open</dt>
+        <dd>
+          <p>For a request that is not yet closed: how long it has been open.</p>
+          <span class="formula">Days open = (time this data was built − created date and time) ÷ 24 hours</span>
+          <p>It is counted to when the data was built, not to today, so it does not grow while the data sits still.</p>
+        </dd>
+
+        <dt id="share">Share of requests</dt>
+        <dd>
+          <span class="formula">Share = requests about one problem ÷ all located requests in that place</span>
+          <p>Used in the Compare panel. Shares let you compare a district with its borough and the city, even though they have very different numbers of requests.</p>
+        </dd>
+
+        <dt id="caveat">What 311 counts can and cannot tell you</dt>
+        <dd><p>311 counts show who reports problems and how, not only how many problems exist. A higher count can mean more engaged neighbors, not a worse block.</p></dd>
+      </dl>
+    </section>
+
+    <section class="panel" aria-labelledby="panels-h">
+      <h2 id="panels-h">Each part of a district page</h2>
+      <dl class="glossary">
+        <dt id="filters">Filters</dt>
+        <dd><p>From and To dates, Problem, Description (you can also exclude descriptions), Agency, Status and Address. Filters apply to every panel unless a panel says otherwise. They are saved in the page's web address, so you can bookmark or share a filtered view.</p></dd>
+
+        <dt id="at-a-glance">At a glance</dt>
+        <dd><p>Four numbers for the filtered requests: <a href="#requests">Requests</a>, <a href="#not-closed">Not yet closed</a>, <a href="#median">Median</a> and <a href="#average">Average time to close</a>. Times under 10 days show one decimal; longer times are rounded to whole days.</p></dd>
+
+        <dt id="top-10">Top 10 problems</dt>
+        <dd><p>The 10 problems with the most requests. Ties are sorted A to Z. Select a problem to see its 15 most common descriptions.</p></dd>
+
+        <dt id="per-month">Requests per month</dt>
+        <dd>
+          <p>Requests counted by the month they were created.</p>
+          <p>A <strong>partial month</strong> is a month where only some days are counted: because your From or To date falls inside it, or because the data has not reached the end of it yet. (The newest month is usually partial, because the city publishes 311 data a day or more late.) Partial months are drawn as hollow dots with the word "partial", and are not joined to the line, so a short month never looks like a sudden drop. The table says which days they cover.</p>
+          <p><strong>One line per year.</strong> When the dates cover more than 13 months, the chart draws one line for each calendar year, with January to December along the bottom. The newest year is the thickest, darkest line. The table still lists every month.</p>
+          <p><strong>Same month a year earlier</strong> (in the table, and on the chart for shorter date ranges) uses the same filters on exactly the same days, 12 months before. For a partial month it covers the same partial days. It only appears where the data reaches back that far.</p>
+        </dd>
+
+        <dt id="agency-responsiveness">Agency responsiveness</dt>
+        <dd><p>One row per agency, most requests first: requests, not yet closed, closed, and median and average days to close (closed requests only). The chart below it splits the 8 agencies with the most requests by status.</p></dd>
+
+        <dt id="still-open">Still open from before this period</dt>
+        <dd>
+          <p>Requests created between the start of the data and the day before your From date that were still not closed when the data was built. Every filter applies except dates and status.</p>
+          <p>Statuses of older months can lag. To save time, the build reuses its download of any month that ended more than 60 days ago, so some of these may have closed since.</p>
+        </dd>
+
+        <dt id="map">Map of requests</dt>
+        <dd><p>Each dot is a request. Circles group requests that are close together. Bigger, darker circles hold more requests (light: under 100, middle: 100 to 999, dark: 1,000 or more). Select a circle to zoom in. The map shows at most the 60,000 most recent matching requests.</p></dd>
+
+        <dt id="top-addresses">Addresses with the most requests</dt>
+        <dd><p>The 15 <a href="#address">addresses</a> with the most matching requests, with the problem reported most often at each one. Requests with only cross streets are not in this list.</p></dd>
+
+        <dt id="address-page">Address page</dt>
+        <dd><p>Every request at one <a href="#address">address</a>, over the whole data window. Open it by selecting an address in the <a href="#address-lookup">address lookup</a>. It has the same filters and panels as a district page, plus <strong>Problems over time</strong>: one bar per month, split into the five most common problems at that address, with the rest grouped. <strong>Compare with its districts</strong> puts the address's 10 biggest problems, as a <a href="#share">share</a> of its requests, next to the same share in its community district and council district, with buttons to open either district. As in Compare, only the dates apply there, and the districts use whole months. It matches the address exactly as the city spelled it, so requests that gave only a cross street are not included. A link at the top opens the address on the <a href="https://boundaries.beta.nyc/">BetaNYC Boundaries Map</a> (<a href="https://github.com/BetaNYC/nyc-boundaries">code on GitHub</a>), which lists the political and administrative districts at that spot. It uses the middle of the locations 311 recorded for the address.</p></dd>
+
+        <dt id="compare">Compare</dt>
+        <dd><p>This district's 10 biggest problems, as a <a href="#share">share</a> of its located requests, next to the same share in its <a href="#borough-compare">borough</a> and the whole city. It uses whole months from your From and To dates. Only the dates apply: problem, description, agency, status and address filters do not.</p></dd>
+
+        <dt id="every-request">Every request (and the CSV download)</dt>
+        <dd><p>The matching requests, newest first, 50 at a time. <strong>Download CSV</strong> gives every matching request as a spreadsheet file, with the city's original fields plus BoardStat's district numbers (<code>cd</code>, <code>cc</code>), <code>days_to_close</code>, and <code>close_flag</code>, which says why a time to close was left out.</p></dd>
+      </dl>
+    </section>
+
+    <section class="panel" aria-labelledby="timing-h">
+      <h2 id="timing-h">Dates and how fresh the data is</h2>
+      <dl class="glossary">
+        <dt id="data-as-of">Data as of</dt>
+        <dd><p>When BoardStat last downloaded the data and rebuilt its files.</p></dd>
+
+        <dt id="portal-updated">Portal last updated</dt>
+        <dd><p>When the city last updated the 311 dataset on NYC Open Data.</p></dd>
+
+        <dt id="window">Data window</dt>
+        <dd><p>The dates BoardStat covers. For now that is about the last three years, starting November 1, 2023. Older years are planned.</p></dd>
+
+        <dt id="delay">Publishing delay</dt>
+        <dd><p>The city publishes 311 data a day or more after requests are made, so the newest request is always a little older than the build date.</p></dd>
+
+        <dt id="stale">Out-of-date warning</dt>
+        <dd><p>A yellow notice appears when the data was built more than 48 hours ago.</p></dd>
+
+        <dt id="time-zone">Time zone</dt>
+        <dd><p>All dates and times are New York City local time, as the city publishes them.</p></dd>
+      </dl>
+    </section>
+
+    <section class="panel" aria-labelledby="datasets-h">
+      <h2 id="datasets-h">Datasets and where to find them</h2>
+      <p>All of these are free and public. You can open them, filter them and download them yourself.</p>
+      <dl class="glossary">
+        <dt id="ds-311">311 Service Requests from 2020 to Present</dt>
+        <dd><p>On NYC Open Data, dataset ID <code>erm2-nwe9</code>. Every request on BoardStat comes from here. <a href="https://data.cityofnewyork.us/d/erm2-nwe9">Open the dataset</a>.</p></dd>
+
+        <dt id="ds-311-old">311 Service Requests, 2010 to 2019</dt>
+        <dd><p>Dataset ID <code>76ig-c548</code> on NYC Open Data. Older requests are in this separate dataset. BoardStat does not use it yet. <a href="https://data.cityofnewyork.us/d/76ig-c548">Open the dataset</a>.</p></dd>
+
+        <dt id="ds-cd">Community Districts</dt>
+        <dd><p>Publisher: Department of City Planning, on NYC Open Data. Dataset ID <code>5crt-au7u</code>. The community district shapes. <a href="https://data.cityofnewyork.us/d/5crt-au7u">Open the dataset</a>.</p></dd>
+
+        <dt id="ds-cc">City Council Districts</dt>
+        <dd><p>Publisher: Department of City Planning, on NYC Open Data. Dataset ID <code>872g-cjhh</code>. The council district shapes. <a href="https://data.cityofnewyork.us/d/872g-cjhh">Open the dataset</a>.</p></dd>
+
+        <dt id="ds-basemap">Street map</dt>
+        <dd><p>The City's own NYC basemap, from the Office of Technology and Innovation. If it cannot load, the map switches to a street map built from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> data with <a href="https://docs.protomaps.com/">Protomaps</a>. The street map is only a background; no number on BoardStat comes from it.</p></dd>
+
+        <dt id="ds-code">BoardStat's code</dt>
+        <dd><p>The program that downloads the data, places requests in districts and writes the files is open source, on <a href="https://github.com/BetaNYC/BoardStat/tree/v2">GitHub</a>. You can read every calculation on this page in the code.</p></dd>
+      </dl>
+    </section>
+  </main>
+
+  <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. The original BoardStat lives at <a href="https://boardstat.beta.nyc">boardstat.beta.nyc</a>.</footer>
+</body>
+</html>

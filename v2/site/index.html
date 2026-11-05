@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BoardStat 2.0 (prototype)</title>
+  <meta name="description" content="311 service requests for every NYC community district and council district. A BetaNYC prototype.">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css?v=c78c82815c">
+  <!-- importmap:start -->
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=39658bdbe9","./js/index.js":"./js/index.js?v=506d3a7772","./js/lib.js":"./js/lib.js?v=5b03d7e396","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <!-- importmap:end -->
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site">
+    <a class="brand" href="./">BoardStat 2.0</a><span class="tag">prototype</span>
+    <nav class="site-nav" aria-label="Site"><a href="./">Districts</a> <a href="about.html">About</a> <a href="glossary.html">Glossary</a></nav>
+  </header>
+
+  <main id="main">
+    <h1>BoardStat 2.0 (prototype)</h1>
+    <p class="lede">See what New Yorkers report to 311 in your community district, your council district, or at one address: the most common problems, how long the city takes to close them, and where they happen.</p>
+    <p class="muted" id="as-of">Loading data status…</p>
+    <div class="banner warn" id="stale" role="status" hidden></div>
+
+    <form id="chooser" class="panel" novalidate>
+      <fieldset>
+        <legend>Step 1: What do you want to look at?</legend>
+        <label class="choice"><input type="radio" name="geo" value="cd" checked> A community district</label>
+        <label class="choice"><input type="radio" name="geo" value="cc"> A council district</label>
+        <label class="choice"><input type="radio" name="geo" value="addr"> An address</label>
+        <p class="muted" id="cc-note" hidden>Council districts use the current lines (Department of City Planning release <span class="bver">26c</span>). Requests made before the 2023 redistricting are re-mapped to today's lines by their location, so totals may differ from the city's own <code>council_district</code> field.</p>
+      </fieldset>
+
+      <fieldset id="step-district">
+        <legend id="district-legend">Step 2: Pick your community district</legend>
+        <label for="district-select">District</label>
+        <select id="district-select" required></select>
+        <p><button type="submit">Show this district</button></p>
+        <p class="muted">Or select a district on the map below.</p>
+      </fieldset>
+
+      <fieldset id="step-addr" hidden>
+        <legend>Step 2: Type an address</legend>
+        <label for="addr">Street address</label>
+        <input type="search" id="addr" autocomplete="off" placeholder="e.g. 114 Nassau Ave, Brooklyn, NY 11222" aria-describedby="addr-help">
+        <p class="muted" id="addr-help">Select an address to see every request there over time, and how it compares with its community district and council district. This is not a geocoder: it only finds addresses that already appear in 311 requests in this data. Common short forms work (<code>114 Nassau Ave, Brooklyn, NY 11222</code>), but write numbered streets with numbers (<code>5 Ave</code>, not <code>Fifth Ave</code>). Press Enter to open the first match.</p>
+        <p class="status" id="addr-status" role="status" aria-live="polite"></p>
+        <ul class="results" id="addr-results"></ul>
+      </fieldset>
+    </form>
+
+    <section class="panel" id="map-panel" aria-labelledby="map-h">
+      <h2 id="map-h">Or click the map</h2>
+      <div id="map" class="map" role="region" aria-label="Map of district boundaries. Clicking a district opens it. The list above offers the same choices."></div>
+      <p class="map-note">The map shows district boundaries only.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="about-h">
+      <h2 id="about-h">About</h2>
+      <p>Data comes from NYC Open Data's 311 service requests and the Department of City Planning's district boundaries. Everything runs in your browser; nothing you type is sent anywhere.</p>
+      <ul class="more-links">
+        <li><a class="button" href="about.html">About BoardStat: sources and history</a></li>
+        <li><a class="button secondary" href="glossary.html">Glossary: terms and how numbers are counted</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. The original BoardStat lives at <a href="https://boardstat.beta.nyc">boardstat.beta.nyc</a>.</footer>
+
+  <script type="module" src="js/index.js?v=506d3a7772"></script>
+</body>
+</html>
