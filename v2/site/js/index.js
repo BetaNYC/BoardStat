@@ -1,4 +1,5 @@
-// Landing page: choose a district kind, then a district (list, map, or address).
+// Landing page: Step 1 picks what to look at (community district, council district, or an
+// address); Step 2 shows the matching chooser. An address opens address.html directly.
 import { loadManifest, renderDataStatus, registerData, query, lit, el, setStatus, fmtInt, districtLabel } from './lib.js';
 import { makeMap, addBoundaries } from './map.js';
 
@@ -15,6 +16,26 @@ let mapCtx = null;
 
 const currentGeo = () => form.querySelector('input[name="geo"]:checked').value;
 const districtUrl = (geo, id) => `district.html?geo=${geo}&id=${encodeURIComponent(id)}`;
+const addressUrl = (r) => `address.html?geo=cd&id=${encodeURIComponent(r.cd)}&addr=${encodeURIComponent(r.address)}`;
+const titleCase = (s) => (s ? s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : '');
+let lastResults = [];
+
+/** Show the Step 2 that matches Step 1: a district list and map, or the address box. */
+async function applyMode() {
+  const geo = currentGeo();
+  const isAddr = geo === 'addr';
+  document.getElementById('step-district').hidden = isAddr;
+  document.getElementById('step-addr').hidden = !isAddr;
+  document.getElementById('map-panel').hidden = isAddr;
+  ccNote.hidden = geo !== 'cc';
+  history.replaceState(null, '', isAddr ? '#addr' : location.pathname + location.search);
+  if (isAddr) { addrInput.focus(); return; }
+  document.getElementById('district-legend').textContent = `Step 2: Pick your ${geo === 'cc' ? 'council' : 'community'} district`;
+  fillSelect(geo);
+  try { await showMap(geo); } catch (err) {
+    document.getElementById('map').replaceChildren(el('p', { text: `The map could not load (${err.message}). Use the list above.` }));
+  }
+}
 
 function fillSelect(geo) {
   const list = manifest.districts[geo].filter((d) => d.rows > 0);
@@ -30,16 +51,18 @@ function fillSelect(geo) {
   } else {
     for (const d of list) select.append(el('option', { value: d.id, text: d.label + (d.borough ? ` (mostly ${d.borough})` : '') }));
   }
-  ccNote.hidden = geo !== 'cc';
 }
 
 async function showMap(geo) {
   if (!geojson[geo]) geojson[geo] = await (await fetch(`data/boundaries/${geo}.geojson`)).json();
-  if (!mapCtx) mapCtx = await makeMap('map');
+  const first = !mapCtx;
+  if (first) mapCtx = await makeMap('map');
   const { map } = mapCtx;
+  map.resize(); // the map may have been hidden while the address box was showing
   for (const id of ['districts-fill', 'districts-line']) if (map.getLayer(id)) map.removeLayer(id);
   if (map.getSource('districts')) map.removeSource('districts');
   addBoundaries(map, geojson[geo]);
+  if (first) wireMap();
 }
 
 function wireMap() {
@@ -100,12 +123,13 @@ function normalizeAddress(s) {
 async function searchAddress() {
   const { street: q, zip } = normalizeAddress(addrInput.value);
   addrResults.replaceChildren();
+  lastResults = [];
   if (q.length < 4) { setStatus(addrStatus, q ? 'Type at least 4 characters.' : ''); return; }
   setStatus(addrStatus, 'Searching addresses in 311 data…');
   addrReady ||= registerData('addresses.parquet', 'data/addresses.parquet');
   await addrReady;
   // The file is sorted by address, so a prefix range lets DuckDB skip row groups.
-  const rows = await query(`
+  const rows = lastResults = await query(`
     SELECT address, zip, cd, cc, borough, n FROM 'addresses.parquet'
     WHERE address >= ${lit(q)} AND address < ${lit(q + '￿')}${zip ? ` AND zip = ${lit(zip)}` : ''}
     ORDER BY n DESC LIMIT 15`);
@@ -116,12 +140,8 @@ async function searchAddress() {
   setStatus(addrStatus, `${rows.length} matching address${rows.length === 1 ? '' : 'es'} found.`);
   for (const r of rows) {
     addrResults.append(el('li', {},
-      el('a', { class: 'addr-main', href: `address.html?geo=cd&id=${encodeURIComponent(r.cd)}&addr=${encodeURIComponent(r.address)}` },
-        `${r.address}${r.zip ? ` (${r.zip})` : ''}`), ` · ${fmtInt(r.n)} requests · in `,
-      el('a', { href: districtUrl('cd', r.cd) + `&addr=${encodeURIComponent(r.address)}` }, districtLabel(manifest, 'cd', r.cd) || `CD ${r.cd}`),
-      ' · ',
-      el('a', { href: districtUrl('cc', r.cc) + `&addr=${encodeURIComponent(r.address)}` }, districtLabel(manifest, 'cc', r.cc) || `Council District ${r.cc}`),
-    ));
+      el('a', { class: 'addr-main', href: addressUrl(r) }, `${r.address}${r.zip ? ` (${r.zip})` : ''}`),
+      el('span', { class: 'muted', text: ` · ${titleCase(r.borough)} · ${fmtInt(r.n)} requests` })));
   }
 }
 
@@ -138,28 +158,22 @@ async function main() {
   const v = manifest.sources?.council_districts?.version;
   if (v) document.querySelectorAll('.bver').forEach((n) => { n.textContent = v; });
 
-  fillSelect(currentGeo());
-  form.addEventListener('change', async (e) => {
-    if (e.target.name === 'geo') {
-      fillSelect(currentGeo());
-      await showMap(currentGeo());
-    }
-  });
+  if (location.hash === '#addr') form.querySelector('input[value="addr"]').checked = true;
+  form.addEventListener('change', (e) => { if (e.target.name === 'geo') applyMode(); });
   form.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (currentGeo() === 'addr') { if (lastResults.length) window.location.href = addressUrl(lastResults[0]); return; }
     if (select.value) window.location.href = districtUrl(currentGeo(), select.value);
   });
   addrInput.addEventListener('input', () => {
     clearTimeout(addrTimer);
     addrTimer = setTimeout(() => searchAddress().catch((err) => setStatus(addrStatus, `Address search failed: ${err.message}`)), 300);
   });
+  addrInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); if (lastResults.length) window.location.href = addressUrl(lastResults[0]); }
+  });
 
-  try {
-    await showMap(currentGeo());
-    wireMap();
-  } catch (err) {
-    document.getElementById('map').replaceChildren(el('p', { text: `The map could not load (${err.message}). Use the list above.` }));
-  }
+  await applyMode();
 }
 
 main();

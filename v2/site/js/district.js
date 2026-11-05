@@ -37,6 +37,7 @@ let page = 0;
 let total = 0;
 let mapCtx = null;
 let selectedType = null;
+let addrInfo = null; // address page: { zip, cd, cc, boro, lng, lat } of the address
 let asOfSql = null; // build time as an NYC-local TIMESTAMP literal; "days open" is measured to it
 
 // ------------------------------------------------------------- state <-> URL
@@ -67,13 +68,13 @@ function writeUrl() {
   history.replaceState(null, '', `?${p.toString()}`);
 }
 
-function where({ skipType = false, skipDates = false, skipDesc = false, skipStatus = false } = {}) {
+function where({ skipType = false, skipDates = false, skipDesc = false, skipStatus = false, skipAgency = false } = {}) {
   const w = skipDates ? ['TRUE'] : [
     `created_date >= CAST(${lit(state.start)} AS DATE)`,
     `created_date < CAST(${lit(state.end)} AS DATE) + INTERVAL 1 DAY`,
   ];
   if (!skipType && state.types.length) w.push(`complaint_type IN (${state.types.map(lit).join(', ')})`);
-  if (state.agency) w.push(`agency = ${lit(state.agency)}`);
+  if (!skipAgency && state.agency) w.push(`agency = ${lit(state.agency)}`);
   if (!skipDesc && state.descs.length) w.push(`${DESC_SQL} ${state.descEx ? 'NOT IN' : 'IN'} (${state.descs.map(lit).join(', ')})`);
   if (!skipStatus && state.status) w.push(state.status === NOT_CLOSED ? NOT_CLOSED_SQL : `status = ${lit(state.status)}`);
   if (state.addr) w.push(`address_norm = ${lit(state.addr)}`);
@@ -528,6 +529,72 @@ async function renderTimeline() {
   ], 'Requests at this address per month, by problem');
 }
 
+/**
+ * Address page: this address's mix of problems next to its community district and
+ * council district. Only the dates apply (like the district Compare panel), and the
+ * districts use whole months from the aggregate file.
+ */
+async function renderAddressCompare() {
+  const cd = addrInfo?.cd != null ? String(addrInfo.cd) : null;
+  const cc = addrInfo?.cc != null ? String(addrInfo.cc) : null;
+  const label = (g, id) => manifest.districts[g]?.find((x) => String(x.id) === id)?.label || `${g.toUpperCase()} ${id}`;
+  const cdLabel = cd ? label('cd', cd) : null;
+  const ccLabel = cc ? label('cc', cc) : null;
+  const keep = new URLSearchParams();
+  if (state.start !== manifest.window.start) keep.set('start', state.start);
+  if (state.end !== manifest.window.end) keep.set('end', state.end);
+  const extra = keep.toString() ? `&${keep}` : '';
+  $('acmp-links').replaceChildren(
+    ...(cd ? [el('li', {}, el('a', { class: 'button', href: `district.html?geo=cd&id=${encodeURIComponent(cd)}${extra}` }, `Open ${cdLabel}`))] : []),
+    ...(cc ? [el('li', {}, el('a', { class: 'button secondary', href: `district.html?geo=cc&id=${encodeURIComponent(cc)}${extra}` }, `Open ${ccLabel}`))] : []),
+  );
+  const ymStart = state.start.slice(0, 7);
+  const ymEnd = state.end.slice(0, 7);
+  $('acmp-note').textContent = `Share of each problem among requests at this address, next to the same share across ${[cdLabel, ccLabel].filter(Boolean).join(' and ') || 'its districts'}. ` +
+    `The address uses your From and To dates; the districts use whole months, ${monthLabel(ymStart)} to ${monthLabel(ymEnd)}. Problem, description, agency and status filters do not apply here.`;
+  const rows = await query(`
+    WITH a AS (
+      SELECT complaint_type AS t, count(*) AS n FROM req
+      WHERE ${where({ skipType: true, skipDesc: true, skipStatus: true, skipAgency: true })}
+      GROUP BY 1
+    ), ash AS (SELECT t, n / sum(n) OVER () AS a_share FROM a),
+    g AS (
+      SELECT geo_kind, complaint_type AS t, sum(n) AS n FROM 'agg.parquet'
+      WHERE year_month BETWEEN ${lit(ymStart)} AND ${lit(ymEnd)}
+        AND ((geo_kind = 'cd' AND geo_id = ${lit(cd || '')}) OR (geo_kind = 'cc' AND geo_id = ${lit(cc || '')}))
+      GROUP BY ALL
+    ), gs AS (SELECT geo_kind, t, n / sum(n) OVER (PARTITION BY geo_kind) AS g_share FROM g),
+    top AS (SELECT t, a_share FROM ash ORDER BY a_share DESC, t LIMIT 10)
+    SELECT top.t, top.a_share AS a,
+      max(g_share) FILTER (WHERE geo_kind = 'cd') AS d,
+      max(g_share) FILTER (WHERE geo_kind = 'cc') AS c
+    FROM top LEFT JOIN gs USING (t) GROUP BY top.t, top.a_share ORDER BY a DESC, top.t`);
+  if (!rows.length) { $('acmp').replaceChildren(el('p', { text: 'No requests at this address in these dates.' })); return; }
+  const names = ['This address', cdLabel || 'Community district', ccLabel || 'Council district'];
+  const long = rows.flatMap((r) => [
+    { t: r.t, where: names[0], share: r.a ?? 0 },
+    { t: r.t, where: names[1], share: r.d ?? 0 },
+    { t: r.t, where: names[2], share: r.c ?? 0 },
+  ]);
+  const chart = Plot.plot({
+    ariaLabel: 'Share of top problems: this address, its community district, its council district',
+    ariaDescription: 'Dot chart comparing each top problem\'s share of requests at this address, in its community district, and in its council district.',
+    marginLeft: 180,
+    height: 50 + 30 * rows.length,
+    x: { label: 'Share of requests', tickFormat: '.0%', grid: true },
+    y: { label: null, domain: rows.map((r) => r.t) },
+    color: { domain: names, range: [BLUE, DARK, GRAY], legend: true },
+    symbol: { domain: names, range: ['circle', 'square', 'triangle'] },
+    marks: [Plot.dot(long, { x: 'share', y: 't', fill: 'where', symbol: 'where', r: 5, tip: true })],
+  });
+  chartWithTable($('acmp'), chart, rows, [
+    { key: 't', label: 'Problem' },
+    { key: 'a', label: 'This address', num: true, fmt: fmtPct },
+    { key: 'd', label: names[1], num: true, fmt: fmtPct },
+    { key: 'c', label: names[2], num: true, fmt: fmtPct },
+  ], 'Share of requests by problem: this address and its districts');
+}
+
 async function renderAddresses() {
   const rows = await query(`
     SELECT address_norm AS a, count(*)::INTEGER AS n, mode(complaint_type) AS top_type
@@ -700,6 +767,7 @@ async function renderAddressLinks() {
   const [a] = await query(`
     SELECT mode(incident_zip) AS zip, mode(cd) AS cd, mode(cc) AS cc, mode(borough) AS boro,
            median(longitude) AS lng, median(latitude) AS lat FROM req WHERE address_norm = ${lit(state.addr)}`);
+  addrInfo = a || null;
   const link = (g, id) => {
     const d = manifest.districts[g]?.find((x) => String(x.id) === String(id));
     return el('a', { href: `district.html?geo=${g}&id=${encodeURIComponent(id)}` }, d ? d.label : `${g.toUpperCase()} ${id}`);
@@ -738,7 +806,7 @@ async function refresh() {
     await renderKpis();
     if (seq !== refreshSeq) return;
     await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgencyResponse(), renderAgency(), renderBacklog(), renderDetail(), renderMap(),
-      ...(ADDRESS_MODE ? [renderTimeline()] : [renderAddresses(), renderCompare()])]);
+      ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare()] : [renderAddresses(), renderCompare()])]);
     if (seq === refreshSeq) setStatus($('status'), `${fmtInt(total)} requests match.`);
   } catch (err) {
     console.error(err);
