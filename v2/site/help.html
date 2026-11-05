@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Help and feedback · BoardStat 2.0 (prototype)</title>
+  <meta name="description" content="How to use BoardStat 2.0, answers to common questions, and how to send BetaNYC feedback.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css?v=cbb35afbba">
+  <!-- importmap:start -->
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=889a56c4ec","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=7c26b37530","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <!-- importmap:end -->
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site">
+    <a class="brand" href="./">BoardStat 2.0</a><span class="tag">prototype</span>
+    <nav class="site-nav" aria-label="Site"><a href="./">Districts</a> <a href="about.html">About</a> <a href="glossary.html">Glossary</a> <a href="help.html" aria-current="page">Help &amp; feedback</a></nav>
+  </header>
+
+  <main id="main">
+    <h1>Help and feedback</h1>
+    <p class="lede">How to use BoardStat, answers to common questions, and how to tell us what works and what doesn't.</p>
+    <nav class="panel toc" aria-label="On this page">
+      <ul>
+        <li><a href="#feedback-h">Give feedback</a></li>
+        <li><a href="#start-h">How to use BoardStat</a></li>
+        <li><a href="#faq-h">Common questions</a></li>
+      </ul>
+    </nav>
+
+    <section class="panel" aria-labelledby="feedback-h" id="feedback">
+      <h2 id="feedback-h">Give feedback</h2>
+      <p>BoardStat 2.0 is a prototype, and we are building it with the people who use it. Tell us what helps, what is confusing, what is wrong, and what you wish it did.</p>
+      <ul class="more-links">
+        <li><a class="button" href="mailto:boardstat@beta.nyc?subject=BoardStat%202.0%20feedback">Email boardstat@beta.nyc</a></li>
+        <li><a class="button secondary" href="https://github.com/BetaNYC/BoardStat/issues">Open an issue on GitHub</a></li>
+      </ul>
+      <p>Email works for everyone. GitHub is for people who already use it; issues there are public.</p>
+      <p><strong>It helps if you include:</strong></p>
+      <ul>
+        <li>the web address of the page you were on (it keeps your filters, so we see what you saw)</li>
+        <li>what you expected to see, and what you saw instead</li>
+        <li>your phone or computer and browser, if something looked broken</li>
+      </ul>
+    </section>
+
+    <section class="panel" aria-labelledby="start-h">
+      <h2 id="start-h">How to use BoardStat</h2>
+      <ol>
+        <li><strong>Pick what to look at.</strong> On the <a href="./">first page</a>, choose a community district, a council district or an address. For a district, pick it from the list or click it on the map. For an address, type it the way you normally would (for example <code>114 Nassau Ave, Brooklyn, NY 11222</code>) and select a match.</li>
+        <li><strong>Narrow it down.</strong> Use the filters at the top: dates, problem, description, agency and status. Every part of the page updates.</li>
+        <li><strong>Read the page.</strong> Start with "At a glance", then the top problems, requests per month, how long agencies take to close requests, and the map. Select a problem or an agency to filter the page to it.</li>
+        <li><strong>Share or keep it.</strong> The page's web address keeps your filters, so you can bookmark it or send it to someone. "Print summary" makes a printable page, and "Download CSV" gives you every matching request in a spreadsheet.</li>
+      </ol>
+      <p>Every term and number is explained in the <a href="glossary.html">Glossary</a>.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="faq-h">
+      <h2 id="faq-h">Common questions</h2>
+      <dl class="glossary">
+        <dt>Why can't it find my address?</dt>
+        <dd><p>BoardStat only knows addresses that already appear in 311 requests in its data, spelled the way the city records them. Write numbered streets with numbers (<code>5 Ave</code>, not <code>Fifth Ave</code>). If a building has never had a 311 request with its address, it won't be found. Requests that gave only a cross street are not on address pages.</p></dd>
+
+        <dt>How up to date is the data?</dt>
+        <dd><p>BoardStat updates every night. The city publishes 311 data with a delay of a day or more, so the newest requests are usually from the day before. Each page says when the data was built and what changed since the last update. If a page says the data is out of date, the nightly update did not run; we are alerted when that happens.</p></dd>
+
+        <dt>Why do my council district numbers differ from the city's?</dt>
+        <dd><p>Council district lines changed in 2023. BoardStat places every request in today's lines by where it happened, while the city's own <code>council_district</code> field keeps the old district on older requests. See <a href="glossary.html#agreement">Agreement</a> in the Glossary.</p></dd>
+
+        <dt>Why is the last month so low?</dt>
+        <dd><p>It is a partial month: only the days so far. BoardStat shows partial months as hollow dots so they don't look like a drop.</p></dd>
+
+        <dt>Can I see years before 2023?</dt>
+        <dd><p>Not yet. BoardStat covers about the last three years. Going back to 2010 is planned.</p></dd>
+
+        <dt>Is anything I type sent anywhere?</dt>
+        <dd><p>No. BoardStat runs in your browser: your filters and the addresses you search for stay on your device.</p></dd>
+
+        <dt>Is this an official City of New York tool?</dt>
+        <dd><p>No. BoardStat is a BetaNYC prototype built on the City's open data. For official 311 information, see <a href="https://portal.311.nyc.gov/">NYC311</a>.</p></dd>
+      </dl>
+    </section>
+  </main>
+
+  <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>.</footer>
+</body>
+</html>
