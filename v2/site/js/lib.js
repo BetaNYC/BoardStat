@@ -51,7 +51,7 @@ export function getDB() {
  */
 export async function registerData(name, relPath) {
   const { duckdb, db } = await getDB();
-  const url = new URL(relPath, window.location.href).href;
+  const url = new URL(dataUrl(relPath), window.location.href).href;
   await db.registerFileURL(name, url, duckdb.DuckDBDataProtocol.HTTP, false);
 }
 
@@ -74,10 +74,18 @@ export function lit(s) {
 
 // ---------------------------------------------------------------- manifest
 
+// Data files keep the same names on every rebuild and the server sends no cache
+// rule for them, so a browser could reuse yesterday's copy next to today's
+// manifest. Every data link carries the build time (?v=generated_at) instead.
+let dataVersion = '';
+export const dataUrl = (relPath) => (dataVersion ? `${relPath}?v=${encodeURIComponent(dataVersion)}` : relPath);
+
 export async function loadManifest() {
   const r = await fetch('data/manifest.json', { cache: 'no-cache' });
   if (!r.ok) throw new Error(`data/manifest.json returned HTTP ${r.status}. Run the pipeline first (see v2/README.md).`);
-  return r.json();
+  const m = await r.json();
+  dataVersion = m.generated_at || '';
+  return m;
 }
 
 export function hoursSince(iso) {
@@ -101,6 +109,26 @@ export function renderDataStatus(manifest, asOfEl, staleEl) {
       `Heads up: this data was built ${Math.floor(age / 24)} days ago and may be out of date. ` +
       `Newer 311 requests will not appear until the data is rebuilt.`;
   }
+}
+
+/**
+ * "What changed since the last update" from data/changes.json, which the nightly
+ * refresh writes (new requests, updated requests, requests that became Closed).
+ * No file, no line: a one-off build has nothing to compare against.
+ */
+export async function renderChanges(target, where = null) {
+  if (!target) return;
+  let c;
+  try {
+    const r = await fetch('data/changes.json', { cache: 'no-cache' });
+    if (!r.ok) return;
+    c = await r.json();
+  } catch { return; }
+  const part = (x = {}) => `${fmtInt(x.new || 0)} new, ${fmtInt(x.updated || 0)} updated, ${fmtInt(x.closed || 0)} closed`;
+  let text = `What changed ${c.since ? `since ${fmtDateTime(c.since)}` : 'in the latest update'}: citywide ${part(c.city)}`;
+  if (where) text += `; ${where.label} ${part(c[where.geo]?.[String(where.id)])}`;
+  target.textContent = `${text}.`;
+  target.hidden = false;
 }
 
 // ---------------------------------------------------------------- formatting

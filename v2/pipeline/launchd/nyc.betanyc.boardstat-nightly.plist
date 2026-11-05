@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- BoardStat nightly refresh. Installed by v2/pipeline/launchd/install.sh, which fills in REPO.
+     launchd runs it at 5:30 AM local time; if the Mac is asleep then, it runs on wake. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>nyc.betanyc.boardstat-nightly</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__REPO__/v2/pipeline/launchd/nightly.sh</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>BOARDSTAT_NOTIFY</key>
+        <string>__NOTIFY__</string>
+    </dict>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>5</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/boardstat-nightly/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/boardstat-nightly/launchd.err.log</string>
+</dict>
+</plist>

@@ -1,6 +1,6 @@
 // District page: every query runs in DuckDB-WASM over ONE district's Parquet file.
 import {
-  PLOT_URL, loadManifest, renderDataStatus, registerData, query, lit, el, table, chartWithTable,
+  PLOT_URL, loadManifest, renderDataStatus, renderChanges, dataUrl, registerData, query, lit, el, table, chartWithTable,
   setStatus, fmtInt, fmtDays, fmtPct, fmtDate, fmtDateTime, monthLabel,
 } from './lib.js';
 import { makeMap, addBoundaries, featureBounds } from './map.js';
@@ -695,7 +695,7 @@ async function downloadCsv() {
 // ------------------------------------------------------------- map
 
 async function setupMap() {
-  const gj = await (await fetch(`data/boundaries/${geo}.geojson`)).json();
+  const gj = await (await fetch(dataUrl(`data/boundaries/${geo}.geojson`))).json();
   const feature = gj.features.find((f) => String(f.properties.id) === String(geoId));
   mapCtx = await makeMap('map', feature ? { bounds: featureBounds(feature) } : {});
   const { map, ml } = mapCtx;
@@ -847,6 +847,7 @@ async function main() {
   document.title = `${label} · BoardStat 2.0 (prototype)`;
   $('title').textContent = label;
   renderDataStatus(manifest, $('as-of'), $('stale'));
+  renderChanges($('changes'), { geo, id: geoId, label: ADDRESS_MODE ? `in ${district.label}` : 'in this district' });
   asOfSql = `CAST(${lit(nycLocal(manifest.generated_at))} AS TIMESTAMP)`;
   const b = geo === 'cd' ? manifest.sources.community_districts : manifest.sources.council_districts;
   $('boundary-note').textContent = `Boundary: ${geo === 'cd' ? 'Community District' : 'City Council District'} lines, Department of City Planning release ${b.version || 'unknown'}.` +

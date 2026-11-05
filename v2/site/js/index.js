@@ -1,6 +1,6 @@
 // Landing page: Step 1 picks what to look at (community district, council district, or an
 // address); Step 2 shows the matching chooser. An address opens address.html directly.
-import { loadManifest, renderDataStatus, registerData, query, lit, el, setStatus, fmtInt, districtLabel } from './lib.js';
+import { loadManifest, renderDataStatus, renderChanges, dataUrl, registerData, query, lit, el, setStatus, fmtInt, districtLabel } from './lib.js';
 import { makeMap, addBoundaries } from './map.js';
 
 const form = document.getElementById('chooser');
@@ -54,7 +54,7 @@ function fillSelect(geo) {
 }
 
 async function showMap(geo) {
-  if (!geojson[geo]) geojson[geo] = await (await fetch(`data/boundaries/${geo}.geojson`)).json();
+  if (!geojson[geo]) geojson[geo] = await (await fetch(dataUrl(`data/boundaries/${geo}.geojson`))).json();
   const first = !mapCtx;
   if (first) mapCtx = await makeMap('map');
   const { map } = mapCtx;
@@ -155,6 +155,7 @@ async function main() {
     return;
   }
   renderDataStatus(manifest, document.getElementById('as-of'), document.getElementById('stale'));
+  renderChanges(document.getElementById('changes'));
   const v = manifest.sources?.council_districts?.version;
   if (v) document.querySelectorAll('.bver').forEach((n) => { n.textContent = v; });
 

@@ -79,8 +79,53 @@ rsync -a --chmod=D755,F644 --exclude .gitkeep -e "ssh -i ~/.ssh/id_ed25519_betan
   v2/site/ wp_iz4gh3@dp-6803fc88d2.dreamhostps.com:beta.nyc/boardstat/v2/
 ```
 
-Data files keep the same names on every rebuild, so a nightly refresh (#107) also
-needs versioned data paths or a no-cache rule for `data/`.
+Data files keep the same names on every rebuild and beta.nyc sends no cache rule
+for them, so the site adds the build time to every data link (`?v=generated_at`,
+see `dataUrl()` in `site/js/lib.js`). A new build is never mixed with old files.
+
+## Nightly refresh (#107)
+
+The city changes old 311 rows every night (a request closes, a status changes),
+so the nightly job picks up **changed** rows as well as new ones.
+`pipeline/boardstat_nightly.py`:
+
+1. Asks the portal for every row whose `:updated_at` (a Socrata system field,
+   https://dev.socrata.com/docs/system-fields) is newer than the last run, in a
+   rolling 3-year window.
+2. Patches those rows into the cached month files, replacing by `unique_key`.
+3. Saves the night's diff (`pipeline/.cache/nightly/diffs/*.parquet`: new or
+   updated, old and new status).
+4. On Sundays, compares each cached month's row count with the city's and moves
+   mismatched months to `pipeline/.cache/nightly/stale-months/`, so the build
+   downloads them again (`:updated_at` cannot show a row the city deleted).
+5. Runs the normal build into `v2/data-nightly/` and writes `changes.json`:
+   new, updated and newly closed requests since the last publish, citywide and
+   per district. The site shows it as "What changed since …".
+6. `--publish`: uploads to `data-next/` on beta.nyc, then swaps it with `data/`
+   in one step (the street map folder moves across). It refuses to publish if
+   total requests fell by more than 5%, then checks the live manifest.
+7. `--notify CHANNEL`: posts failures and warnings (no changes for 2 runs, a
+   spike over 200,000 rows, count mismatches) to Discord through Rosie, the
+   BetaNYC bot (`scripts/discord_rosie_post.py` in the BetaNYC AI workspace).
+
+State (the `:updated_at` watermark and the last publish) is in
+`pipeline/.cache/nightly/state.json`.
+
+**Where it runs:** the office Mac mini, as a launchd job, outside Claude Code.
+It runs the code in this checkout, so keep the checkout on `master`.
+
+```sh
+# one time: secrets go in the login Keychain, never a file
+security add-generic-password -U -s boardstat-socrata-app-token -a boardstat -w   # prompts
+security add-generic-password -U -s boardstat-rosie-discord-token -a boardstat -w # prompts (Rosie's DISCORD_TOKEN)
+
+bash v2/pipeline/launchd/install.sh ops-website   # 5:30 AM nightly; alerts to #ops-website
+launchctl kickstart gui/$(id -u)/nyc.betanyc.boardstat-nightly   # run now
+tail -f ~/Library/Logs/boardstat-nightly/$(date +%F).log         # watch it
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/nyc.betanyc.boardstat-nightly.plist  # stop it
+```
+
+Run it by hand without publishing: `uv run v2/pipeline/boardstat_nightly.py`.
 
 Tests (offline except for the one-time DuckDB spatial extension download):
 
@@ -245,8 +290,8 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 - Prototype quality: no automated browser tests; verified by hand in Chromium
   (Playwright) on 2026-11-04, including the description, agency-responsiveness
   and still-open features (counts cross-checked against DuckDB in Python).
-- Data is a snapshot. A stale banner appears when the build is more than 48
-  hours old; there is no scheduled job yet.
+- The nightly job depends on one Mac being on. A stale banner appears when the
+  build is more than 48 hours old.
 - Detail files for the busiest districts are the largest downloads; on slow
   connections the first load of a district takes a few seconds.
 - The map shows at most the 60,000 most recent matching requests.
@@ -263,8 +308,7 @@ Run on office-mac, 2026-11-04, with an app token, default window.
   every request without shipping GeoJSON to the browser.
 - **Historical backfill** from `76ig-c548` (2010–2019) and the rest of
   `erm2-nwe9`, re-mapped to current lines.
-- **GitHub Actions daily job** to rebuild and publish (and refresh recent
-  months' statuses).
+- **Move the nightly job to GitHub Actions** if the Mac mini proves unreliable.
 - **Hosting:** Cloudflare R2 + Pages, or GitHub Pages for the site with data on
   object storage (range requests would then let DuckDB-WASM read partial files).
 - **License decision:** this repository has **no LICENSE file**. One was not

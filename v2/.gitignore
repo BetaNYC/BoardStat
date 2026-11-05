@@ -11,3 +11,7 @@ __pycache__/
 # Local 3-year build and preview (uploaded to the server, never committed).
 data-3yr/
 preview-3yr/
+
+# Nightly refresh build folder (uploaded to the server, never committed).
+data-nightly/
+preview-nightly/
