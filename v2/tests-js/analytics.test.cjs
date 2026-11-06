@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const a = require(path.join(__dirname, '..', 'site', 'js', 'analytics.js'));
 
-const BASE = 'https://www.beta.nyc/boardstat/v2/';
+const BASE = 'https://www.beta.nyc/boardstat/';
 const ADDR = '114 NASSAU AVENUE';
 
 test('address page: the searched address is removed, the district is kept', () => {
@@ -32,7 +32,7 @@ test('the landing page #addr fragment never reaches Google', () => {
 test('referrers: same-site referrers are cleaned, other sites cut to their origin', () => {
   const ref = `${BASE}address.html?geo=cd&id=301&addr=${encodeURIComponent(ADDR)}`;
   assert.equal(a.sanitizeReferrer(ref, 'www.beta.nyc'), `${BASE}address.html?geo=cd&id=301`);
-  assert.equal(a.sanitizeReferrer('https://beta.nyc/boardstat/v2/address.html?addr=1+MAIN+ST', 'www.beta.nyc'), 'https://beta.nyc/boardstat/v2/address.html');
+  assert.equal(a.sanitizeReferrer('https://beta.nyc/boardstat/address.html?addr=1+MAIN+ST', 'www.beta.nyc'), 'https://beta.nyc/boardstat/address.html');
   assert.equal(a.sanitizeReferrer('https://www.google.com/search?q=114+nassau+avenue', 'www.beta.nyc'), 'https://www.google.com/');
   assert.equal(a.sanitizeReferrer('', 'www.beta.nyc'), '');
   assert.equal(a.sanitizeReferrer('not a url', 'www.beta.nyc'), '');

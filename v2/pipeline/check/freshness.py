@@ -21,9 +21,10 @@ import os
 import subprocess
 import sys
 import urllib.request
+from pathlib import Path
 
-MANIFEST = "https://www.beta.nyc/boardstat/v2/data/manifest.json"
-SITE = "https://www.beta.nyc/boardstat/v2/"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from site_location import PUBLIC_MANIFEST as MANIFEST, SITE  # noqa: E402
 MAX_AGE_H = float(os.environ.get("MAX_AGE_HOURS", "26"))
 LABEL = "data-freshness"
 TITLE = "BoardStat data is out of date"

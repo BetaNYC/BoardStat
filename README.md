@@ -1,5 +1,5 @@
 # BoardStat
-## BoardStat 2.0 (prototype) is live: https://www.beta.nyc/boardstat/v2/
+## BoardStat 2.0 (prototype) is live: https://www.beta.nyc/boardstat/
 
 The original Power BI BoardStat stopped refreshing in 2026. **BoardStat 2.0** replaces it: an open-source, browser-based tool for 311 data by community district, council district, or a single address, with about three years of data refreshed every night. Its code and documentation are in [`v2/`](v2/README.md). The old addresses at boardstat.beta.nyc now send visitors to the new prototype.
 
@@ -46,7 +46,7 @@ BoardStat is ingesting [NYC 311 Service Requests from 2010 to Present](https://d
 ## BoardStat 2.0 (prototype) - 2026
  * A rebuild that no longer depends on Power BI: a Python + DuckDB pipeline and a static site that queries the data in your browser. See [`v2/README.md`](v2/README.md).
  * Community districts, council districts and address pages; about three years of 311 data, refreshed nightly.
- * boardstat.beta.nyc (GitHub Pages) now redirects to https://www.beta.nyc/boardstat/v2/.
+ * boardstat.beta.nyc (GitHub Pages) now redirects to https://www.beta.nyc/boardstat/.
 
 ## BoardStat v0.7 - A New Look
  * Updated all pages to have a new header from the NYC Core Framework
