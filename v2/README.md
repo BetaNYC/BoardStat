@@ -71,7 +71,7 @@ python3 v2/serve.py
 #   Use this, not `python3 -m http.server`: the street map needs HTTP range requests.
 ```
 
-Publishing to the demo at https://www.beta.nyc/boardstat/v2/ (DreamPress; access in
+Publishing to the demo at https://www.beta.nyc/boardstat/ (DreamPress; access in
 the workspace's `team/engineering/hosting/README.md`):
 
 ```sh
@@ -79,7 +79,7 @@ python3 v2/stamp_assets.py
 #   adds ?v=<hash> to CSS/JS links and writes an import map. beta.nyc tells browsers
 #   to keep .js/.css for 120 days, so without this visitors keep old code.
 rsync -a --chmod=D755,F644 --exclude .gitkeep --exclude /data/ -e "ssh -i ~/.ssh/id_ed25519_betanyc_dreampress" \
-  v2/site/ wp_iz4gh3@dp-6803fc88d2.dreamhostps.com:beta.nyc/boardstat/v2/
+  v2/site/ wp_iz4gh3@dp-6803fc88d2.dreamhostps.com:beta.nyc/boardstat/
 ```
 
 > ⚠️ Keep `--exclude /data/`. The nightly job publishes the live `data/` folder; without

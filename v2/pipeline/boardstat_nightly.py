@@ -57,17 +57,17 @@ import duckdb
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import boardstat_build as bb  # noqa: E402
+from site_location import PUBLIC_MANIFEST, REMOTE_DIR  # noqa: E402,F401
 
 SCRIPT = "boardstat_nightly"
 NYC = ZoneInfo("America/New_York")
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 
-# Server layout (see team hosting notes): the site lives in beta.nyc/boardstat/v2/.
+# Server layout (see team hosting notes): the site lives in beta.nyc/boardstat/.
+# REMOTE_DIR and PUBLIC_MANIFEST come from site_location.py.
 SSH_KEY = Path.home() / ".ssh" / "id_ed25519_betanyc_dreampress"
 SSH_HOST = "wp_iz4gh3@dp-6803fc88d2.dreamhostps.com"
-REMOTE_DIR = "beta.nyc/boardstat/v2"
-PUBLIC_MANIFEST = "https://www.beta.nyc/boardstat/v2/data/manifest.json"
 
 # Rosie's poster lives in the BetaNYC AI workspace.
 ROSIE = Path.home() / "Code" / "BetaNYC_AI_Workspace" / "scripts" / "discord_rosie_post.py"
