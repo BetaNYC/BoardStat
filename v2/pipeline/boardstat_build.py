@@ -714,13 +714,16 @@ def build(
         descriptor, descriptor_2, status, incident_address, street_name, intersection_street_1, intersection_street_2,
         incident_zip, bbl, borough, community_board, council_district, latitude, longitude, resolution_description,
         cd, cc, city_cd, days_to_close, close_flag, address_norm, year_month, is_closed"""
-    # Detail files hold every request not yet Closed first, then the Closed ones,
-    # each part in created_date order. Each 50,000-row group's min/max statistics
-    # then let the browser fetch only the row groups a view needs: all open
-    # requests (is_closed = false) plus closed ones from the chosen dates on
-    # (is_closed = true AND created_date >= ...). See district.js, loadRange().
+    # Detail files hold the Closed requests first, then every request not yet
+    # Closed at the end, each part in created_date order. Each 50,000-row group's
+    # min/max statistics then let the browser fetch only the row groups a view
+    # needs: closed requests from the chosen dates on (is_closed = true AND
+    # created_date >= ...) plus all open ones (is_closed = false). Those are one
+    # run of row groups ending at the end of the file, so DuckDB-WASM's growing
+    # read-ahead stops at the end of the file instead of reading past what the
+    # page needs. See district.js, ensureLoaded().
     # https://duckdb.org/docs/stable/data/parquet/overview (filter pushdown, row groups)
-    detail_order = "is_closed, created_date, unique_key"
+    detail_order = "is_closed DESC, created_date, unique_key"
     # COPY ... TO with FORMAT parquet: https://duckdb.org/docs/stable/data/parquet/overview#writing-to-parquet-files
     parquet_opts = "(FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 50000)"
 

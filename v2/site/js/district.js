@@ -44,14 +44,19 @@ let loadedFrom = null; // closed requests created before this date are not in th
 
 // ------------------------------------------------------------- loading only what the view needs
 //
-// Detail files hold every request not yet Closed first, then the Closed ones in
-// created_date order, in 50,000-row groups (boardstat_build.py). The page loads all
-// open requests plus Closed ones from LOAD_BACK_MONTHS before the From date: the
-// "same month a year earlier" series needs that year, and "Still open from before
-// this period" needs every older open request. DuckDB-WASM reads only the row groups
-// whose min/max statistics match, over HTTP range requests
-// (https://duckdb.org/docs/stable/clients/wasm/data_ingestion#parquet,
-//  https://duckdb.org/docs/stable/data/parquet/overview#partial-reading).
+// Detail files hold the Closed requests first, in created_date order, then every
+// request not yet Closed at the very end, in 50,000-row groups (boardstat_build.py).
+// The page loads all open requests plus Closed ones from LOAD_BACK_MONTHS before the
+// From date: the "same month a year earlier" series needs that year, and "Still open
+// from before this period" needs every older open request. So the rows a page needs
+// are one run of row groups at the end of the file. DuckDB-WASM reads only the row
+// groups whose min/max statistics match, over HTTP range requests (lib.js turns off
+// forceFullHTTPReads; https://duckdb.org/docs/stable/data/parquet/overview#partial-reading).
+// Its read-ahead grows each read up to 16 MB, so a contiguous run that ends at the
+// end of the file costs little more than the run itself. The Closed branch of the
+// load runs first: run the other way round, DuckDB-WASM fetched about 20% more bytes
+// (CC 11, 2020+ data, measured 2026-11-06), because the second scan's read-ahead
+// re-fetched ranges the first had already read.
 // Moving the From date earlier than that reloads the table.
 const LOAD_BACK_MONTHS = 12;
 // The columns the page's panels use. The CSV download reads every column straight
@@ -90,9 +95,9 @@ async function ensureLoaded() {
   setStatus($('status'), `Loading requests from ${fmtDate(from > manifest.window.start ? from : manifest.window.start)} on…`);
   await query(`
     CREATE OR REPLACE TABLE req AS
-    SELECT ${cols} FROM 'd.parquet' WHERE is_closed = false
+    SELECT ${cols} FROM 'd.parquet' WHERE is_closed = true AND created_date >= CAST(${lit(from)} AS TIMESTAMP)
     UNION ALL
-    SELECT ${cols} FROM 'd.parquet' WHERE is_closed = true AND created_date >= CAST(${lit(from)} AS TIMESTAMP)`);
+    SELECT ${cols} FROM 'd.parquet' WHERE is_closed = false`);
   loadedFrom = from;
 }
 
@@ -200,7 +205,7 @@ async function fillFilterOptions() {
   allTypes = (await query(`SELECT complaint_type AS t, count(*) AS n FROM req GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.t);
   $('type-options').replaceChildren(...allTypes.map((t) => el('option', { value: t })));
   // Keep the fixed first options ("All agencies", "Any status", "Not yet closed"); replace the rest.
-  $('f-agency').replaceChildren($('f-agency').options[0], ...(await query(`SELECT agency, any_value(agency_name) AS agency_label, count(*) AS n FROM req GROUP BY 1 ORDER BY 3 DESC`))
+  $('f-agency').replaceChildren($('f-agency').options[0], ...(await query(`SELECT agency, any_value(agency_name) AS agency_label, count(*) AS n FROM req GROUP BY 1 ORDER BY 3 DESC, 1`))
     .map((r) => el('option', { value: r.agency, text: `${r.agency}${r.agency_label ? ` (${r.agency_label})` : ''}` })));
   const fixedStatus = [...$('f-status').options].filter((o) => o.value === '' || o.value === NOT_CLOSED);
   $('f-status').replaceChildren(...fixedStatus, ...(await query(`SELECT status, count(*) AS n FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY 2 DESC`))
@@ -628,9 +633,8 @@ async function renderAddressCompare() {
       GROUP BY 1
     ), ash AS (SELECT t, n / sum(n) OVER () AS a_share FROM a),
     g AS (
-      SELECT geo_kind, complaint_type AS t, sum(n) AS n FROM 'agg.parquet'
-      WHERE year_month BETWEEN ${lit(ymStart)} AND ${lit(ymEnd)}
-        AND ((geo_kind = 'cd' AND geo_id = ${lit(cd || '')}) OR (geo_kind = 'cc' AND geo_id = ${lit(cc || '')}))
+      SELECT geo_kind, complaint_type AS t, sum(n) AS n
+      FROM ${aggRows(ymStart, ymEnd, [['cd', cd || ''], ['cc', cc || '']])}
       GROUP BY ALL
     ), gs AS (SELECT geo_kind, t, n / sum(n) OVER (PARTITION BY geo_kind) AS g_share FROM g),
     top AS (SELECT t, a_share FROM ash ORDER BY a_share DESC, t LIMIT 10)
@@ -675,6 +679,21 @@ async function renderAddresses() {
   ], 'Select an address to filter the page to it'));
 }
 
+/**
+ * Rows of agg/month_type.parquet for the given (geo_kind, geo_id) pairs and months, as a
+ * parenthesized subquery. One UNION ALL branch per pair, because DuckDB prunes row groups
+ * with min/max statistics only for AND-ed filters; an OR across geo_kind and geo_id made
+ * every Compare query read the whole file. The file is sorted by geo_kind, geo_id,
+ * year_month (boardstat_build.py), so each branch touches one or two row groups.
+ * A null geo_id matches the kind alone ('city' has a single id).
+ */
+function aggRows(ymStart, ymEnd, pairs) {
+  return '(' + pairs.map(([kind, id]) => `
+      SELECT geo_kind, complaint_type, n FROM 'agg.parquet'
+      WHERE geo_kind = ${lit(kind)}${id === null ? '' : ` AND geo_id = ${lit(id)}`}
+        AND year_month BETWEEN ${lit(ymStart)} AND ${lit(ymEnd)}`).join('\n      UNION ALL') + ')';
+}
+
 async function renderCompare() {
   const boro = district.borough;
   const ymStart = state.start.slice(0, 7);
@@ -683,9 +702,8 @@ async function renderCompare() {
     `Compared with ${boro || 'the borough'}${geo === 'cc' ? ' (the borough where most of this district\'s requests are)' : ''} and the whole city. Problem, agency, status and address filters do not apply here.`;
   const rows = await query(`
     WITH a AS (
-      SELECT geo_kind, complaint_type AS t, sum(n) AS n FROM 'agg.parquet'
-      WHERE year_month BETWEEN ${lit(ymStart)} AND ${lit(ymEnd)}
-        AND ((geo_kind = ${lit(geo)} AND geo_id = ${lit(geoId)}) OR (geo_kind = 'borough' AND geo_id = ${lit(boro || '')}) OR geo_kind = 'city')
+      SELECT geo_kind, complaint_type AS t, sum(n) AS n
+      FROM ${aggRows(ymStart, ymEnd, [[geo, geoId], ['borough', boro || ''], ['city', null]])}
       GROUP BY ALL
     ), s AS (SELECT geo_kind, t, n / sum(n) OVER (PARTITION BY geo_kind) AS share FROM a),
     top_types AS (SELECT t FROM s WHERE geo_kind = ${lit(geo)} ORDER BY share DESC LIMIT 10)
