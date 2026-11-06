@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import email.utils
 import gzip
 import io
 import json
@@ -139,6 +140,53 @@ RETRYABLE = (
 )
 
 
+# Pacing. Socrata publishes no request-rate number: with an app token "we do not throttle
+# ... unless those requests are determined to be abusive", and a throttled client gets 429
+# (https://dev.socrata.com/docs/app-tokens). NYC Open Data still sent 27 429s and 14 503s to
+# ~83 back-to-back count queries on 2026-11-06, and 5 429s to a sequential month backfill,
+# all with a token. So we leave a gap between requests, widen it when told to slow down, and
+# let it shrink back after successes. Change with BOARDSTAT_SODA_MIN_INTERVAL /
+# BOARDSTAT_SODA_MAX_INTERVAL (seconds).
+DEFAULT_MIN_INTERVAL = 2.0
+DEFAULT_MAX_INTERVAL = 60.0
+RETRY_AFTER_CAP = 300.0
+
+
+def env_seconds(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise PipelineError(f"{name}={raw!r} is not a number of seconds") from exc
+    if value < 0:
+        raise PipelineError(f"{name}={raw!r} must not be negative")
+    return value
+
+
+def retry_after_seconds(r: requests.Response | None) -> float | None:
+    """Seconds asked for by a Retry-After header (delay or HTTP date), or None.
+
+    RFC 9110 section 10.2.3 allows either form. NYC Open Data sent none on 2026-11-06,
+    so this only matters if the portal starts sending it.
+    """
+    if r is None:
+        return None
+    raw = (r.headers.get("Retry-After") or "").strip()
+    if not raw:
+        return None
+    if raw.isdigit():
+        return float(raw)
+    try:
+        when = email.utils.parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=dt.UTC)
+    return max(0.0, (when - dt.datetime.now(dt.UTC)).total_seconds())
+
+
 class Soda:
     """Minimal client for the documented SODA endpoints we use.
 
@@ -150,9 +198,20 @@ class Soda:
     - 429 means throttled (https://dev.socrata.com/docs/app-tokens); we retry with backoff,
       and also retry 5xx, connection errors, and a connection that breaks while the body
       is being read (see RETRYABLE).
+    - Polite pacing: at least ``min_interval`` seconds between request starts. A 429 doubles
+      the gap (up to ``max_interval``); each success halves it back toward ``min_interval``.
+      A Retry-After header on 429/503 is honored (capped at RETRY_AFTER_CAP).
     """
 
-    def __init__(self, base: str = PORTAL, token: str | None = None, max_tries: int = 6, timeout: int = 180):
+    def __init__(
+        self,
+        base: str = PORTAL,
+        token: str | None = None,
+        max_tries: int = 6,
+        timeout: int = 180,
+        min_interval: float | None = None,
+        max_interval: float | None = None,
+    ):
         self.base = base.rstrip("/")
         self.session = requests.Session()
         self.session.headers["User-Agent"] = "BetaNYC-BoardStat-v2-prototype"
@@ -160,26 +219,59 @@ class Soda:
             self.session.headers["X-App-Token"] = token
         self.max_tries = max_tries
         self.timeout = timeout
+        self.min_interval = env_seconds("BOARDSTAT_SODA_MIN_INTERVAL", DEFAULT_MIN_INTERVAL) if min_interval is None else min_interval
+        self.max_interval = env_seconds("BOARDSTAT_SODA_MAX_INTERVAL", DEFAULT_MAX_INTERVAL) if max_interval is None else max_interval
+        self.max_interval = max(self.max_interval, self.min_interval)
+        self.gap = self.min_interval
+        self._last_start: float | None = None
 
-    def get(self, path: str, params: dict[str, str] | None = None) -> requests.Response:
+    def _pace(self) -> None:
+        """Wait until ``gap`` seconds have passed since the previous request started."""
+        if self._last_start is not None:
+            wait = self._last_start + self.gap - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+        self._last_start = time.monotonic()
+
+    def _slow_down(self) -> None:
+        self.gap = min(self.max_interval, max(self.gap * 2, self.min_interval, 1.0))
+        log("http_slow_down", gap_s=round(self.gap, 1))
+
+    def _speed_up(self) -> None:
+        self.gap = max(self.min_interval, self.gap / 2)
+
+    def get(self, path: str, params: dict[str, str] | None = None, max_tries: int | None = None) -> requests.Response:
         url = f"{self.base}{path}"
+        tries = max_tries or self.max_tries
         last: Exception | None = None
-        for attempt in range(1, self.max_tries + 1):
+        for attempt in range(1, tries + 1):
             try:
+                self._pace()
                 r = self.session.get(url, params=params, timeout=self.timeout)
                 if r.status_code == 429 or r.status_code >= 500:
                     raise requests.HTTPError(f"HTTP {r.status_code}", response=r)
                 r.raise_for_status()
+                self._speed_up()
                 return r
             except RETRYABLE as exc:
-                status = getattr(getattr(exc, "response", None), "status_code", None)
+                resp = getattr(exc, "response", None)
+                status = getattr(resp, "status_code", None)
                 if status is not None and status < 500 and status != 429:
                     raise PipelineError(f"{url} returned HTTP {status}: {exc.response.text[:300]}") from exc
                 last = exc
-                wait = min(120, 2**attempt) + random.uniform(0, 1)
-                log("http_retry", path=path, attempt=attempt, status=status, wait_s=round(wait, 1), error=str(exc)[:200])
+                if status == 429:
+                    self._slow_down()
+                if attempt == tries:
+                    break
+                asked = retry_after_seconds(resp) if status in (429, 503) else None
+                if asked is not None:
+                    wait = min(RETRY_AFTER_CAP, asked)
+                else:
+                    wait = min(120, 2**attempt) + random.uniform(0, 1)
+                log("http_retry", path=path, attempt=attempt, status=status, wait_s=round(wait, 1),
+                    retry_after=asked, error=str(exc)[:200])
                 time.sleep(wait)
-        raise PipelineError(f"Giving up on {url} after {self.max_tries} tries: {last}")
+        raise PipelineError(f"Giving up on {url} after {tries} tries: {last}")
 
     def metadata(self, dataset_id: str) -> dict[str, Any]:
         return self.get(f"/api/views/{dataset_id}.json").json()
