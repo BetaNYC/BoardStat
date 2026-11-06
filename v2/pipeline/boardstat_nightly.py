@@ -379,11 +379,14 @@ def publish(out_dir: Path) -> None:
 def verify_live(generated_at: str) -> None:
     import requests
 
-    for _ in range(5):
-        r = requests.get(PUBLIC_MANIFEST, params={"nocache": str(time.time())}, timeout=60)
-        if r.ok and r.json().get("generated_at") == generated_at:
-            log("live_verified", generated_at=generated_at)
-            return
+    for attempt in range(1, 6):
+        try:
+            r = requests.get(PUBLIC_MANIFEST, params={"nocache": str(time.time())}, timeout=60)
+            if r.ok and r.json().get("generated_at") == generated_at:
+                log("live_verified", generated_at=generated_at)
+                return
+        except (*bb.RETRYABLE, ValueError) as exc:  # ValueError: a half-written manifest that is not JSON yet
+            log("http_retry", path=PUBLIC_MANIFEST, attempt=attempt, status=None, wait_s=10, error=str(exc)[:200])
         time.sleep(10)
     raise bb.PipelineError(f"Published, but {PUBLIC_MANIFEST} does not show generated_at {generated_at}")
 

@@ -344,8 +344,9 @@ Run on office-mac, 2026-11-04, with an app token, default window.
    date or in the future, so those rows do not distort medians.
 6. **Monthly download windows, paged at 200,000 rows with `$order=unique_key`.**
    The portal times out on year-long aggregates; SODA 2.1 has no `$limit`
-   maximum, but a page bounds the cost of a retry. 429 and 5xx retry with
-   exponential backoff. Raw months are cached gzipped in `v2/pipeline/.cache/`.
+   maximum, but a page bounds the cost of a retry. 429, 5xx, connection
+   errors, and a connection reset while the body is downloading retry with
+   exponential backoff; other 4xx stop the build. Raw months are cached gzipped in `v2/pipeline/.cache/`.
    Months that ended more than 60 days ago are reused; recent months are
    refetched after 12 hours because statuses and close dates keep changing.
    Consequence: statuses on older cached months can lag until `--refresh-all`.

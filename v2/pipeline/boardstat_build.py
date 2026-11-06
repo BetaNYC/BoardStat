@@ -124,6 +124,21 @@ class PipelineError(RuntimeError):
 # --------------------------------------------------------------------------- HTTP
 
 
+# Network failures worth another try. With stream=False, ``Session.send`` reads the whole
+# body before returning (requests/sessions.py: ``if not stream: r.content``), so a reset
+# mid-body surfaces from ``session.get`` itself. ``Response.iter_content`` maps urllib3's
+# ProtocolError to ChunkedEncodingError and DecodeError to ContentDecodingError; neither is a
+# ConnectionError subclass (ChunkedEncodingError derives only from RequestException), so they
+# must be named. ReadTimeoutError and SSLError mid-body already map to ConnectionError.
+RETRYABLE = (
+    requests.ConnectionError,
+    requests.Timeout,
+    requests.exceptions.ChunkedEncodingError,
+    requests.exceptions.ContentDecodingError,
+    requests.HTTPError,
+)
+
+
 class Soda:
     """Minimal client for the documented SODA endpoints we use.
 
@@ -133,7 +148,8 @@ class Soda:
     - $select / $where / $order / $limit / $offset SoQL parameters
       ($order is required for stable paging: https://dev.socrata.com/docs/queries/order)
     - 429 means throttled (https://dev.socrata.com/docs/app-tokens); we retry with backoff,
-      and also retry 5xx and connection errors.
+      and also retry 5xx, connection errors, and a connection that breaks while the body
+      is being read (see RETRYABLE).
     """
 
     def __init__(self, base: str = PORTAL, token: str | None = None, max_tries: int = 6, timeout: int = 180):
@@ -155,7 +171,7 @@ class Soda:
                     raise requests.HTTPError(f"HTTP {r.status_code}", response=r)
                 r.raise_for_status()
                 return r
-            except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as exc:
+            except RETRYABLE as exc:
                 status = getattr(getattr(exc, "response", None), "status_code", None)
                 if status is not None and status < 500 and status != 429:
                     raise PipelineError(f"{url} returned HTTP {status}: {exc.response.text[:300]}") from exc
