@@ -16,6 +16,7 @@ the static site in ``v2/site``.
 
 Run from the repository root:
 
+    uv run v2/pipeline/boardstat_build.py --out v2/site/data            # 2020-01-01 to today
     uv run v2/pipeline/boardstat_build.py --start 2025-11-01 --end 2026-11-04 --out v2/site/data
 
 Only data.cityofnewyork.us is contacted. An app token is read from the
@@ -51,6 +52,16 @@ PORTAL = "https://data.cityofnewyork.us"
 
 DATASET_311 = "erm2-nwe9"  # 311 Service Requests from 2020 to Present
 DATASET_311_HISTORIC = "76ig-c548"  # 2010-2019, not used by the prototype yet
+
+# History starts here, fixed (not a rolling window; issue #108). erm2-nwe9 holds
+# 2020-01-01 onward; earlier months live in 76ig-c548, which this build does not
+# read yet, so asking for an earlier start is an error rather than empty months.
+HISTORY_START = dt.date(2020, 1, 1)
+ERM_FIRST = dt.date(2020, 1, 1)
+
+# The date range the site opens with when a link has no dates: the last 12 full
+# months plus the current month to date (written to manifest.window.default_start).
+DEFAULT_VIEW_MONTHS = 12
 DATASET_CD = "5crt-au7u"  # DCP Community Districts (59 CDs + 12 JIAs)
 DATASET_CC = "872g-cjhh"  # DCP City Council Districts (51)
 
@@ -220,15 +231,24 @@ def month_windows(start: dt.date, end_inclusive: dt.date) -> list[Window]:
     return out
 
 
-def default_window(today: dt.date) -> tuple[dt.date, dt.date]:
-    """Last 12 full months plus the current month to date."""
-    y, m = today.year, today.month - 12
-    if m <= 0:
-        y, m = y - 1, m + 12
-    return dt.date(y, m, 1), today
-
-
 # --------------------------------------------------------------------------- fetching
+
+
+def check_start(start: dt.date) -> None:
+    """Refuse a start before erm2-nwe9's first month instead of fetching empty months."""
+    if start < ERM_FIRST:
+        raise PipelineError(
+            f"--start {start} is before {ERM_FIRST}. Months before 2020 are in {DATASET_311_HISTORIC} "
+            f"(311 Service Requests 2010-2019), which this build does not read yet (issue #108, phase 2)."
+        )
+
+
+def default_view_start(start: dt.date, end_inclusive: dt.date, months: int = DEFAULT_VIEW_MONTHS) -> dt.date:
+    """First day of the month ``months`` before ``end_inclusive``, but never before ``start``."""
+    y, m = end_inclusive.year, end_inclusive.month - months
+    while m <= 0:
+        y, m = y - 1, m + 12
+    return max(start, dt.date(y, m, 1))
 
 
 def soql_ts(d: dt.date) -> str:
@@ -430,10 +450,18 @@ CLOSE_FLAG_SQL = """
 """
 
 
-def connect() -> duckdb.DuckDBPyConnection:
+def connect(temp_dir: Path | None = None) -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
     # https://duckdb.org/docs/stable/core_extensions/spatial/overview
     con.sql("INSTALL spatial; LOAD spatial;")
+    # Six years of rows no longer fit comfortably in memory on a 16 GB Mac, so cap
+    # DuckDB's memory and let it spill to a folder inside the (git-ignored) cache
+    # instead of a ".tmp" folder in whatever directory the build was started from.
+    # https://duckdb.org/docs/stable/configuration/overview (memory_limit, temp_directory)
+    con.execute(f"SET memory_limit = {sql_str(os.environ.get('BOARDSTAT_DUCKDB_MEMORY', '8GB'))}")
+    if temp_dir is not None:
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        con.execute(f"SET temp_directory = {sql_str(str(temp_dir))}")
     return con
 
 
@@ -477,6 +505,7 @@ def build(
     end_inclusive: dt.date,
     sources: dict[str, Any],
     now: dt.datetime | None = None,
+    temp_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Everything after the download. Offline; the tests call this directly."""
     t0 = time.time()
@@ -485,7 +514,7 @@ def build(
     now_local_naive = now.astimezone(ZoneInfo("America/New_York")).replace(tzinfo=None)
     now_sql = f"TIMESTAMP '{now_local_naive.isoformat(sep=' ', timespec='seconds')}'"
 
-    con = connect()
+    con = connect(temp_dir)
     load_boundaries(con, cd_path, cc_path)
 
     files = "[" + ",".join(sql_str(str(p)) for p in csv_paths) + "]"
@@ -557,6 +586,7 @@ def build(
             {DAYS_TO_CLOSE_SQL.format(now=now_sql)} AS days_to_close,
             {CLOSE_FLAG_SQL.format(now=now_sql)} AS close_flag,
             bm.city_cd,
+            coalesce(r.status = 'Closed', false) AS is_closed,
             nullif(upper(regexp_replace(trim(incident_address), '\\s+', ' ', 'g')), '') AS address_norm,
             strftime(created_date, '%Y-%m') AS year_month
         FROM r LEFT JOIN pt_assign a ON r.longitude = a.lon AND r.latitude = a.lat
@@ -575,7 +605,14 @@ def build(
     detail_cols = """unique_key, created_date, closed_date, agency, agency_name, complaint_type, complaint_type_raw,
         descriptor, descriptor_2, status, incident_address, street_name, intersection_street_1, intersection_street_2,
         incident_zip, bbl, borough, community_board, council_district, latitude, longitude, resolution_description,
-        cd, cc, city_cd, days_to_close, close_flag, address_norm, year_month"""
+        cd, cc, city_cd, days_to_close, close_flag, address_norm, year_month, is_closed"""
+    # Detail files hold every request not yet Closed first, then the Closed ones,
+    # each part in created_date order. Each 50,000-row group's min/max statistics
+    # then let the browser fetch only the row groups a view needs: all open
+    # requests (is_closed = false) plus closed ones from the chosen dates on
+    # (is_closed = true AND created_date >= ...). See district.js, loadRange().
+    # https://duckdb.org/docs/stable/data/parquet/overview (filter pushdown, row groups)
+    detail_order = "is_closed, created_date, unique_key"
     # COPY ... TO with FORMAT parquet: https://duckdb.org/docs/stable/data/parquet/overview#writing-to-parquet-files
     parquet_opts = "(FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 50000)"
 
@@ -588,7 +625,7 @@ def build(
             n = con.execute(f"SELECT count(*) FROM req WHERE {kind} = ?", [gid]).fetchone()[0]
             path = out_dir / "detail" / kind / f"{gid}.parquet"
             if n:
-                con.execute(f"COPY (SELECT {detail_cols} FROM req WHERE {kind} = {int(gid)} ORDER BY created_date, unique_key) TO {sql_str(str(path))} {parquet_opts}")
+                con.execute(f"COPY (SELECT {detail_cols} FROM req WHERE {kind} = {int(gid)} ORDER BY {detail_order}) TO {sql_str(str(path))} {parquet_opts}")
             entry: dict[str, Any] = {"id": gid, "rows": n, "file": f"detail/{kind}/{gid}.parquet" if n else None}
             if kind == "cd":
                 label, jia, boro = cd_label(gid)
@@ -647,6 +684,7 @@ def build(
         "generated_at": now.astimezone(dt.UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "generator": f"{SCRIPT} (duckdb {duckdb.__version__})",
         "window": {"start": start.isoformat(), "end": end_inclusive.isoformat(),
+                   "default_start": default_view_start(start, end_inclusive).isoformat(),
                    "first_created": str(stats[7]), "last_created": str(stats[8])},
         "sources": sources,
         "counts": {
@@ -783,6 +821,13 @@ def validate_manifest(m: dict[str, Any]) -> None:
     for k in ("council", "community_district"):
         if k not in m["agreement"]:
             raise PipelineError(f"manifest.agreement missing {k!r}")
+    w = m["window"]
+    try:
+        start, end, view = (dt.date.fromisoformat(w[k]) for k in ("start", "end", "default_start"))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PipelineError(f"manifest.window needs ISO dates start, end and default_start: {exc}") from exc
+    if not start <= view <= end:
+        raise PipelineError(f"manifest.window.default_start {view} is outside {start} to {end}")
 
 
 # --------------------------------------------------------------------------- main
@@ -791,10 +836,10 @@ def validate_manifest(m: dict[str, Any]) -> None:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     here = Path(__file__).resolve().parent
     today = dt.date.today()
-    d_start, d_end = default_window(today)
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("--start", type=dt.date.fromisoformat, default=d_start, help=f"first created date, inclusive (default {d_start})")
-    p.add_argument("--end", type=dt.date.fromisoformat, default=d_end, help=f"last created date, inclusive (default {d_end})")
+    p.add_argument("--start", type=dt.date.fromisoformat, default=HISTORY_START,
+                   help=f"first created date, inclusive (default {HISTORY_START}, fixed; earlier is an error until 2010-2019 is supported)")
+    p.add_argument("--end", type=dt.date.fromisoformat, default=today, help=f"last created date, inclusive (default today, {today})")
     p.add_argument("--out", type=Path, default=here.parent / "site" / "data")
     p.add_argument("--cache", type=Path, default=here / ".cache")
     p.add_argument("--type-map", type=Path, default=here / "complaint_type_map.csv")
@@ -805,6 +850,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    check_start(args.start)  # before any network call
     t0 = time.time()
     token = os.environ.get("SOCRATA_APP_TOKEN") or None
     log("start", start=args.start, end=args.end, out=args.out, app_token="set" if token else "unset")
@@ -845,7 +891,8 @@ def main(argv: list[str] | None = None) -> int:
         "community_districts": src(meta_cd, DATASET_CD, version=boundary_version(meta_cd), features=len(cd_gj["features"])),
         "council_districts": src(meta_cc, DATASET_CC, version=boundary_version(meta_cc), features=len(cc_gj["features"])),
     }
-    manifest = build(paths, cd_path, cc_path, args.type_map, args.out, args.start, args.end, sources)
+    manifest = build(paths, cd_path, cc_path, args.type_map, args.out, args.start, args.end, sources,
+                     temp_dir=args.cache / "duckdb-tmp")
     manifest_elapsed = round(time.time() - t0, 1)
     print(agreement_markdown(manifest))
     log("done", total_elapsed_s=manifest_elapsed)

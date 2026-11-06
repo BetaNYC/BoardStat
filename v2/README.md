@@ -35,7 +35,8 @@ internal reports, in Noel's private vault).
                 │  plain HTTP, any static host
                 ▼
  v2/site/  index.html + district.html (ES modules, no build step)
-   DuckDB-WASM ── queries ONE district's Parquet file in the browser
+   DuckDB-WASM ── queries ONE district's Parquet file in the browser, loading only
+                  the dates the view needs (see "Loading only what the view needs")
    MapLibre GL ── self-hosted Protomaps street map, district boundaries, clustered points
    Observable Plot ── monthly line, agency × status, compare chart
    Page features: filters (dates, problem, description with exclude, agency, status
@@ -53,9 +54,11 @@ access to data.cityofnewyork.us):
 # Optional: a Socrata app token raises rate limits. Never commit it.
 # export SOCRATA_APP_TOKEN=...   (or set it in your Claude Code env)
 
-uv run v2/pipeline/boardstat_build.py --out v2/site/data
-#   defaults: last 12 full months + the current month to date
-#   e.g. --start 2025-11-01 --end 2026-11-04
+uv run v2/pipeline/boardstat_build.py --start 2026-01-01 --out v2/site/data
+#   default --start is 2020-01-01 (fixed; the full history), --end is today.
+#   The full history is about 23 million rows: the first download takes 1 to 2.5
+#   hours, so pass a later --start for a quick local build.
+#   A --start before 2020-01-01 fails: 2010-2019 is a separate city dataset (#108).
 #   --refresh-all ignores the download cache
 
 bash v2/pipeline/basemap_build.sh
@@ -90,9 +93,15 @@ so the nightly job picks up **changed** rows as well as new ones.
 `pipeline/boardstat_nightly.py`:
 
 1. Asks the portal for every row whose `:updated_at` (a Socrata system field,
-   https://dev.socrata.com/docs/system-fields) is newer than the last run, in a
-   rolling 3-year window.
+   https://dev.socrata.com/docs/system-fields) is newer than the last run, from
+   a **fixed start, 2020-01-01**, through today. The start never rolls forward,
+   so the history only grows. `--start DATE` changes it (a date before 2020
+   fails loudly); `--years N` gives the old rolling window, for tests.
 2. Patches those rows into the cached month files, replacing by `unique_key`.
+   A changed row in a month with no cached file counts as **new** only if that
+   month is newer than every cached month (a new month starting). An older
+   missing month is a backfill, so its rows are left out of `changes.json` and
+   logged as `month_backfill`; the build downloads that month whole.
 3. Saves the night's diff (`pipeline/.cache/nightly/diffs/*.parquet`: new or
    updated, old and new status).
 4. On Sundays, compares each cached month's row count with the city's and moves
@@ -130,6 +139,120 @@ launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/nyc.betanyc.boardstat-nigh
 
 Run it by hand without publishing: `uv run v2/pipeline/boardstat_nightly.py`.
 
+### One-time backfill to January 2020 (#108)
+
+Moving the start from 2023-11 to 2020-01 adds 46 months (about 12 million rows).
+Download them **by hand, once, before the nightly job runs the new code.** If the
+job meets those months first, it downloads them inside the 5:30 run (1 to 2.5
+hours), and the site's "What changed" line would be wrong for that night. (The
+`month_backfill` guard above keeps those rows out of `changes.json`, but the
+manual run also keeps the long download out of the live job.)
+
+On the office Mac, in the live checkout, after the PR is merged:
+
+```sh
+cd /Volumes/Home_Remote/noneck_remote/Code/BoardStat
+tail -3 ~/Library/Logs/boardstat-nightly/$(date +%F).log      # wait for today's "done" first
+
+# 1. Pause the nightly job.
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/nyc.betanyc.boardstat-nightly.plist
+
+# 2. Get the new code.
+git switch master && git pull
+
+# 3. Backfill: fills v2/pipeline/.cache/311 with 2020-01 to 2023-10. 1 to 2.5 hours.
+#    The output folder is a scratch build; the nightly job writes its own.
+export SOCRATA_APP_TOKEN="$(security find-generic-password -s boardstat-socrata-app-token -w)"
+/usr/bin/time -l uv run v2/pipeline/boardstat_build.py --start 2020-01-01 --out v2/data-backfill
+#    Check: requests per year roughly match the city's (2020 2.94M, 2021 3.22M,
+#    2022 3.17M, 2023 3.22M, minus requests with no location), and the council
+#    agreement in v2/data-backfill/build-log.md is lower before 2024 (old lines).
+#    complaint_type_map.csv gains new unreviewed names: commit it on a branch.
+
+# 4. One nightly run without publishing: changes.json should show a normal night,
+#    not millions of "new" requests.
+uv run v2/pipeline/boardstat_nightly.py --check-counts yes
+python3 -c "import json; print(json.load(open('v2/data-nightly/changes.json'))['city'])"
+
+# 5. Upload the new site code (it also works with the old 3-year data).
+python3 v2/stamp_assets.py   # then the rsync under "Publishing", above
+
+# 6. Turn the job back on. The next 5:30 run publishes 2020 onward.
+bash v2/pipeline/launchd/install.sh ops-website
+```
+
+The build uses up to 8 GB of memory (`BOARDSTAT_DUCKDB_MEMORY` changes that) and
+spills to `v2/pipeline/.cache/duckdb-tmp/` beyond it. A 2-month test build
+(2020-01 and 2020-02, 368,393 rows) peaked at 1.9 GB.
+
+### Loading only what the view needs (#108)
+
+With six years of data, the largest district (Council District 11, about one
+million requests) would take about 700 MB of browser memory if loaded whole. So
+the district and address pages load only:
+
+- every request **not yet Closed**, of any age (the "Still open from before this
+  period" panel and the "not yet closed" filter need them all), and
+- **Closed** requests from 12 months before the From date on (the "same month a
+  year earlier" line needs that year).
+
+Moving the From date earlier reloads; a status filter other than Closed never
+needs to. The page opens on `manifest.window.default_start`: **the last 12 full
+months plus the current month**, so a link without dates shows about a year. The
+date pickers still reach back to 2020-01-01. Only the columns the page shows are
+kept in memory; the CSV download reads every column straight from the file.
+
+To make that cheap, `boardstat_build.py` writes each detail file with every
+not-yet-Closed request first, then the Closed ones in `created_date` order, with
+an `is_closed` column, in 50,000-row groups. A file built before this change has
+no `default_start` in its manifest; the page then loads it whole, as before.
+
+Measured on 2026-11-06 for Council District 11 (DuckDB-WASM 1.32.0 in headless
+Chromium, `duckdb_memory()`, table memory). The 2020+ file is synthetic: today's
+real rows plus shifted copies to fill 2020-01 to 2023-10 (1,020,624 rows, 30 MB).
+
+| Case | Rows in memory | Memory |
+|---|---:|---:|
+| Before: today's 3 years, whole file | 461,073 | 317 MB |
+| Before: 2020 onward, whole file | 1,020,624 | 694 MB |
+| **After: default view (Nov 2025 on)** | 347,922 | **115 MB** |
+| After: From date moved to June 2021 | 985,457 | 330 MB |
+
+Numbers on the page matched a whole-file count exactly in every case checked.
+**Known gap:** in these tests DuckDB-WASM 1.32.0 still downloaded each file
+whole (one plain GET, no range requests), even though the local server and
+beta.nyc answer range requests. So memory dropped, but download size did not:
+about 30 MB for the largest district once 2020 is in. Row-group statistics are
+in place for range reads; making DuckDB-WASM use them, or splitting files by
+year, is a follow-up.
+
+## Traffic measurement (Google Analytics)
+
+Every page loads `site/js/analytics.js`, which adds the beta.nyc Google tag
+(`GT-MQ7Q7VP`) **only on beta.nyc** (never on localhost). Rules, as promised on
+the About page:
+
+- Before the tag loads, `page_location`, `page_referrer` and `page_title` are
+  replaced with cleaned copies for every event: only the `geo`, `id`, `start`
+  and `end` parameters survive. Addresses, coordinates, searches and filter
+  values are dropped; the address page gets a fixed title.
+- The automatic page view is off (`send_page_view: false`); one cleaned
+  `page_view` is sent by hand.
+- Events, all without free text: `district_selected`, `address_viewed`,
+  `date_range_changed` (length in months, start year), `filter_changed` (the
+  filter's name only), `csv_download`, `print_page`.
+- GA's "page changes based on browser history events" setting can only be
+  turned off in the GA property, not in code. So BoardStat never writes an
+  address into the URL after load: the address page never rewrites its URL, and
+  the district page no longer keeps the address filter in its link. The Boundaries
+  Map link is a button (`noopener,noreferrer`), so Google's outbound-click event
+  never sees the address in it.
+- Recommended in GA (someone with access): turn off "Page changes based on
+  browser history events" for the beta.nyc stream, or BoardStat filter changes
+  count as page views.
+
+Tests: `node --test v2/tests-js/` (also run by `uv run pytest`).
+
 **If the Mac is off, the job can't alert anyone, so a second check runs on
 GitHub.** `.github/workflows/boardstat-freshness.yml` runs every day at 14:00 UTC
 (9 AM EST / 10 AM EDT) and reads the live `manifest.json`. If the data is more
@@ -151,8 +274,8 @@ cd v2/pipeline && uv run pytest
 
 | What | Dataset | Notes |
 |---|---|---|
-| 311 Service Requests from 2020 to Present | [`erm2-nwe9`](https://data.cityofnewyork.us/d/erm2-nwe9) | Updated daily. Pulled month by month. |
-| 311 Service Requests 2010–2019 | [`76ig-c548`](https://data.cityofnewyork.us/d/76ig-c548) | Same 48 columns. **Not used yet** (historical backfill is a next step). |
+| 311 Service Requests from 2020 to Present | [`erm2-nwe9`](https://data.cityofnewyork.us/d/erm2-nwe9) | Updated daily. Pulled month by month, from 2020-01-01. |
+| 311 Service Requests 2010–2019 | [`76ig-c548`](https://data.cityofnewyork.us/d/76ig-c548) | Same 48 columns. **Not used yet** (phase 2 of #108). |
 | Community Districts (DCP) | [`5crt-au7u`](https://data.cityofnewyork.us/d/5crt-au7u) | 71 features: 59 CDs + 12 Joint Interest Areas. Release 26c at build time. |
 | City Council Districts (DCP) | [`872g-cjhh`](https://data.cityofnewyork.us/d/872g-cjhh) | 51 features. Release 26c at build time. |
 
@@ -226,8 +349,9 @@ Run on office-mac, 2026-11-04, with an app token, default window.
    Months that ended more than 60 days ago are reused; recent months are
    refetched after 12 hours because statuses and close dates keep changing.
    Consequence: statuses on older cached months can lag until `--refresh-all`.
-7. **One Parquet file per district, loaded whole into DuckDB-WASM.** Each is a
-   few MB (zstd). The browser never touches citywide detail. `v2/serve.py`
+7. **One Parquet file per district, queried by DuckDB-WASM.** Each is a
+   few MB (zstd). Since #108 the page loads only the rows a view needs (see
+   "Loading only what the view needs"). The browser never touches citywide detail. `v2/serve.py`
    answers HTTP range requests (the street map needs them); any real static host
    does too.
 8. **Address lookup is a list of addresses that already appear in 311 data,**
@@ -310,8 +434,8 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 - Detail files for the busiest districts are the largest downloads; on slow
   connections the first load of a district takes a few seconds.
 - The map shows at most the 60,000 most recent matching requests.
-- "Same month a year earlier" only exists where the window covers both months
-  (with the default 13-month window, only the first month).
+- "Same month a year earlier" only exists where the data covers both months
+  (none before January 2021).
 - Boundary simplification (about 10 m) is per polygon, so hairline gaps can show
   between neighbors at high zoom. Assignment uses the full-resolution shapes.
 - Problem-name groupings are all `reviewed=false` until a person reviews them.
@@ -321,8 +445,8 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 
 - **Vector tiles for points** with tippecanoe → PMTiles, so the map can show
   every request without shipping GeoJSON to the browser.
-- **Historical backfill** from `76ig-c548` (2010–2019) and the rest of
-  `erm2-nwe9`, re-mapped to current lines.
+- **Historical backfill, phase 2:** `76ig-c548` (2010–2019), re-mapped to
+  current lines (#108).
 - **Move the nightly job to GitHub Actions** if the Mac mini proves unreliable.
 - **Hosting:** Cloudflare R2 + Pages, or GitHub Pages for the site with data on
   object storage (range requests would then let DuckDB-WASM read partial files).

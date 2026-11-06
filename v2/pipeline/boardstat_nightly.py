@@ -15,7 +15,7 @@ recent months, so on its own an old request that closes later would stay
 
 1. Ask the portal for every row whose Socrata system field ``:updated_at`` is
    newer than the last run (https://dev.socrata.com/docs/system-fields),
-   within the rolling 3-year window.
+   from the fixed history start (2020-01-01, ``--start``) through today.
 2. Patch those rows into the cached month files, replacing by ``unique_key``.
 3. Save the night's diff (new rows, updated rows, old and new status).
 4. Once a week, compare each cached month's row count with the city's and
@@ -87,8 +87,22 @@ def log(event: str, **fields: Any) -> None:
 
 
 def rolling_window(today: dt.date, years: int = 3) -> tuple[dt.date, dt.date]:
-    """First day of the same month ``years`` back, through today."""
+    """First day of the same month ``years`` back, through today (only with ``--years``)."""
     return dt.date(today.year - years, today.month, 1), today
+
+
+def run_window(today: dt.date, start: dt.date | None, years: int | None) -> tuple[dt.date, dt.date]:
+    """The window to refresh: a fixed start (the default, 2020-01-01) through today.
+
+    ``--years`` keeps the old rolling window for tests and one-off runs. A start
+    before 2020 fails loudly: those months are in a dataset this job does not read.
+    """
+    if years is not None:
+        win = rolling_window(today, years)
+    else:
+        win = (start or bb.HISTORY_START, today)
+    bb.check_start(win[0])
+    return win
 
 
 def load_state(path: Path) -> dict[str, Any]:
@@ -191,6 +205,12 @@ def month_files(cache_311: Path, month_start: dt.date) -> list[Path]:
     return sorted(cache_311.glob(f"{bb.DATASET_311}_{month_start.isoformat()}_*.csv.gz"))
 
 
+def newest_cached_month(cache_311: Path) -> dt.date | None:
+    """First day of the newest month with a cached file, or None if the cache is empty."""
+    starts = [dt.date.fromisoformat(p.name.split("_")[1]) for p in cache_311.glob(f"{bb.DATASET_311}_*.csv.gz")]
+    return max(starts, default=None)
+
+
 def patch_cache(con: duckdb.DuckDBPyConnection, changes_csv: Path, cache_311: Path, start: dt.date, end_inclusive: dt.date) -> None:
     """Replace changed rows in each cached month file and build the ``diff`` table.
 
@@ -198,7 +218,11 @@ def patch_cache(con: duckdb.DuckDBPyConnection, changes_csv: Path, cache_311: Pa
     'updated' (some field differs from our copy), with the old and new status.
     Rows the city re-stamped without changing anything (a catch-up night touches
     hundreds of thousands) are patched but left out of the diff. Rows in a month we have no file for
-    are left to the build, which downloads that month whole; they count as new.
+    are left to the build, which downloads that month whole. They count as new only when the month
+    is newer than every cached month (a new month starting). A missing month older than that is a
+    backfill (the history start moved earlier) or a month the weekly count check set aside; its
+    rows are not tonight's changes, so they stay out of ``changes.json`` (logged as
+    ``month_backfill``).
     """
     cols = ", ".join(bb.FIELDS_311)
     con.execute(f"""
@@ -207,6 +231,7 @@ def patch_cache(con: duckdb.DuckDBPyConnection, changes_csv: Path, cache_311: Pa
         QUALIFY row_number() OVER (PARTITION BY unique_key ORDER BY updated_at DESC) = 1
     """)
     con.execute("CREATE OR REPLACE TABLE diff (unique_key VARCHAR, created_date VARCHAR, kind VARCHAR, old_status VARCHAR, new_status VARCHAR)")
+    newest_cached = newest_cached_month(cache_311)
     for win in bb.month_windows(start, end_inclusive):
         lo, hi = win.start.isoformat(), win.end.isoformat()
         in_month = f"TRY_CAST(created_date AS TIMESTAMP) >= DATE '{lo}' AND TRY_CAST(created_date AS TIMESTAMP) < DATE '{hi}'"
@@ -215,6 +240,9 @@ def patch_cache(con: duckdb.DuckDBPyConnection, changes_csv: Path, cache_311: Pa
             continue
         files = month_files(cache_311, win.start.replace(day=1))
         if not files:
+            if newest_cached is not None and win.start.replace(day=1) < newest_cached:
+                log("month_backfill", month=win.label, changed=n)
+                continue
             con.execute(f"INSERT INTO diff SELECT unique_key, created_date, 'new', NULL, status FROM chg WHERE {in_month}")
             log("month_not_cached", month=win.label, changed=n)
             continue
@@ -387,7 +415,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--cache", type=Path, default=HERE / ".cache")
     p.add_argument("--out", type=Path, default=REPO / "v2" / "data-nightly", help="local build folder (what gets uploaded)")
     p.add_argument("--type-map", type=Path, default=HERE / "complaint_type_map.csv")
-    p.add_argument("--years", type=int, default=3)
+    when = p.add_mutually_exclusive_group()
+    when.add_argument("--start", type=dt.date.fromisoformat, default=None,
+                      help=f"first created date (default {bb.HISTORY_START}, fixed; earlier fails until 2010-2019 is supported)")
+    when.add_argument("--years", type=int, default=None, help="rolling window instead of a fixed start (tests, one-off runs)")
     p.add_argument("--today", type=dt.date.fromisoformat, default=None, help="override today's date (NYC), for tests")
     p.add_argument("--check-counts", choices=["auto", "yes", "no"], default="auto", help="weekly city count check; auto = Sundays")
     p.add_argument("--publish", action="store_true", help="upload to beta.nyc and swap it live")
@@ -399,7 +430,7 @@ def run(args: argparse.Namespace) -> int:
     t0 = time.time()
     now = dt.datetime.now(dt.UTC)
     today = args.today or now.astimezone(NYC).date()
-    start, end = rolling_window(today, args.years)
+    start, end = run_window(today, args.start, args.years)
     nightly = args.cache / "nightly"
     nightly.mkdir(parents=True, exist_ok=True)
     state_path = nightly / "state.json"

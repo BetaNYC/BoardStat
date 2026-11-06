@@ -15,3 +15,7 @@ preview-3yr/
 # Nightly refresh build folder (uploaded to the server, never committed).
 data-nightly/
 preview-nightly/
+
+# One-time backfill build and DuckDB spill folders (never committed).
+data-backfill/
+.tmp/
