@@ -39,12 +39,68 @@ let mapCtx = null;
 let selectedType = null;
 let addrInfo = null; // address page: { zip, cd, cc, boro, lng, lat } of the address
 let asOfSql = null; // build time as an NYC-local TIMESTAMP literal; "days open" is measured to it
+let viewStart = null; // the From date a link without dates opens with (manifest.window.default_start)
+let loadedFrom = null; // closed requests created before this date are not in the req table
+
+// ------------------------------------------------------------- loading only what the view needs
+//
+// Detail files hold every request not yet Closed first, then the Closed ones in
+// created_date order, in 50,000-row groups (boardstat_build.py). The page loads all
+// open requests plus Closed ones from LOAD_BACK_MONTHS before the From date: the
+// "same month a year earlier" series needs that year, and "Still open from before
+// this period" needs every older open request. DuckDB-WASM reads only the row groups
+// whose min/max statistics match, over HTTP range requests
+// (https://duckdb.org/docs/stable/clients/wasm/data_ingestion#parquet,
+//  https://duckdb.org/docs/stable/data/parquet/overview#partial-reading).
+// Moving the From date earlier than that reloads the table.
+const LOAD_BACK_MONTHS = 12;
+// The columns the page's panels use. The CSV download reads every column straight
+// from the file instead, so the long text fields never sit in memory.
+const LOAD_COLUMNS = ['unique_key', 'created_date', 'closed_date', 'agency', 'agency_name', 'complaint_type', 'descriptor', 'status',
+  'incident_address', 'intersection_street_1', 'intersection_street_2', 'incident_zip', 'borough', 'latitude', 'longitude',
+  'cd', 'cc', 'days_to_close', 'address_norm', 'year_month'];
+// Files built before range loading have no is_closed column or default_start; load those whole.
+const rangeLoading = () => Boolean(manifest.window.default_start);
+
+function monthsBefore(iso, n) {
+  const d = new Date(`${iso.slice(0, 7)}-01T12:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The earliest created date the current filters need for Closed requests, or null for none. */
+function neededFrom() {
+  // Every request whose status is not Closed is always loaded, so a status filter
+  // other than Closed (including "not yet closed") never needs older Closed rows.
+  if (state.status && state.status !== 'Closed') return null;
+  const from = monthsBefore(state.start, LOAD_BACK_MONTHS);
+  return from > manifest.window.start ? from : manifest.window.start;
+}
+
+/** (Re)build the req table if the view needs Closed requests older than what is loaded. */
+async function ensureLoaded() {
+  if (!rangeLoading()) {
+    if (loadedFrom === null) { await query(`CREATE TABLE req AS SELECT * FROM 'd.parquet'`); loadedFrom = manifest.window.start; }
+    return;
+  }
+  const need = neededFrom();
+  if (loadedFrom !== null && (need === null || need >= loadedFrom)) return;
+  const from = need === null ? monthsBefore(viewStart, LOAD_BACK_MONTHS) : need;
+  const cols = LOAD_COLUMNS.join(', ');
+  setStatus($('status'), `Loading requests from ${fmtDate(from > manifest.window.start ? from : manifest.window.start)} on…`);
+  await query(`
+    CREATE OR REPLACE TABLE req AS
+    SELECT ${cols} FROM 'd.parquet' WHERE is_closed = false
+    UNION ALL
+    SELECT ${cols} FROM 'd.parquet' WHERE is_closed = true AND created_date >= CAST(${lit(from)} AS TIMESTAMP)`);
+  loadedFrom = from;
+}
 
 // ------------------------------------------------------------- state <-> URL
 
 function readState() {
   return {
-    start: params.get('start') || manifest.window.start,
+    start: params.get('start') || viewStart,
     end: params.get('end') || manifest.window.end,
     types: (params.get('type') || '').split('|').filter(Boolean),
     descs: (params.get('desc') || '').split('|').filter(Boolean),
@@ -57,14 +113,18 @@ function readState() {
 
 function writeUrl() {
   const p = new URLSearchParams({ geo, id: geoId });
-  if (state.start !== manifest.window.start) p.set('start', state.start);
+  if (state.start !== viewStart) p.set('start', state.start);
   if (state.end !== manifest.window.end) p.set('end', state.end);
   if (state.types.length) p.set('type', state.types.join('|'));
   if (state.descs.length) p.set('desc', state.descs.join('|'));
   if (state.descs.length && state.descEx) p.set('descx', '1');
   if (state.agency) p.set('agency', state.agency);
   if (state.status) p.set('status', state.status);
-  if (state.addr) p.set('addr', state.addr);
+  // Street addresses never go back into the URL bar after the page loads, so no
+  // later history entry (or analytics page view; see analytics.js) can carry one.
+  // The address page keeps the address it was opened with and does not rewrite its
+  // URL at all; the district page's address filter is not kept in the link.
+  if (ADDRESS_MODE) return;
   history.replaceState(null, '', `?${p.toString()}`);
 }
 
@@ -132,19 +192,28 @@ function addType(t) {
   $('f-type').value = '';
 }
 
+/** Fill the problem, agency and status lists from what is loaded (again after a reload). */
+let optionsFrom;
+async function fillFilterOptions() {
+  if (optionsFrom === loadedFrom) return;
+  optionsFrom = loadedFrom;
+  allTypes = (await query(`SELECT complaint_type AS t, count(*) AS n FROM req GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.t);
+  $('type-options').replaceChildren(...allTypes.map((t) => el('option', { value: t })));
+  // Keep the fixed first options ("All agencies", "Any status", "Not yet closed"); replace the rest.
+  $('f-agency').replaceChildren($('f-agency').options[0], ...(await query(`SELECT agency, any_value(agency_name) AS agency_label, count(*) AS n FROM req GROUP BY 1 ORDER BY 3 DESC`))
+    .map((r) => el('option', { value: r.agency, text: `${r.agency}${r.agency_label ? ` (${r.agency_label})` : ''}` })));
+  const fixedStatus = [...$('f-status').options].filter((o) => o.value === '' || o.value === NOT_CLOSED);
+  $('f-status').replaceChildren(...fixedStatus, ...(await query(`SELECT status, count(*) AS n FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY 2 DESC`))
+    .map((r) => el('option', { value: r.status, text: r.status })));
+  syncForm();
+}
+
 async function setupFilters() {
   const { start, end } = manifest.window;
   for (const id of ['f-start', 'f-end']) { $(id).min = start; $(id).max = end; }
   $('f-start').value = state.start;
   $('f-end').value = state.end;
-  allTypes = (await query(`SELECT complaint_type AS t, count(*) AS n FROM req GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.t);
-  $('type-options').replaceChildren(...allTypes.map((t) => el('option', { value: t })));
-  for (const r of await query(`SELECT agency, any_value(agency_name) AS agency_label, count(*) AS n FROM req GROUP BY 1 ORDER BY 3 DESC`)) {
-    $('f-agency').append(el('option', { value: r.agency, text: `${r.agency}${r.agency_label ? ` (${r.agency_label})` : ''}` }));
-  }
-  for (const r of await query(`SELECT status, count(*) AS n FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY 2 DESC`)) {
-    $('f-status').append(el('option', { value: r.status, text: r.status }));
-  }
+  await fillFilterOptions();
   if (state.status && ![...$('f-status').options].some((o) => o.value === state.status)) state.status = '';
   syncForm();
 
@@ -159,10 +228,10 @@ async function setupFilters() {
   $('f-desc-ex').addEventListener('change', (e) => { state.descEx = e.target.checked; refresh(); });
   $('addr-clear').addEventListener('click', () => { state.addr = ''; refresh(); });
   $('reset').addEventListener('click', () => {
-    state = { start, end, types: [], descs: [], descEx: false, agency: '', status: '', addr: ADDRESS_MODE ? state.addr : '' };
+    state = { start: viewStart, end, types: [], descs: [], descEx: false, agency: '', status: '', addr: ADDRESS_MODE ? state.addr : '' };
     refresh();
   });
-  $('print').addEventListener('click', () => window.print());
+  $('print').addEventListener('click', () => { window.boardstatTrack?.('print_page', { geo, district_id: geoId }); window.print(); });
   window.addEventListener('beforeprint', describeFiltersForPrint);
   $('prev').addEventListener('click', () => { if (page > 0) { page--; renderDetail(); } });
   $('next').addEventListener('click', () => { if ((page + 1) * PAGE < total) { page++; renderDetail(); } });
@@ -541,7 +610,7 @@ async function renderAddressCompare() {
   const cdLabel = cd ? label('cd', cd) : null;
   const ccLabel = cc ? label('cc', cc) : null;
   const keep = new URLSearchParams();
-  if (state.start !== manifest.window.start) keep.set('start', state.start);
+  if (state.start !== viewStart) keep.set('start', state.start);
   if (state.end !== manifest.window.end) keep.set('end', state.end);
   const extra = keep.toString() ? `&${keep}` : '';
   $('acmp-links').replaceChildren(
@@ -681,9 +750,11 @@ function csvCell(v) {
 }
 
 async function downloadCsv() {
+  window.boardstatTrack?.('csv_download', { geo, district_id: geoId, page_type: ADDRESS_MODE ? 'address' : 'district' });
   setStatus($('status'), 'Preparing CSV…');
   const sel = CSV_COLUMNS.map((c) => (c.endsWith('_date') ? `strftime(${c}, '%Y-%m-%dT%H:%M:%S') AS ${c}` : c)).join(', ');
-  const rows = await query(`SELECT ${sel} FROM req WHERE ${where()} ORDER BY created_date, unique_key`);
+  // Straight from the file, so every column is there without keeping it in memory.
+  const rows = await query(`SELECT ${sel} FROM 'd.parquet' WHERE ${where()} ORDER BY created_date, unique_key`);
   const lines = [CSV_COLUMNS.join(',')].concat(rows.map((r) => CSV_COLUMNS.map((c) => csvCell(r[c])).join(',')));
   const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
   const a = el('a', { href: URL.createObjectURL(blob), download: `boardstat-${geo}-${geoId}-${state.start}-to-${state.end}.csv` });
@@ -784,7 +855,12 @@ async function renderAddressLinks() {
   // so the link carries the middle of this address's 311 locations; addr is kept as a label.
   const bq = new URLSearchParams({ addr: [state.addr, boro, a?.zip].filter(Boolean).join(', ') });
   if (a?.lng != null && a?.lat != null) { bq.set('lng', a.lng.toFixed(6)); bq.set('lat', a.lat.toFixed(6)); }
-  const bLink = el('a', { href: `https://boundaries.beta.nyc/?${bq}`, target: '_blank', rel: 'noopener' }, 'See the boundaries around this address on the BetaNYC Boundaries Map');
+  // A button that opens the map, not a link: the Google tag's automatic "outbound click"
+  // event would otherwise send the link, with this address in it, to Google (analytics.js).
+  // noreferrer keeps this page's URL (also with the address) out of the request.
+  const bUrl = `https://boundaries.beta.nyc/?${bq}`;
+  const bLink = el('button', { type: 'button', class: 'link', onclick: () => window.open(bUrl, '_blank', 'noopener,noreferrer') },
+    'See the boundaries around this address on the BetaNYC Boundaries Map');
   $('addr-links').replaceChildren(...(out.length ? ['In ', ...out, '. Select a district to see all of it.'] : []));
   $('addr-links').after(el('p', { class: 'no-print' }, bLink, el('span', { class: 'muted', text: ' (political and administrative districts, opens in a new tab)' })));
   $('boundary-note').textContent = 'Every request whose address matches this one exactly, as the city spelled it. Requests that gave only a cross street are not included.';
@@ -792,9 +868,32 @@ async function renderAddressLinks() {
 
 // ------------------------------------------------------------- refresh / boot
 
+// Traffic events (analytics.js): filter names and short codes only, never values typed or an address.
+let lastTracked = null;
+let trackTimer = null;
+function trackFilters() {
+  const key = { dates: `${state.start}|${state.end}`, type: state.types.join('|'), desc: `${state.descs.join('|')}|${state.descEx}`, agency: state.agency, status: state.status, address: state.addr };
+  const prev = lastTracked;
+  lastTracked = key;
+  if (!prev) return; // the first render is the page view itself
+  const changed = Object.keys(key).filter((k) => key[k] !== prev[k]);
+  clearTimeout(trackTimer);
+  trackTimer = setTimeout(() => {
+    for (const filter of changed) {
+      if (filter === 'dates') {
+        const months = Math.round((new Date(state.end) - new Date(state.start)) / (30.44 * 864e5));
+        window.boardstatTrack?.('date_range_changed', { geo, district_id: geoId, months, start_year: state.start.slice(0, 4) });
+      } else {
+        window.boardstatTrack?.('filter_changed', { geo, district_id: geoId, filter });
+      }
+    }
+  }, 1500);
+}
+
 let refreshSeq = 0;
 async function refresh() {
   const seq = ++refreshSeq;
+  trackFilters();
   writeUrl();
   syncForm();
   renderChips();
@@ -802,6 +901,11 @@ async function refresh() {
   page = 0;
   setStatus($('status'), 'Updating…');
   try {
+    const before = loadedFrom;
+    await ensureLoaded();
+    if (seq !== refreshSeq) return;
+    if (loadedFrom !== before) { descOptionsKey = null; await fillFilterOptions(); }
+    setStatus($('status'), 'Updating…');
     await updateDescOptions();
     await renderKpis();
     if (seq !== refreshSeq) return;
@@ -858,10 +962,13 @@ async function main() {
   setStatus($('status'), 'Loading the query engine and this district\'s data…');
   [Plot] = await Promise.all([
     import(PLOT_URL),
-    registerData('d.parquet', `data/${district.file}`).then(() => query(`CREATE TABLE req AS SELECT * FROM 'd.parquet'`)),
+    registerData('d.parquet', `data/${district.file}`),
     registerData('agg.parquet', 'data/agg/month_type.parquet'),
   ]);
+  viewStart = manifest.window.default_start || manifest.window.start;
+  window.boardstatTrack?.(ADDRESS_MODE ? 'address_viewed' : 'district_selected', { geo, district_id: geoId, page_type: ADDRESS_MODE ? 'address' : 'district' });
   state = readState();
+  await ensureLoaded();
   if (ADDRESS_MODE) await renderAddressLinks();
   await setupFilters();
   try { await setupMap(); } catch (err) {

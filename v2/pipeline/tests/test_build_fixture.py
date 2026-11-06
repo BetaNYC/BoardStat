@@ -7,6 +7,7 @@ output files, and the manifest's required keys. No network.
 import csv
 import datetime as dt
 import gzip
+import itertools
 import json
 
 import duckdb
@@ -161,3 +162,103 @@ def test_rerun_is_idempotent(built, tmp_path):
     assert tmap.read_text() == before
     assert sorted(p.name for p in out.rglob("*.parquet")) == files_before
     assert m2["counts"] == m["counts"]
+
+
+# --------------------------------------------------------------------------- range loading (#108)
+
+
+def test_manifest_has_default_view_start(built):
+    m, _, _ = built
+    # The fixture window is one month, so the 13-month default view clips to its start.
+    assert m["window"]["default_start"] == "2026-01-01"
+
+
+def test_validate_manifest_rejects_default_start_outside_window(built):
+    m, _, _ = built
+    bad = json.loads(json.dumps(m))
+    bad["window"]["default_start"] = "2019-01-01"
+    with pytest.raises(bb.PipelineError, match="default_start"):
+        bb.validate_manifest(bad)
+    del bad["window"]["default_start"]
+    with pytest.raises(bb.PipelineError, match="default_start"):
+        bb.validate_manifest(bad)
+
+
+def test_detail_files_put_open_requests_first(built):
+    _, out, _ = built
+    rows = duckdb.sql(f"SELECT unique_key, status, is_closed FROM '{out}/detail/cd/101.parquet'").fetchall()
+    assert rows == [("2", "Open", False), ("1", "Closed", True)]  # file order, not sorted by the query
+
+
+# The browser's load query (district.js, loadRange): every request not yet Closed,
+# plus Closed requests created on or after the load start. Kept in step with the JS.
+LOAD_SQL = """
+    SELECT * FROM read_parquet({f}) WHERE is_closed = false
+    UNION ALL
+    SELECT * FROM read_parquet({f}) WHERE is_closed = true AND created_date >= CAST({x} AS TIMESTAMP)
+"""
+
+
+@pytest.fixture()
+def big_detail(tmp_path):
+    """Six years of synthetic requests written exactly like a detail file (sort, row groups)."""
+    path = tmp_path / "d.parquet"
+    duckdb.sql(f"""
+        COPY (
+            WITH g AS (
+                SELECT i, TIMESTAMP '2020-01-01' + to_minutes(CAST(i * 7 AS BIGINT)) AS created_date FROM range(450000) t(i)
+            )
+            SELECT CAST(i AS VARCHAR) AS unique_key, created_date,
+                   CASE WHEN i % 23 = 0 THEN 'In Progress' WHEN i % 41 = 0 THEN NULL ELSE 'Closed' END AS status,
+                   CASE WHEN i % 3 = 0 THEN 'DSNY' ELSE 'HPD' END AS agency
+            FROM g
+        ) TO '{tmp_path / 'src.parquet'}' (FORMAT parquet)
+    """)
+    duckdb.sql(f"""
+        COPY (SELECT *, coalesce(status = 'Closed', false) AS is_closed FROM '{tmp_path / 'src.parquet'}'
+              ORDER BY is_closed, created_date, unique_key)
+        TO '{path}' (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 50000)
+    """)
+    return path
+
+
+def test_range_load_gives_the_same_answers_as_the_whole_file(big_detail):
+    f = bb.sql_str(str(big_detail))
+    con = duckdb.connect()
+    con.execute(f"CREATE TABLE whole AS SELECT * FROM read_parquet({f})")
+    con.execute("CREATE TABLE part AS " + LOAD_SQL.format(f=f, x="'2024-06-01'"))
+    assert con.execute("SELECT count(*) FROM part").fetchone()[0] < con.execute("SELECT count(*) FROM whole").fetchone()[0] / 2
+    start = "2025-06-01"  # the From date; the load starts 12 months earlier
+    queries = {
+        # headline numbers for the period
+        "kpi": f"SELECT count(*), count(*) FILTER (WHERE status IS DISTINCT FROM 'Closed') FROM {{t}} WHERE created_date >= DATE '{start}'",
+        # "Still open from before this period": every older request not yet closed
+        "backlog": f"SELECT agency, count(*) FROM {{t}} WHERE created_date < DATE '{start}' AND status IS DISTINCT FROM 'Closed' GROUP BY 1 ORDER BY 1",
+        # "Same month a year earlier"
+        "prior": f"SELECT strftime(created_date, '%Y-%m'), count(*) FROM {{t}} WHERE created_date >= DATE '{start}' - INTERVAL 12 MONTH AND created_date < DATE '{start}' GROUP BY 1 ORDER BY 1",
+    }
+    for name, q in queries.items():
+        assert con.execute(q.format(t="part")).fetchall() == con.execute(q.format(t="whole")).fetchall(), name
+    # A status other than Closed needs no extra load: every such request is loaded.
+    q = "SELECT count(*) FROM {t} WHERE status = 'In Progress'"
+    assert con.execute(q.format(t="part")).fetchall() == con.execute(q.format(t="whole")).fetchall()
+
+
+def test_row_group_statistics_allow_pruning(big_detail):
+    """Each row group is all-open or all-closed (but one), and closed groups run in date order,
+    so min/max statistics alone tell the reader which groups a date range needs."""
+    groups = duckdb.sql(f"""
+        SELECT row_group_id,
+               max(stats_min) FILTER (WHERE path_in_schema = 'is_closed') AS c_min,
+               max(stats_max) FILTER (WHERE path_in_schema = 'is_closed') AS c_max,
+               max(stats_min) FILTER (WHERE path_in_schema = 'created_date') AS d_min,
+               max(stats_max) FILTER (WHERE path_in_schema = 'created_date') AS d_max
+        FROM parquet_metadata('{big_detail}') GROUP BY 1 ORDER BY 1
+    """).fetchall()
+    assert len(groups) >= 9
+    mixed = [g for g in groups if g[1] != g[2]]
+    assert len(mixed) <= 1
+    closed = [g for g in groups if g[1] == g[2] == "true"]
+    assert all(a[4] <= b[3] for a, b in itertools.pairwise(closed))  # non-overlapping date spans
+    needed = [g for g in closed if g[4] >= "2024-06-01"]
+    assert len(needed) < len(closed) / 2

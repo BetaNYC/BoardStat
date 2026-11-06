@@ -25,3 +25,6 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# DuckDB spill folder if a build is started from the repository root
+.tmp/

@@ -8,8 +8,9 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css?v=cbb35afbba">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=331aabc32e","./js/district.js":"./js/district.js?v=889a56c4ec","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=7c26b37530","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=2d30694181","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=7c26b37530","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
   <!-- importmap:end -->
+  <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -24,6 +25,8 @@
     <nav class="panel toc" aria-label="On this page">
       <ul>
         <li><a href="#data-h">Where the data comes from</a></li>
+        <li><a href="#lines-h">District lines</a></li>
+        <li><a href="#measure-h">What we measure about visits</a></li>
         <li><a href="#history-h">History</a></li>
         <li><a href="#ai-h">How we used AI tools</a></li>
         <li><a href="#tools-h">Open-source tools</a></li>
@@ -35,8 +38,27 @@
       <p class="muted" id="as-of">Loading data status…</p>
       <div class="banner warn" id="stale" role="status" hidden></div>
       <div id="about"><p class="muted">Loading…</p></div>
-      <p>Everything runs in your browser. Nothing you type is sent anywhere.</p>
+      <p>Every search and filter runs in your browser. Nothing you type is sent to us, and no address you look up is sent to Google (see <a href="#measure-h">What we measure about visits</a>).</p>
       <p>Every term and calculation, step by step, is in the <a href="glossary.html">Glossary</a>.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="lines-h">
+      <h2 id="lines-h">District lines</h2>
+      <p>BoardStat places every request in today's community district and council district lines, from the Department of City Planning. That includes older requests, so a district looks the same shape for every year you pick.</p>
+      <p>Council district lines were redrawn in 2023. A request made before then may show a different council district here than the one it was in at the time. The city's own community board and council district fields are kept exactly as the city published them, in the CSV download, and this page shows how often they match ours.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="measure-h">
+      <h2 id="measure-h">What we measure about visits</h2>
+      <p>We want to know whether BoardStat is useful, so we count visits with Google Analytics, through the same Google tag the rest of beta.nyc uses. It tells us:</p>
+      <ul>
+        <li>which BoardStat pages and districts people look at, and which dates and filters they use (by name, such as "agency", not what was picked);</li>
+        <li>the approximate area a visit comes from, worked out by Google from your internet address (IP address);</li>
+        <li>the kind of device and browser you use;</li>
+        <li>whether you have been here before. Google Analytics sets cookies in your browser to tell returning visitors apart. You can block or delete them in your browser settings.</li>
+      </ul>
+      <p><strong>Addresses stay with you.</strong> When you look up an address, the address appears in the page's link, but we remove it, and any map coordinates, before anything is sent to Google. It is never part of what we measure. What you type into the search box is never sent at all.</p>
+      <p>We look at these numbers only in total, to decide what to improve. More detail is in BetaNYC's <a href="https://www.beta.nyc/privacy-policy/">privacy policy</a>.</p>
     </section>
 
     <section class="panel" aria-labelledby="history-h">
@@ -63,7 +85,7 @@
       <p>In January 2026, the city's Office of Technology and Innovation let BetaNYC know that BoardStat's connection to NYC Open Data had stopped working. The data had not refreshed since early 2025, and BetaNYC added a notice to the site (<a href="https://github.com/BetaNYC/BoardStat/issues/99">#99</a>). By November 2026, the five borough views of the dataset that BoardStat read from had been removed. The city had also split 311 data into two datasets: one for 2010–2019 and one for 2020 to the present.</p>
 
       <h3>November 2026: BoardStat 2.0</h3>
-      <p>BoardStat 2.0 is a rebuild that does not depend on Power BI. A small program downloads 311 data from NYC Open Data and places each request that has a location in today's community district and council district lines. It then saves the data as compact files that your browser can query directly. It covers council districts as well as community districts. It brings back features people used most in the first BoardStat, like problem and description filters, agency response times, and address lookups. It is open source, and it needs no special servers: it is a folder of web pages and data files. It is a prototype: for now it covers about the last three years, starting November 1, 2023, and we are testing it with community boards.</p>
+      <p>BoardStat 2.0 is a rebuild that does not depend on Power BI. A small program downloads 311 data from NYC Open Data and places each request that has a location in today's community district and council district lines. It then saves the data as compact files that your browser can query directly. It covers council districts as well as community districts. It brings back features people used most in the first BoardStat, like problem and description filters, agency response times, and address lookups. It is open source, and it needs no special servers: it is a folder of web pages and data files. It is a prototype: it covers requests from January 1, 2020, on, and we are testing it with community boards. Requests from 2010 to 2019 are in a separate city dataset, and we plan to add them later.</p>
     </section>
 
     <section class="panel" aria-labelledby="ai-h">
@@ -86,6 +108,6 @@
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>.</footer>
 
-  <script type="module" src="js/about.js?v=331aabc32e"></script>
+  <script type="module" src="js/about.js?v=76a05c01cc"></script>
 </body>
 </html>
