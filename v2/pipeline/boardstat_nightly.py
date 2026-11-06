@@ -150,6 +150,39 @@ def fetch_changes(soda: bb.Soda, since: str, start: dt.date, end_inclusive: dt.d
     return rows
 
 
+def next_watermark(since: str, max_updated_at: str | None) -> str:
+    """The watermark to save: the newest ``:updated_at`` fetched, to the second.
+
+    Truncating the milliseconds means ``> watermark`` re-fetches the last batch
+    (rows stamped within that second) every night. That is deliberate: patching
+    is idempotent, and it leaves a one-second margin for rows the city stamps
+    in the same second after we read. ``record_night`` therefore judges a quiet
+    night by whether the watermark moved, not by how many rows came back.
+    """
+    if not max_updated_at:
+        return since
+    return max(since, max_updated_at.rstrip("Z")[:19])
+
+
+def record_night(state: dict[str, Any], since: str, max_updated_at: str | None, diff_rows: int) -> str | None:
+    """Advance the watermark and the quiet-run counter; return the stall warning, if any.
+
+    A night is quiet when nothing moved: the watermark did not advance AND the
+    diff is empty. The fetched row count is not used, because it is never zero
+    once the last batch is re-fetched (see ``next_watermark``). A city catch-up
+    night that re-stamps many rows without changing them advances the
+    watermark, so it is not quiet: the city is publishing.
+    """
+    wm = next_watermark(since, max_updated_at)
+    state["watermark"] = wm
+    quiet = wm == since and diff_rows == 0
+    state["quiet_runs"] = state.get("quiet_runs", 0) + 1 if quiet else 0
+    if state["quiet_runs"] >= 2:
+        return (f"No new or changed 311 rows, and the city's last update stamp ({wm} UTC) has not moved, "
+                f"for {state['quiet_runs']} runs in a row; the city may not be publishing.")
+    return None
+
+
 # --------------------------------------------------------------------------- patch the month cache
 
 
@@ -388,16 +421,15 @@ def run(args: argparse.Namespace) -> int:
     diff_path.parent.mkdir(exist_ok=True)
     con.execute(f"COPY (SELECT *, {bb.sql_str(run_id)} AS run FROM diff) TO {bb.sql_str(str(diff_path))} (FORMAT parquet)")
     kinds = dict(con.execute("SELECT kind, count(*) FROM diff GROUP BY 1").fetchall())
-    log("diff_saved", file=diff_path.name, changed=changed, **kinds)
+    diff_rows = sum(kinds.values())
+    log("diff_saved", file=diff_path.name, changed=changed, diff_rows=diff_rows, **kinds)
     new_wm = con.execute("SELECT max(updated_at) FROM chg").fetchone()[0]
     changes_csv.unlink()  # the diff keeps what matters; the raw download is re-creatable
-    if new_wm:
-        state["watermark"] = new_wm.rstrip("Z")[:19]
+    stall = record_night(state, since, new_wm, diff_rows)
     state["last_run"] = now.isoformat(timespec="seconds")
-    state["quiet_runs"] = 0 if changed else state.get("quiet_runs", 0) + 1
     save_state(state_path, state)
-    if state["quiet_runs"] >= 2:
-        warnings.append(f"No changed 311 rows for {state['quiet_runs']} runs in a row; the city may not be publishing.")
+    if stall:
+        warnings.append(stall)
     if changed >= SPIKE_ROWS:
         warnings.append(f"{changed:,} 311 rows re-stamped by the city tonight ({kinds.get('updated', 0):,} actually changed), far more than usual; likely a city catch-up."
                         + (" Published anyway." if args.publish else ""))
