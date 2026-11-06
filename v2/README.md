@@ -78,9 +78,12 @@ the workspace's `team/engineering/hosting/README.md`):
 python3 v2/stamp_assets.py
 #   adds ?v=<hash> to CSS/JS links and writes an import map. beta.nyc tells browsers
 #   to keep .js/.css for 120 days, so without this visitors keep old code.
-rsync -a --chmod=D755,F644 --exclude .gitkeep -e "ssh -i ~/.ssh/id_ed25519_betanyc_dreampress" \
+rsync -a --chmod=D755,F644 --exclude .gitkeep --exclude /data/ -e "ssh -i ~/.ssh/id_ed25519_betanyc_dreampress" \
   v2/site/ wp_iz4gh3@dp-6803fc88d2.dreamhostps.com:beta.nyc/boardstat/v2/
 ```
+
+> ⚠️ Keep `--exclude /data/`. The nightly job publishes the live `data/` folder; without
+> the exclude, this upload replaces it with whatever stale files sit in `v2/site/data`.
 
 Data files keep the same names on every rebuild and beta.nyc sends no cache rule
 for them, so the site adds the build time to every data link (`?v=generated_at`,
@@ -184,6 +187,14 @@ bash v2/pipeline/launchd/install.sh ops-website
 The build uses up to 8 GB of memory (`BOARDSTAT_DUCKDB_MEMORY` changes that) and
 spills to `v2/pipeline/.cache/duckdb-tmp/` beyond it. A 2-month test build
 (2020-01 and 2020-02, 368,393 rows) peaked at 1.9 GB.
+
+Requests to NYC Open Data are paced: at least 2 seconds between requests, doubled after
+each HTTP 429 (up to 60 seconds) and halved again after each success. A `Retry-After`
+header is honored. Socrata publishes no request-rate number
+(https://dev.socrata.com/docs/app-tokens), so these come from our own logs.
+`BOARDSTAT_SODA_MIN_INTERVAL` and `BOARDSTAT_SODA_MAX_INTERVAL` (seconds) change them.
+The Sunday count check asks one grouped question per year (four per year if the portal
+finds a year too heavy) instead of one per month.
 
 ### Loading only what the view needs (#108)
 

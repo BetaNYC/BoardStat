@@ -276,12 +276,69 @@ def patch_cache(con: duckdb.DuckDBPyConnection, changes_csv: Path, cache_311: Pa
 # --------------------------------------------------------------------------- weekly count check
 
 
+def _count_query(where: str, grouped: bool) -> dict[str, str]:
+    if not grouped:
+        return {"$select": "count(*) AS n", "$where": where}
+    # date_trunc_ym: https://dev.socrata.com/docs/functions/date_trunc_ym
+    return {
+        "$select": "date_trunc_ym(created_date) AS m, count(*) AS n",
+        "$where": where,
+        "$group": "m",
+        "$order": "m",
+        "$limit": "50",
+    }
+
+
+def _range_where(start: dt.date, end: dt.date) -> str:
+    return f"created_date >= {bb.soql_ts(start)} AND created_date < {bb.soql_ts(end)}"
+
+
+def city_month_counts(soda: bb.Soda, windows: list[bb.Window]) -> dict[str, int]:
+    """The city's row count for each window, asking as few questions as possible.
+
+    Whole calendar months are counted with one grouped query per year (``$group`` by
+    month). If a year is too heavy for the portal, that year is asked again as four
+    quarters. A partial first month (a --start that is not the 1st) keeps its own
+    single count, so it covers exactly the same dates as the cached file.
+    """
+    counts: dict[str, int] = {}
+    whole: dict[int, list[bb.Window]] = {}
+    for win in windows:
+        if win.start.day == 1 and win.end == (win.start + dt.timedelta(days=32)).replace(day=1):
+            whole.setdefault(win.start.year, []).append(win)
+        else:
+            r = soda.get(f"/resource/{bb.DATASET_311}.json", params=_count_query(_range_where(win.start, win.end), False))
+            counts[win.label] = int(r.json()[0]["n"])
+
+    def grouped(group: list[bb.Window], max_tries: int | None = None) -> None:
+        r = soda.get(
+            f"/resource/{bb.DATASET_311}.json",
+            params=_count_query(_range_where(group[0].start, group[-1].end), True),
+            max_tries=max_tries,
+        )
+        got = {row["m"][:7]: int(row["n"]) for row in r.json() if row.get("m")}
+        for win in group:
+            counts[win.label] = got.get(win.label, 0)  # a month with no rows is absent
+
+    for year in sorted(whole):
+        wins = whole[year]
+        try:
+            grouped(wins, max_tries=2)
+        except bb.PipelineError as exc:
+            log("count_year_fallback", year=year, error=str(exc)[:200])
+            for q in range(4):
+                part = [w for w in wins if (w.start.month - 1) // 3 == q]
+                if part:
+                    grouped(part)
+    return counts
+
+
 def check_counts(soda: bb.Soda, cache_311: Path, start: dt.date, end_inclusive: dt.date, today: dt.date, stale_dir: Path) -> list[str]:
     """Compare full cached months with the city's row counts; move mismatches aside.
 
     Returns the months moved. The build then downloads them whole.
     """
-    moved = []
+    todo: list[tuple[bb.Window, Path, int]] = []
     for win in bb.month_windows(start, end_inclusive):
         if win.end > today.replace(day=1):  # the current month is re-downloaded anyway
             continue
@@ -290,11 +347,11 @@ def check_counts(soda: bb.Soda, cache_311: Path, start: dt.date, end_inclusive: 
             continue
         path = files[-1]
         ours = json.loads(path.with_suffix(".json").read_text())["rows"]
-        r = soda.get(f"/resource/{bb.DATASET_311}.json", params={
-            "$select": "count(*) AS n",
-            "$where": f"created_date >= {bb.soql_ts(win.start)} AND created_date < {bb.soql_ts(win.end)}",
-        })
-        theirs = int(r.json()[0]["n"])
+        todo.append((win, path, ours))
+    city = city_month_counts(soda, [w for w, _, _ in todo]) if todo else {}
+    moved = []
+    for win, path, ours in todo:
+        theirs = city[win.label]
         if theirs != ours:
             stale_dir.mkdir(parents=True, exist_ok=True)
             for p in (path, path.with_suffix(".json")):
