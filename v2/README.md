@@ -104,9 +104,12 @@ so the nightly job picks up **changed** rows as well as new ones.
 6. `--publish`: uploads to `data-next/` on beta.nyc, then swaps it with `data/`
    in one step (the street map folder moves across). It refuses to publish if
    total requests fell by more than 5%, then checks the live manifest.
-7. `--notify CHANNEL`: posts failures and warnings (no changes for 2 runs, a
-   spike over 200,000 rows, count mismatches) to Discord through Rosie, the
+7. `--notify CHANNEL`: posts failures and warnings (nothing moved for 2 runs,
+   a spike over 200,000 rows, count mismatches) to Discord through Rosie, the
    BetaNYC bot (`scripts/discord_rosie_post.py` in the BetaNYC AI workspace).
+   "Nothing moved" means the city's newest `:updated_at` did not advance and
+   no row was new or different. The row count alone can't tell: the watermark
+   is kept to the second, so each night re-fetches the city's last batch.
 
 State (the `:updated_at` watermark and the last publish) is in
 `pipeline/.cache/nightly/state.json`.

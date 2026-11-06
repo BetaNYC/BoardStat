@@ -99,3 +99,37 @@ def test_write_changes_counts_city_and_districts(tmp_path):
     assert s["cd"]["105"] == {"new": 1, "updated": 0, "closed": 1}
     assert s["cc"]["33"]["updated"] == 2
     assert json.loads((out / "changes.json").read_text())["since"] == "2026-11-04T06:00:00+00:00"
+
+
+def test_refetching_the_same_batch_is_quiet_and_alarms_on_the_second_night():
+    # 2026-11-05/06: the city stalled at 02:46:28.115Z; every night re-fetched
+    # the same 3,200 rows with an empty diff and the watermark never moved.
+    state = {"watermark": "2026-11-05T02:46:28", "quiet_runs": 0}
+    assert nightly.record_night(state, state["watermark"], "2026-11-05T02:46:28.115Z", diff_rows=0) is None
+    assert state == {"watermark": "2026-11-05T02:46:28", "quiet_runs": 1}
+    warning = nightly.record_night(state, state["watermark"], "2026-11-05T02:46:28.115Z", diff_rows=0)
+    assert state["quiet_runs"] == 2
+    assert warning and "2 runs in a row" in warning and "2026-11-05T02:46:28" in warning
+
+
+def test_no_rows_at_all_is_quiet():
+    state = {"watermark": "2026-11-05T02:46:28", "quiet_runs": 1}
+    assert nightly.record_night(state, state["watermark"], None, diff_rows=0)
+    assert state == {"watermark": "2026-11-05T02:46:28", "quiet_runs": 2}
+
+
+def test_normal_night_resets_the_counter():
+    state = {"watermark": "2026-11-05T02:46:28", "quiet_runs": 3}
+    assert nightly.record_night(state, state["watermark"], "2026-11-06T03:21:07.004Z", diff_rows=41_000) is None
+    assert state == {"watermark": "2026-11-06T03:21:07", "quiet_runs": 0}
+
+
+def test_restamp_catch_up_night_is_not_a_stall():
+    # Many rows re-stamped, nothing actually changed, but the stamp moved: the city is publishing.
+    state = {"watermark": "2026-11-05T02:46:28", "quiet_runs": 1}
+    assert nightly.record_night(state, state["watermark"], "2026-11-06T03:21:07.004Z", diff_rows=0) is None
+    assert state["quiet_runs"] == 0
+
+
+def test_watermark_never_moves_backwards():
+    assert nightly.next_watermark("2026-11-05T02:46:28", "2026-11-04T00:00:00.000Z") == "2026-11-05T02:46:28"
