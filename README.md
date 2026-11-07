@@ -1,14 +1,19 @@
 # BoardStat
 ## BoardStat 2.0 (prototype) is live: https://www.beta.nyc/boardstat/
 
-The original Power BI BoardStat stopped refreshing in 2026. **BoardStat 2.0** replaces it: an open-source, browser-based tool for 311 data by community district, council district, or a single address, with about three years of data refreshed every night. Its code and documentation are in [`v2/`](v2/README.md). The old addresses at boardstat.beta.nyc now send visitors to the new prototype.
+The original Power BI BoardStat stopped refreshing in early 2025. **BoardStat 2.0** replaces it: an open-source, browser-based tool for 311 data by community district, council district, or a single address. It covers requests from January 1, 2020, on, and refreshes every night. Requests from 2010 to 2019 are in a separate city dataset, and adding them is planned ([#108](https://github.com/BetaNYC/BoardStat/issues/108)). Its code and documentation are in [`v2/`](v2/README.md). The old addresses at boardstat.beta.nyc, and the earlier `beta.nyc/boardstat/v2/` address, now send visitors to https://www.beta.nyc/boardstat/.
 
-The rest of this page describes the original BoardStat (v0.x), kept for history.
-BoardStat is an interactive tool for New York City’s community boards. It empowers users to discover issues and trends within district boundaries. The six pages of the tool provide a variety of summaries, graphs, and maps of 311 data (from 2010 through the present day). Not only does BoardStat empower community board staff and members to gain timely insights into their residents’ concerns, but it also furthers Manhattan Borough President Gale A. Brewer's goal of moving beyond open data access to meaningful open data use.
+Questions or feedback on BoardStat 2.0: email [boardstat@beta.nyc](mailto:boardstat@beta.nyc?subject=BoardStat%202.0%20feedback) or see [how to give feedback](https://www.beta.nyc/boardstat/help.html#feedback-h).
 
-This github repo is to document issues and outline future features.
+## The original BoardStat (v0.x), kept for history
 
-**IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
+The rest of this page describes the original BoardStat as it was. Its training materials and contacts are from that time.
+
+BoardStat is an interactive tool for New York City’s community boards. It empowers users to discover issues and trends within district boundaries. The six pages of the tool provided a variety of summaries, graphs, and maps of 311 data (from 2010 through the present day). Not only did BoardStat empower community board staff and members to gain timely insights into their residents’ concerns, but it also furthered then-Manhattan Borough President Gale A. Brewer's goal of moving beyond open data access to meaningful open data use.
+
+This GitHub repo documents issues and holds the code.
+
+The original page-by-page [tutorial videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik) (2018) teach the Power BI version, which no longer runs.
 
 These original borough addresses now redirect to BoardStat 2.0.
 
@@ -20,32 +25,31 @@ These original borough addresses now redirect to BoardStat 2.0.
 | Queens | https://boardstat.beta.nyc/queens |
 | Staten Island | https://boardstat.beta.nyc/statenisland |
 
-## File an Issue 
-We're tracking all issues via this [repo's issue cue](https://github.com/BetaNYC/BoardStat/issues).
+## File an Issue
+We track all issues, for both versions, in this [repo's issue queue](https://github.com/BetaNYC/BoardStat/issues).
 
 ### Development Process and Methodology:
-BoardStat was conceived with the Manhattan Borough President Gale A. Brewer as a simple 311 analysis tool. Through research conducted by Civic Innovation Fellows, key features were baked into a prototype. During the Spring semester of 2016 - 2017, fellows and BetaNYC staff, with assistance from Microsoft Civic Chicago and NYC, developed a prototype using PowerBI. Through group and one-on-one meetings, MBPO staff, Community District staff, and Community Board members helped refine key features. 
+BoardStat was conceived with the Manhattan Borough President Gale A. Brewer as a simple 311 analysis tool. Through research conducted by Civic Innovation Fellows, key features were baked into a prototype. During the Spring semester of 2016 - 2017, fellows and BetaNYC staff, with assistance from Microsoft Civic Chicago and NYC, developed a prototype using Power BI. Through group and one-on-one meetings, MBPO staff, Community District staff, and Community Board members helped refine key features. 
 
 ### Funders:
 BoardStat was created with funds and support from the Alfred P. Sloan Foundation, Fund for the City of New York, and Microsoft Civic.
 
-## Training Documents
-BetaNYC routinely hosts 90 min public training sessions. To find out about the next training session, join our [meetup](https://meetup.com/betanyc). If you are a Manhattan Community Board District Office staff member or Community Board member, email us at 'boardstat@manhattanbp.nyc.gov' to set up a personal one-on-one training. 
+## Training Documents (original version)
+BetaNYC ran 90-minute public training sessions on the original BoardStat, and the Manhattan Borough President's office offered one-on-one trainings for Manhattan community boards. These materials teach the Power BI version:
+ * [BoardStat Training - Data Journey Worksheet](https://docs.google.com/document/d/1DHgVLrm-X1gs1rwovhpWA5En_ozcQnTWHYobmG9_B0A/edit), the worksheet BetaNYC used to teach BoardStat, with [companion slides](http://bit.ly/betanyc_datajourney_manhattan).
+ * [Tutorial videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik) (2018).
 
-**IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
+For help with BoardStat 2.0, use [boardstat@beta.nyc](mailto:boardstat@beta.nyc) and the [help page](https://www.beta.nyc/boardstat/help.html).
 
-In the meantime, you can browse our training materials.
- * [BoardStat Training - Data Journey Worksheet](https://docs.google.com/document/d/1DHgVLrm-X1gs1rwovhpWA5En_ozcQnTWHYobmG9_B0A/edit) - This is the worksheet BetaNYC uses to teach BoardStat. You can find companion slides [here](http://bit.ly/betanyc_datajourney_manhattan).
- * [Training Videos](https://) - In development
- 
 ## Data
-BoardStat is ingesting [NYC 311 Service Requests from 2010 to Present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-Present/erm2-nwe9) dataset directly from the city’s open data portal. Data is filtered by the Community Board column.
+The original BoardStat read the city's 311 Service Requests dataset ([`erm2-nwe9`](https://data.cityofnewyork.us/d/erm2-nwe9), then titled "from 2010 to Present") through special views on NYC Open Data, filtered by the Community Board column. The city has since split 311 data in two: [311 Service Requests from 2020 to Present](https://data.cityofnewyork.us/d/erm2-nwe9) (`erm2-nwe9`, which BoardStat 2.0 uses) and [311 Service Requests 2010–2019](https://data.cityofnewyork.us/d/76ig-c548) (`76ig-c548`). See the [data sources in `v2/README.md`](v2/README.md).
 
 # Change Log
 
 ## BoardStat 2.0 (prototype) - 2026
  * A rebuild that no longer depends on Power BI: a Python + DuckDB pipeline and a static site that queries the data in your browser. See [`v2/README.md`](v2/README.md).
- * Community districts, council districts and address pages; about three years of 311 data, refreshed nightly.
+ * Community districts, council districts and address pages; 311 data from January 1, 2020, refreshed nightly.
+ * Lives at https://www.beta.nyc/boardstat/ (moved from `/boardstat/v2/` in November 2026; old links redirect).
  * boardstat.beta.nyc (GitHub Pages) now redirects to https://www.beta.nyc/boardstat/.
 
 ## BoardStat v0.7 - A New Look
