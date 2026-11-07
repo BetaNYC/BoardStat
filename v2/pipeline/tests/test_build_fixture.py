@@ -184,18 +184,18 @@ def test_validate_manifest_rejects_default_start_outside_window(built):
         bb.validate_manifest(bad)
 
 
-def test_detail_files_put_open_requests_first(built):
+def test_detail_files_put_open_requests_last(built):
     _, out, _ = built
     rows = duckdb.sql(f"SELECT unique_key, status, is_closed FROM '{out}/detail/cd/101.parquet'").fetchall()
-    assert rows == [("2", "Open", False), ("1", "Closed", True)]  # file order, not sorted by the query
+    assert rows == [("1", "Closed", True), ("2", "Open", False)]  # file order, not sorted by the query
 
 
-# The browser's load query (district.js, loadRange): every request not yet Closed,
-# plus Closed requests created on or after the load start. Kept in step with the JS.
+# The browser's load query (district.js, ensureLoaded): Closed requests created on or
+# after the load start, plus every request not yet Closed. Kept in step with the JS.
 LOAD_SQL = """
-    SELECT * FROM read_parquet({f}) WHERE is_closed = false
-    UNION ALL
     SELECT * FROM read_parquet({f}) WHERE is_closed = true AND created_date >= CAST({x} AS TIMESTAMP)
+    UNION ALL
+    SELECT * FROM read_parquet({f}) WHERE is_closed = false
 """
 
 
@@ -216,7 +216,7 @@ def big_detail(tmp_path):
     """)
     duckdb.sql(f"""
         COPY (SELECT *, coalesce(status = 'Closed', false) AS is_closed FROM '{tmp_path / 'src.parquet'}'
-              ORDER BY is_closed, created_date, unique_key)
+              ORDER BY is_closed DESC, created_date, unique_key)
         TO '{path}' (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 50000)
     """)
     return path
@@ -262,3 +262,7 @@ def test_row_group_statistics_allow_pruning(big_detail):
     assert all(a[4] <= b[3] for a, b in itertools.pairwise(closed))  # non-overlapping date spans
     needed = [g for g in closed if g[4] >= "2024-06-01"]
     assert len(needed) < len(closed) / 2
+    # Open requests sit last, so a view's row groups are one run that ends at the
+    # end of the file (DuckDB-WASM's read-ahead then stops at the end of the file).
+    load = [g[0] for g in groups if g[1] == "false" or g[4] >= "2024-06-01"]
+    assert load == list(range(load[0], groups[-1][0] + 1))

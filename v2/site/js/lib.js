@@ -36,6 +36,14 @@ export function getDB() {
       const logger = new duckdb.VoidLogger();
       const db = new duckdb.AsyncDuckDB(logger, worker);
       await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+      // Read Parquet over HTTP range requests, not whole files. DuckDB-WASM 1.32.0
+      // defaults forceFullHTTPReads to TRUE (lib/src/io/web_filesystem.cc:
+      // force_full_http_reads.value_or(true)), so every registered file was fetched
+      // whole in one GET. With it off, DuckDB probes with HEAD + "Range: bytes=0-" and
+      // reads only the footer and the row groups a query needs. allowFullHTTPReads
+      // stays on (its default), so a server without Range support still works.
+      // Config keys: DuckDBFilesystemConfig in the package's types/src/bindings/config.d.ts.
+      await db.open({ filesystem: { forceFullHTTPReads: false } });
       URL.revokeObjectURL(workerUrl);
       const conn = await db.connect();
       return { duckdb, db, conn };

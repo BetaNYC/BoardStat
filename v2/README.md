@@ -213,10 +213,12 @@ months plus the current month**, so a link without dates shows about a year. The
 date pickers still reach back to 2020-01-01. Only the columns the page shows are
 kept in memory; the CSV download reads every column straight from the file.
 
-To make that cheap, `boardstat_build.py` writes each detail file with every
-not-yet-Closed request first, then the Closed ones in `created_date` order, with
-an `is_closed` column, in 50,000-row groups. A file built before this change has
-no `default_start` in its manifest; the page then loads it whole, as before.
+To make that cheap, `boardstat_build.py` writes each detail file with the Closed
+requests first, in `created_date` order, then every not-yet-Closed request at the
+end, with an `is_closed` column, in 50,000-row groups. So the rows a view needs
+are one run of row groups that ends at the end of the file. A file built before
+this change has no `default_start` in its manifest; the page then loads it whole,
+as before.
 
 Measured on 2026-11-06 for Council District 11 (DuckDB-WASM 1.32.0 in headless
 Chromium, `duckdb_memory()`, table memory). The 2020+ file is synthetic: today's
@@ -230,12 +232,38 @@ real rows plus shifted copies to fill 2020-01 to 2023-10 (1,020,624 rows, 30 MB)
 | After: From date moved to June 2021 | 985,457 | 330 MB |
 
 Numbers on the page matched a whole-file count exactly in every case checked.
-**Known gap:** in these tests DuckDB-WASM 1.32.0 still downloaded each file
-whole (one plain GET, no range requests), even though the local server and
-beta.nyc answer range requests. So memory dropped, but download size did not:
-about 30 MB for the largest district once 2020 is in. Row-group statistics are
-in place for range reads; making DuckDB-WASM use them, or splitting files by
-year, is a follow-up.
+
+### What a browser downloads
+
+DuckDB-WASM 1.32.0 defaults `forceFullHTTPReads` to **true**
+(`lib/src/io/web_filesystem.cc` in duckdb-wasm: `force_full_http_reads.value_or(true)`),
+so it fetched every registered file whole. `lib.js` now opens the database with
+`{ filesystem: { forceFullHTTPReads: false } }`. DuckDB then checks with
+`HEAD` + `Range: bytes=0-` (beta.nyc and `v2/serve.py` both answer `206`) and
+reads only the footer and the row groups a query needs. A server without range
+support still works: `allowFullHTTPReads` stays on, so it falls back to one GET.
+
+Its read-ahead grows each read ×4, from 16 KB up to 16 MB. A run of row groups
+that ends at the end of the file therefore costs little more than the run, which
+is why open requests now sit last. Reading the run in the middle of a file
+overshoots by up to 16 MB.
+
+Measured on 2026-11-06, Council District 11 (the largest), real 2020+ data
+(`data-backfill`, 940,801 rows, 28.1 MB file), headless Chromium, bytes counted
+at a local server that answers ranges. "Page data" is every file under `data/`.
+
+| Case | Page data | CC 11 file | Compare panel (`agg`) | Table memory |
+|---|---:|---:|---:|---:|
+| Before (whole-file reads) | 30.0 MB | 28.1 MB | 1.57 MB | 113 MB |
+| **After: default view** | **13.8 MB** | **12.8 MB** | 0.71 MB | 112 MB |
+| After, file still in the old open-first layout | 19.6 MB | 18.6 MB | 0.71 MB | 112 MB |
+| After: link opened at 2020-01-01 | 30.9 MB | 29.9 MB | 0.71 MB | 299 MB |
+| After: default, then From moved to June 2021 | +28.6 MB | +28.6 MB | — | 292 MB |
+
+The CSV download now fetches 0.7 MB more instead of nothing (it reads the long
+text columns from the file). The tradeoff: before, the whole file was already
+in the browser, so moving the From date back cost no download; now it costs
+about one more file's worth. If that proves common, split files by year.
 
 ## Traffic measurement (Google Analytics)
 
