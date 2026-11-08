@@ -487,6 +487,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def run(args: argparse.Namespace) -> int:
+    bb.require_data_license()  # before any network call (#134)
     t0 = time.time()
     now = dt.datetime.now(dt.UTC)
     today = args.today or now.astimezone(NYC).date()

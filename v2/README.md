@@ -500,9 +500,11 @@ Run on office-mac, 2026-11-04, with an app token, default window.
   https://opendatacommons.org/licenses/odbl/1-0/. The underlying records come
   from NYC Open Data and stay subject to the City's terms. Attribution line and
   source datasets: [`LICENSE-DATA.md`](../LICENSE-DATA.md).
-- Every build copies `LICENSE-DATA.md` into the output folder as `LICENSE.md`
+- Every build copies `LICENSE-DATA.md` into the output folder as `LICENSE.txt`
   and adds a `license` block to `manifest.json`, so the published `data/`
-  folder always carries the notice (#134). The build stops if the file is missing.
+  folder always carries the notice (#134). It is `.txt` because beta.nyc serves
+  `.md` files as downloads. The build and the nightly job stop before any
+  download if the file is missing.
 
 ## Third-party software
 
@@ -521,4 +523,4 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 
 Street map data: © OpenStreetMap contributors (ODbL), via Protomaps; credited in the map's attribution.
 
-Data: NYC Open Data (data.cityofnewyork.us), subject to the portal's terms of use. The exact terms page was not reachable from the build machine (HTTP 403), so it is not linked here; confirm it before publishing.
+Data: NYC Open Data (data.cityofnewyork.us), subject to the portal's terms of use. The exact terms page was not reachable from the build machine (HTTP 403), so it is not linked here yet ([#136](https://github.com/BetaNYC/BoardStat/issues/136)).

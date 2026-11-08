@@ -49,17 +49,26 @@ import duckdb
 import requests
 
 SCRIPT = "boardstat_build"
-# The data outputs are ODbL 1.0 (#134). The notice travels with every build as LICENSE.md,
+# The data outputs are ODbL 1.0 (#134). The notice travels with every build as LICENSE.txt
+# (.txt because beta.nyc serves .md as a download, not as text),
 # copied from the repo-root LICENSE-DATA.md, so the published data/ folder carries it.
 DATA_LICENSE_FILE = Path(__file__).resolve().parents[2] / "LICENSE-DATA.md"
 DATA_LICENSE = {
     "name": "Open Database License (ODbL) 1.0",
     "spdx": "ODbL-1.0",
     "url": "https://opendatacommons.org/licenses/odbl/1-0/",
-    "attribution": "BoardStat by BetaNYC (https://www.beta.nyc/boardstat/), built from NYC Open Data.",
+    "attribution": "BoardStat by BetaNYC (https://www.beta.nyc/boardstat/), built from NYC Open Data. Data available under the Open Database License (ODbL) 1.0: https://opendatacommons.org/licenses/odbl/1-0/",
     "source_terms": "Individual records come from NYC Open Data and remain subject to the City's terms of use.",
-    "notice": "LICENSE.md",
+    "notice": "LICENSE.txt",
 }
+
+
+def require_data_license() -> None:
+    """Fail fast if the notice that every build ships is missing (#134)."""
+    if not DATA_LICENSE_FILE.is_file():
+        raise PipelineError(f"data license notice missing: {DATA_LICENSE_FILE} (it is copied into every build)")
+
+
 PORTAL = "https://data.cityofnewyork.us"
 
 DATASET_311 = "erm2-nwe9"  # 311 Service Requests from 2020 to Present
@@ -628,8 +637,7 @@ def build(
 ) -> dict[str, Any]:
     """Everything after the download. Offline; the tests call this directly."""
     t0 = time.time()
-    if not DATA_LICENSE_FILE.is_file():
-        raise PipelineError(f"data license notice missing: {DATA_LICENSE_FILE} (it is copied into every build)")
+    require_data_license()
     now = now or dt.datetime.now(dt.UTC)
     # created/closed dates are floating NYC local time; compare "now" in the same frame.
     now_local_naive = now.astimezone(ZoneInfo("America/New_York")).replace(tzinfo=None)
@@ -977,6 +985,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     check_start(args.start)  # before any network call
+    require_data_license()  # before a download that can take hours
     t0 = time.time()
     token = os.environ.get("SOCRATA_APP_TOKEN") or None
     log("start", start=args.start, end=args.end, out=args.out, app_token="set" if token else "unset")

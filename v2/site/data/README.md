@@ -8,7 +8,7 @@ pipeline and ignored by git. Rebuild it from the repository root with:
 | Path | What it is |
 |---|---|
 | `manifest.json` | Build time, license, source dataset ids and their `rowsUpdatedAt`, window, row counts, agreement report, district list |
-| `LICENSE.md` | The data license notice (ODbL 1.0), copied from the repo-root `LICENSE-DATA.md` (#134) |
+| `LICENSE.txt` | The data license notice (ODbL 1.0), copied from the repo-root `LICENSE-DATA.md` (#134) |
 | `build-log.md` | The agreement report and counts as Markdown |
 | `boundaries/cd.geojson`, `boundaries/cc.geojson` | Simplified DCP boundaries for the web (properties: `id`, `label`, `jia`, `borough`) |
 | `detail/cd/<boro_cd>.parquet`, `detail/cc/<coundist>.parquet` | One row per request in that district, sorted by `created_date` |

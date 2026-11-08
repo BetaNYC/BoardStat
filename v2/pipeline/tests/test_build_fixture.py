@@ -280,6 +280,28 @@ def test_build_ships_the_data_license(built):
     assert on_disk["license"] == m["license"]
 
 
+def test_notice_is_txt_so_beta_nyc_displays_it():
+    # beta.nyc serves .md as application/octet-stream (a download), so the published notice is .txt.
+    assert bb.DATA_LICENSE["notice"] == "LICENSE.txt"
+
+
+def test_attribution_links_the_license():
+    # ODbL section 4.3: the notice should point to the license.
+    assert bb.DATA_LICENSE["url"] in bb.DATA_LICENSE["attribution"]
+    assert bb.DATA_LICENSE["url"] in bb.DATA_LICENSE_FILE.read_text()
+
+
+def test_main_fails_before_any_network_call_without_the_notice(tmp_path, monkeypatch):
+    monkeypatch.setattr(bb, "DATA_LICENSE_FILE", tmp_path / "missing.md")
+
+    def no_network(*a, **k):
+        raise AssertionError("network call before the license check")
+
+    monkeypatch.setattr(bb, "Soda", no_network)
+    with pytest.raises(bb.PipelineError, match="data license notice missing"):
+        bb.main(["--out", str(tmp_path / "out"), "--cache", str(tmp_path / "cache")])
+
+
 def test_build_fails_loudly_without_the_license_notice(tmp_path, monkeypatch):
     monkeypatch.setattr(bb, "DATA_LICENSE_FILE", tmp_path / "missing.md")
     with pytest.raises(bb.PipelineError, match="data license notice missing"):
