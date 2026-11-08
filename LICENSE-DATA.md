@@ -2,8 +2,9 @@
 
 This file covers BoardStat's **data outputs**: the files the pipeline writes to
 `v2/site/data/` and publishes at https://www.beta.nyc/boardstat/data/
-(`manifest.json`, `build-log.md`, `LICENSE.txt`, `changes.json`, the Parquet files under
-`detail/` and `agg/`, `addresses.parquet`, and the GeoJSON under `boundaries/`).
+(`manifest.json`, `build-log.md`, `changes.json`, the Parquet files under `detail/` and
+`agg/`, `addresses.parquet`, and the GeoJSON under `boundaries/`). Each build also carries a copy
+of this notice as `LICENSE.txt`.
 The code in this repository is under the MIT License; see [`LICENSE`](LICENSE).
 
 ## License
