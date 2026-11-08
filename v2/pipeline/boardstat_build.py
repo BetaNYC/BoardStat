@@ -49,6 +49,17 @@ import duckdb
 import requests
 
 SCRIPT = "boardstat_build"
+# The data outputs are ODbL 1.0 (#134). The notice travels with every build as LICENSE.md,
+# copied from the repo-root LICENSE-DATA.md, so the published data/ folder carries it.
+DATA_LICENSE_FILE = Path(__file__).resolve().parents[2] / "LICENSE-DATA.md"
+DATA_LICENSE = {
+    "name": "Open Database License (ODbL) 1.0",
+    "spdx": "ODbL-1.0",
+    "url": "https://opendatacommons.org/licenses/odbl/1-0/",
+    "attribution": "BoardStat by BetaNYC (https://www.beta.nyc/boardstat/), built from NYC Open Data.",
+    "source_terms": "Individual records come from NYC Open Data and remain subject to the City's terms of use.",
+    "notice": "LICENSE.md",
+}
 PORTAL = "https://data.cityofnewyork.us"
 
 DATASET_311 = "erm2-nwe9"  # 311 Service Requests from 2020 to Present
@@ -617,6 +628,8 @@ def build(
 ) -> dict[str, Any]:
     """Everything after the download. Offline; the tests call this directly."""
     t0 = time.time()
+    if not DATA_LICENSE_FILE.is_file():
+        raise PipelineError(f"data license notice missing: {DATA_LICENSE_FILE} (it is copied into every build)")
     now = now or dt.datetime.now(dt.UTC)
     # created/closed dates are floating NYC local time; compare "now" in the same frame.
     now_local_naive = now.astimezone(ZoneInfo("America/New_York")).replace(tzinfo=None)
@@ -798,6 +811,7 @@ def build(
                    "default_start": default_view_start(start, end_inclusive).isoformat(),
                    "first_created": str(stats[7]), "last_created": str(stats[8])},
         "sources": sources,
+        "license": DATA_LICENSE,
         "counts": {
             "total": stats[0],
             "with_coords": stats[1],
@@ -822,6 +836,7 @@ def build(
     validate_manifest(manifest)
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str))
     (out_dir / "build-log.md").write_text(agreement_markdown(manifest))
+    (out_dir / DATA_LICENSE["notice"]).write_text(DATA_LICENSE_FILE.read_text())
     log("build_done", elapsed_s=round(time.time() - t0, 1), total=stats[0])
     return manifest
 

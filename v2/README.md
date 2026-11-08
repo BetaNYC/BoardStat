@@ -490,10 +490,19 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 - **Move the nightly job to GitHub Actions** if the Mac mini proves unreliable.
 - **Hosting:** Cloudflare R2 + Pages, or GitHub Pages for the site with data on
   object storage (range requests would then let DuckDB-WASM read partial files).
-- **License decision:** this repository has **no LICENSE file**. One was not
-  added on purpose; Noel must choose the license (code and data outputs may
-  want different ones).
 - Review `complaint_type_map.csv` with the people who will use it.
+
+## License
+
+- **Code:** MIT License ([`LICENSE`](../LICENSE)).
+- **Data outputs** (everything the pipeline writes to `site/data/`, published at
+  https://www.beta.nyc/boardstat/data/): Open Database License (ODbL) 1.0,
+  https://opendatacommons.org/licenses/odbl/1-0/. The underlying records come
+  from NYC Open Data and stay subject to the City's terms. Attribution line and
+  source datasets: [`LICENSE-DATA.md`](../LICENSE-DATA.md).
+- Every build copies `LICENSE-DATA.md` into the output folder as `LICENSE.md`
+  and adds a `license` block to `manifest.json`, so the published `data/`
+  folder always carries the notice (#134). The build stops if the file is missing.
 
 ## Third-party software
 

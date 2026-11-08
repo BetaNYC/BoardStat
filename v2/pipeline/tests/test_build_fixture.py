@@ -266,3 +266,22 @@ def test_row_group_statistics_allow_pruning(big_detail):
     # end of the file (DuckDB-WASM's read-ahead then stops at the end of the file).
     load = [g[0] for g in groups if g[1] == "false" or g[4] >= "2024-06-01"]
     assert load == list(range(load[0], groups[-1][0] + 1))
+
+
+def test_build_ships_the_data_license(built):
+    """#134: every build carries the ODbL notice, so the published data/ folder does too."""
+    m, out, _ = built
+    notice = out / bb.DATA_LICENSE["notice"]
+    assert notice.read_text() == bb.DATA_LICENSE_FILE.read_text()
+    assert "https://opendatacommons.org/licenses/odbl/1-0/" in notice.read_text()
+    on_disk = json.loads((out / "manifest.json").read_text())
+    assert on_disk["license"]["spdx"] == "ODbL-1.0"
+    assert on_disk["license"]["url"] == "https://opendatacommons.org/licenses/odbl/1-0/"
+    assert on_disk["license"] == m["license"]
+
+
+def test_build_fails_loudly_without_the_license_notice(tmp_path, monkeypatch):
+    monkeypatch.setattr(bb, "DATA_LICENSE_FILE", tmp_path / "missing.md")
+    with pytest.raises(bb.PipelineError, match="data license notice missing"):
+        bb.build([], tmp_path / "cd.geojson", tmp_path / "cc.geojson", tmp_path / "map.csv", tmp_path / "out",
+                 dt.date(2026, 1, 1), dt.date(2026, 1, 31), sources={}, now=dt.datetime(2026, 2, 1, tzinfo=dt.UTC))
