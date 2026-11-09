@@ -133,3 +133,19 @@ def test_restamp_catch_up_night_is_not_a_stall():
 
 def test_watermark_never_moves_backwards():
     assert nightly.next_watermark("2026-11-05T02:46:28", "2026-11-04T00:00:00.000Z") == "2026-11-05T02:46:28"
+
+
+def test_nightly_fails_before_any_network_call_without_the_license_notice(tmp_path, monkeypatch):
+    """#134: the nightly run stops before fetching anything if the data license notice is gone."""
+    import pytest
+
+    monkeypatch.setattr(bb, "DATA_LICENSE_FILE", tmp_path / "missing.md")
+
+    def no_network(*a, **k):
+        raise AssertionError("network call before the license check")
+
+    monkeypatch.setattr(bb, "Soda", no_network)
+    args = nightly.parse_args(["--cache", str(tmp_path / "cache"), "--out", str(tmp_path / "out")])
+    with pytest.raises(bb.PipelineError, match="data license notice missing"):
+        nightly.run(args)
+    assert not (tmp_path / "cache").exists()

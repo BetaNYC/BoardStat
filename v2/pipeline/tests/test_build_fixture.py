@@ -266,3 +266,44 @@ def test_row_group_statistics_allow_pruning(big_detail):
     # end of the file (DuckDB-WASM's read-ahead then stops at the end of the file).
     load = [g[0] for g in groups if g[1] == "false" or g[4] >= "2024-06-01"]
     assert load == list(range(load[0], groups[-1][0] + 1))
+
+
+def test_build_ships_the_data_license(built):
+    """#134: every build carries the ODbL notice, so the published data/ folder does too."""
+    m, out, _ = built
+    notice = out / bb.DATA_LICENSE["notice"]
+    assert notice.read_text() == bb.DATA_LICENSE_FILE.read_text()
+    assert "https://opendatacommons.org/licenses/odbl/1-0/" in notice.read_text()
+    on_disk = json.loads((out / "manifest.json").read_text())
+    assert on_disk["license"]["spdx"] == "ODbL-1.0"
+    assert on_disk["license"]["url"] == "https://opendatacommons.org/licenses/odbl/1-0/"
+    assert on_disk["license"] == m["license"]
+
+
+def test_notice_is_txt_so_beta_nyc_displays_it():
+    # beta.nyc serves .md as application/octet-stream (a download), so the published notice is .txt.
+    assert bb.DATA_LICENSE["notice"] == "LICENSE.txt"
+
+
+def test_attribution_links_the_license():
+    # ODbL section 4.3: the notice should point to the license.
+    assert bb.DATA_LICENSE["url"] in bb.DATA_LICENSE["attribution"]
+    assert bb.DATA_LICENSE["url"] in bb.DATA_LICENSE_FILE.read_text()
+
+
+def test_main_fails_before_any_network_call_without_the_notice(tmp_path, monkeypatch):
+    monkeypatch.setattr(bb, "DATA_LICENSE_FILE", tmp_path / "missing.md")
+
+    def no_network(*a, **k):
+        raise AssertionError("network call before the license check")
+
+    monkeypatch.setattr(bb, "Soda", no_network)
+    with pytest.raises(bb.PipelineError, match="data license notice missing"):
+        bb.main(["--out", str(tmp_path / "out"), "--cache", str(tmp_path / "cache")])
+
+
+def test_build_fails_loudly_without_the_license_notice(tmp_path, monkeypatch):
+    monkeypatch.setattr(bb, "DATA_LICENSE_FILE", tmp_path / "missing.md")
+    with pytest.raises(bb.PipelineError, match="data license notice missing"):
+        bb.build([], tmp_path / "cd.geojson", tmp_path / "cc.geojson", tmp_path / "map.csv", tmp_path / "out",
+                 dt.date(2026, 1, 1), dt.date(2026, 1, 31), sources={}, now=dt.datetime(2026, 2, 1, tzinfo=dt.UTC))

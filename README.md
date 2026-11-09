@@ -83,5 +83,7 @@ Many thanks to [Briana Vecchione](https://github.com/brianavecchione) for making
  * DATA QUALITY ISSUES — Manhattan CB 08's data stream continues to include service request issues from Marble Hill, which is technically Manhattan but service by Bronx CB 08. 
 
 
-## Copyright
-All documents are Creative Commons 4.0 By-Share Alike, via BetaNYC.
+## License
+* **Code:** MIT License. See [`LICENSE`](LICENSE).
+* **Data outputs** (the files BoardStat 2.0 publishes at https://www.beta.nyc/boardstat/data/): Open Database License (ODbL) 1.0, crediting NYC Open Data as the source. The underlying records stay subject to NYC Open Data's own terms. See [`LICENSE-DATA.md`](LICENSE-DATA.md) for the attribution line and the source datasets.
+* **Documents** (training materials and other written material): Creative Commons Attribution-ShareAlike 4.0, via BetaNYC.
