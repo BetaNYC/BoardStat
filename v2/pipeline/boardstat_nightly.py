@@ -26,7 +26,8 @@ recent months, so on its own an old request that closes later would stay
 6. With ``--publish``: upload to ``data-next/`` on beta.nyc, then swap it with
    ``data/`` in one quick step, so visitors never see half-old, half-new data.
 7. With ``--notify CHANNEL``: tell staff on Discord (Rosie) when something
-   fails or looks wrong. Off by default.
+   fails or looks wrong. Off by default. A FAILED post @-tags Noel
+   (``FAILURE_TAGS``); warnings do not tag anyone.
 
 Run from the repository root:
 
@@ -71,6 +72,18 @@ SSH_HOST = "wp_iz4gh3@dp-6803fc88d2.dreamhostps.com"
 
 # Rosie's poster lives in the BetaNYC AI workspace.
 ROSIE = Path.home() / "Code" / "BetaNYC_AI_Workspace" / "scripts" / "discord_rosie_post.py"
+
+# Who Rosie @-tags on a FAILED post (Noel, 2026-11-09, BetaNYC/betanyc-ai-workspace
+# epic #1618): every failure, not only repeats. Operator names from the
+# workspace's platform/system/discord-staff.md; the poster resolves the user id
+# and allows a ping for that id only. Warnings ("looks wrong") stay untagged.
+FAILURE_TAGS = ("noel",)
+
+# The poster's own refusals that mean "the tag could not be used", never "the
+# post failed": argparse on a poster older than --tag, and an operator missing
+# from discord-staff.md. Only these fall back to an untagged post, so a real
+# failure (a 401, a read-back miss) is never sent twice.
+_TAG_UNSUPPORTED = ("unrecognized arguments: --tag", "cannot tag ")
 
 # Alert thresholds.
 SPIKE_ROWS = 200_000  # a catch-up night; publish, but say so
@@ -451,20 +464,43 @@ def verify_live(generated_at: str) -> None:
 # --------------------------------------------------------------------------- alerts
 
 
-def notify(channel: str | None, text: str) -> None:
+def _rosie(args: list[str]) -> None:
+    subprocess.run(["uv", "run", "--quiet", "python", str(ROSIE), *args],
+                   cwd=str(ROSIE.parent.parent), capture_output=True, text=True, timeout=120, check=True)
+
+
+def notify(channel: str | None, text: str, tags: tuple[str, ...] = ()) -> None:
     """One plain-text line to staff via Rosie (kind 'failure' lands in the channel itself).
-    Never raises: an alert that fails must not hide the real outcome."""
-    log("notify", channel=channel, text=text)
+    ``tags`` are operator names Rosie @-tags (``--tag``). Never raises: an alert that
+    fails must not hide the real outcome.
+
+    If the installed poster cannot tag (it predates ``--tag``, or the name is not in
+    discord-staff.md), the line is posted once more WITHOUT the tag and that is
+    logged: an untagged failure alert beats a lost one."""
+    log("notify", channel=channel, text=text, tags=",".join(tags) or "-")
     if not channel:
         return
     if not ROSIE.exists() or not os.environ.get("DISCORD_TOKEN"):
         log("notify_unavailable", rosie=str(ROSIE), token="set" if os.environ.get("DISCORD_TOKEN") else "unset")
         return
+    base = ["--channel", channel, "--kind", "failure", "--text", text, "--live"]
+    tag_args = [a for t in tags for a in ("--tag", t)]
     try:
-        subprocess.run(["uv", "run", "--quiet", "python", str(ROSIE), "--channel", channel, "--kind", "failure", "--text", text, "--live"],
-                       cwd=str(ROSIE.parent.parent), capture_output=True, text=True, timeout=120, check=True)
+        _rosie(base + tag_args)
+        return
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr or ""
+        if not (tag_args and any(m in stderr for m in _TAG_UNSUPPORTED)):
+            log("notify_failed", error=(stderr or str(exc))[:300])
+            return
+        log("notify_tag_unsupported", tags=",".join(tags), error=stderr.strip()[:300])
     except Exception as exc:  # noqa: BLE001
         log("notify_failed", error=str(exc)[:300])
+        return
+    try:
+        _rosie(base)
+    except Exception as exc:  # noqa: BLE001
+        log("notify_failed", error=str(getattr(exc, "stderr", None) or exc)[:300])
 
 
 # --------------------------------------------------------------------------- main
@@ -569,7 +605,8 @@ def main(argv: list[str] | None = None) -> int:
         return run(args)
     except Exception as exc:  # noqa: BLE001 - every failure must reach staff
         log("failed", error=str(exc)[:500])
-        notify(args.notify, f"BoardStat nightly FAILED: {str(exc)[:300]}. The site still shows the last good data. Log: ~/Library/Logs/boardstat-nightly/")
+        notify(args.notify, f"BoardStat nightly FAILED: {str(exc)[:300]}. The site still shows the last good data. Log: ~/Library/Logs/boardstat-nightly/",
+               tags=FAILURE_TAGS)
         return 2
 
 

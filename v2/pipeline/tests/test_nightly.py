@@ -4,8 +4,10 @@ import csv
 import datetime as dt
 import gzip
 import json
+import subprocess
 
 import duckdb
+import pytest
 
 import boardstat_build as bb
 import boardstat_nightly as nightly
@@ -149,3 +151,74 @@ def test_nightly_fails_before_any_network_call_without_the_license_notice(tmp_pa
     with pytest.raises(bb.PipelineError, match="data license notice missing"):
         nightly.run(args)
     assert not (tmp_path / "cache").exists()
+
+
+# --- Rosie tags Noel on every failure (BetaNYC/betanyc-ai-workspace #1618) ---
+class _Rosie:
+    """Stands in for subprocess.run; records each poster argv. Nothing posts."""
+
+    def __init__(self, *stderrs):
+        self.calls = []
+        self.stderrs = list(stderrs)  # one per call; None means success
+
+    def __call__(self, cmd, **kw):
+        self.calls.append(cmd)
+        err = self.stderrs.pop(0) if self.stderrs else None
+        if err is not None:
+            raise subprocess.CalledProcessError(2, cmd, output="", stderr=err)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+
+@pytest.fixture
+def rosie(monkeypatch, tmp_path):
+    poster = tmp_path / "discord_rosie_post.py"
+    poster.write_text("# stand-in\n")
+    monkeypatch.setattr(nightly, "ROSIE", poster)
+    monkeypatch.setenv("DISCORD_TOKEN", "test-not-real")
+
+    def install(*stderrs):
+        fake = _Rosie(*stderrs)
+        monkeypatch.setattr(nightly.subprocess, "run", fake)
+        return fake
+    return install
+
+
+def _tags(cmd):
+    return [cmd[i + 1] for i, a in enumerate(cmd) if a == "--tag"]
+
+
+def test_a_failed_run_tags_noel(rosie, monkeypatch):
+    fake = rosie()
+
+    def boom(args):
+        raise RuntimeError("portal down")
+    monkeypatch.setattr(nightly, "run", boom)
+    assert nightly.main(["--notify", "ops-website"]) == 2
+    assert len(fake.calls) == 1
+    cmd = fake.calls[0]
+    assert _tags(cmd) == ["noel"]
+    assert cmd[cmd.index("--kind") + 1] == "failure"
+    assert "BoardStat nightly FAILED: portal down" in cmd[cmd.index("--text") + 1]
+
+
+def test_a_warning_is_not_tagged(rosie):
+    fake = rosie()
+    nightly.notify("ops-website", "BoardStat nightly: catch-up night")
+    assert _tags(fake.calls[0]) == []
+
+
+def test_an_old_poster_without_tag_still_gets_the_alert_untagged(rosie):
+    """Before the workspace PR merges, the installed poster rejects --tag with
+    argparse's error. The alert must still go out, once, without the tag."""
+    fake = rosie("discord_rosie_post.py: error: unrecognized arguments: --tag noel\n", None)
+    nightly.notify("ops-website", "BoardStat nightly FAILED: x", tags=("noel",))
+    assert len(fake.calls) == 2
+    assert _tags(fake.calls[0]) == ["noel"]
+    assert _tags(fake.calls[1]) == []
+
+
+def test_a_real_post_failure_is_not_retried(rosie):
+    """A 401 or a read-back miss is not a tag problem; retrying could post twice."""
+    fake = rosie("REFUSED: posted 1 but GET ... returned HTTP 403.\n")
+    nightly.notify("ops-website", "BoardStat nightly FAILED: x", tags=("noel",))
+    assert len(fake.calls) == 1
