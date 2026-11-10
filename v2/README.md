@@ -123,8 +123,14 @@ so the nightly job picks up **changed** rows as well as new ones.
    no row was new or different. The row count alone can't tell: the watermark
    is kept to the second, so each night re-fetches the city's last batch.
 
-State (the `:updated_at` watermark and the last publish) is in
-`pipeline/.cache/nightly/state.json`.
+8. `--skip-if-published-today` (launchd passes it): exits quietly if a run
+   already published today (New York date). launchd starts the job at 5:30 AM
+   and again at 8:30 AM, so the 8:30 run is a retry for a morning NYC Open
+   Data was down (429/503 on 2026-11-08 and 11-09) and can never publish
+   twice. If the retry fails too, its post says "FAILED again (try 2 today)".
+
+State (the `:updated_at` watermark, the last publish, and today's try count)
+is in `pipeline/.cache/nightly/state.json`.
 
 **Where it runs:** the office Mac mini, as a launchd job, outside Claude Code.
 It runs the code in this checkout, so keep the checkout on `master`.
@@ -134,8 +140,8 @@ It runs the code in this checkout, so keep the checkout on `master`.
 security add-generic-password -U -s boardstat-socrata-app-token -a boardstat -w   # prompts
 security add-generic-password -U -s boardstat-rosie-discord-token -a boardstat -w # prompts (Rosie's DISCORD_TOKEN)
 
-bash v2/pipeline/launchd/install.sh ops-website   # 5:30 AM nightly; alerts to #ops-website
-launchctl kickstart gui/$(id -u)/nyc.betanyc.boardstat-nightly   # run now
+bash v2/pipeline/launchd/install.sh ops-website   # 5:30 AM nightly, 8:30 AM retry; alerts to #ops-website
+launchctl kickstart gui/$(id -u)/nyc.betanyc.boardstat-nightly   # run now (skips if today already published)
 tail -f ~/Library/Logs/boardstat-nightly/$(date +%F).log         # watch it
 launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/nyc.betanyc.boardstat-nightly.plist  # stop it
 ```

@@ -187,13 +187,14 @@ def _tags(cmd):
     return [cmd[i + 1] for i, a in enumerate(cmd) if a == "--tag"]
 
 
-def test_a_failed_run_tags_noel(rosie, monkeypatch):
+def test_a_failed_run_tags_noel(rosie, monkeypatch, tmp_path):
     fake = rosie()
 
     def boom(args):
         raise RuntimeError("portal down")
     monkeypatch.setattr(nightly, "run", boom)
-    assert nightly.main(["--notify", "ops-website"]) == 2
+    # --cache: main() records today's try in state.json; never touch the real cache.
+    assert nightly.main(["--notify", "ops-website", "--cache", str(tmp_path / "cache")]) == 2
     assert len(fake.calls) == 1
     cmd = fake.calls[0]
     assert _tags(cmd) == ["noel"]
@@ -222,3 +223,79 @@ def test_a_real_post_failure_is_not_retried(rosie):
     fake = rosie("REFUSED: posted 1 but GET ... returned HTTP 403.\n")
     nightly.notify("ops-website", "BoardStat nightly FAILED: x", tags=("noel",))
     assert len(fake.calls) == 1
+
+
+# --- One later retry: launchd runs 5:30 and 8:30; the 8:30 run is a no-op once published ---
+def _state(tmp_path, **kv):
+    d = tmp_path / "cache" / "nightly"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "state.json").write_text(json.dumps(kv))
+    return d / "state.json"
+
+
+def test_published_on_uses_the_new_york_date():
+    """The 2026-11-09 7:31 PM hand run is stored as 00:31 UTC on 11-10. It published
+    on the 9th in New York, so the 10th's 5:30 run must still run."""
+    st = {"last_publish_at": "2026-11-10T00:31:17+00:00"}
+    assert nightly.published_on(st, dt.date(2026, 11, 9))
+    assert not nightly.published_on(st, dt.date(2026, 11, 10))
+    assert not nightly.published_on({}, dt.date(2026, 11, 10))
+
+
+def test_retry_does_nothing_once_today_has_published(tmp_path, monkeypatch, rosie):
+    fake = rosie()
+    _state(tmp_path, last_publish_at="2026-11-10T10:41:00+00:00")  # 5:41 AM NYC
+
+    def must_not_run(args):
+        raise AssertionError("ran after today's publish")
+    monkeypatch.setattr(nightly, "run", must_not_run)
+    rc = nightly.main(["--cache", str(tmp_path / "cache"), "--today", "2026-11-10",
+                       "--skip-if-published-today", "--publish", "--notify", "ops-website"])
+    assert rc == 0
+    assert fake.calls == []  # no post, no ping
+
+
+def test_without_the_flag_a_published_day_still_runs(tmp_path, monkeypatch):
+    _state(tmp_path, last_publish_at="2026-11-10T10:41:00+00:00")
+    ran = []
+    monkeypatch.setattr(nightly, "run", lambda args: ran.append(1) or 0)
+    assert nightly.main(["--cache", str(tmp_path / "cache"), "--today", "2026-11-10"]) == 0
+    assert ran == [1]
+
+
+def test_retry_runs_when_the_first_run_failed_and_says_so_if_it_fails_too(tmp_path, monkeypatch, rosie):
+    fake = rosie()
+    state_path = _state(tmp_path, last_publish_at="2026-11-08T00:31:17+00:00")
+
+    def boom(args):
+        raise RuntimeError("Giving up after 6 tries: HTTP 503")
+    monkeypatch.setattr(nightly, "run", boom)
+    argv = ["--cache", str(tmp_path / "cache"), "--today", "2026-11-10",
+            "--skip-if-published-today", "--publish", "--notify", "ops-website"]
+    assert nightly.main(argv) == 2  # 5:30
+    assert nightly.main(argv) == 2  # 8:30 retry: not skipped, because nothing published today
+    texts = [c[c.index("--text") + 1] for c in fake.calls]
+    assert len(texts) == 2
+    assert texts[0].startswith("BoardStat nightly FAILED: ")
+    assert texts[1].startswith("BoardStat nightly FAILED again (try 2 today): ")
+    assert all(_tags(c) == ["noel"] for c in fake.calls)
+    st = json.loads(state_path.read_text())
+    assert st["attempt_date"] == "2026-11-10" and st["attempt_n"] == 2
+    assert st["last_publish_at"] == "2026-11-08T00:31:17+00:00"  # kept
+
+
+def test_try_count_resets_on_a_new_day(tmp_path):
+    p = _state(tmp_path, attempt_date="2026-11-09", attempt_n=3)
+    assert nightly.begin_attempt(p, dt.date(2026, 11, 10)) == 1
+    assert nightly.begin_attempt(p, dt.date(2026, 11, 10)) == 2
+
+
+def test_launchd_plist_runs_at_530_and_830():
+    import plistlib
+    from pathlib import Path
+
+    plist = Path(nightly.__file__).parent / "launchd" / "nyc.betanyc.boardstat-nightly.plist"
+    data = plistlib.loads(plist.read_bytes())
+    assert data["StartCalendarInterval"] == [{"Hour": 5, "Minute": 30}, {"Hour": 8, "Minute": 30}]
+    sh = (plist.parent / "nightly.sh").read_text()
+    assert "--skip-if-published-today" in sh

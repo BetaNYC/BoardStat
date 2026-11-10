@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- BoardStat nightly refresh. Installed by v2/pipeline/launchd/install.sh, which fills in REPO.
-     launchd runs it at 5:30 AM local time; if the Mac is asleep then, it runs on wake. -->
+     launchd runs it at 5:30 AM local time, and again at 8:30 AM as a retry; if the Mac is asleep
+     then, it runs on wake (missed times are coalesced into one run). nightly.sh passes
+     skip-if-published-today, so the 8:30 run does nothing on a day 5:30 already published. -->
 <plist version="1.0">
 <dict>
     <key>Label</key>
@@ -17,12 +19,21 @@
         <string>__NOTIFY__</string>
     </dict>
     <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>5</integer>
-        <key>Minute</key>
-        <integer>30</integer>
-    </dict>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>5</integer>
+            <key>Minute</key>
+            <integer>30</integer>
+        </dict>
+        <!-- The retry: a no-op unless the 5:30 run failed. -->
+        <dict>
+            <key>Hour</key>
+            <integer>8</integer>
+            <key>Minute</key>
+            <integer>30</integer>
+        </dict>
+    </array>
     <key>RunAtLoad</key>
     <false/>
     <key>StandardOutPath</key>
