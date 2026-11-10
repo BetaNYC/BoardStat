@@ -28,6 +28,11 @@ recent months, so on its own an old request that closes later would stay
 7. With ``--notify CHANNEL``: tell staff on Discord (Rosie) when something
    fails or looks wrong. Off by default. A FAILED post @-tags Noel
    (``FAILURE_TAGS``); warnings do not tag anyone.
+8. With ``--skip-if-published-today`` (what launchd passes): do nothing if a
+   run already published today (New York date). launchd starts the job twice,
+   at 5:30 and 8:30, so the 8:30 run is a retry that only works on a day the
+   5:30 run failed, and can never publish twice. A second failure on the same
+   day says so ("FAILED again, try 2 today").
 
 Run from the repository root:
 
@@ -126,6 +131,32 @@ def save_state(path: Path, state: dict[str, Any]) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(state, indent=2))
     tmp.replace(path)
+
+
+def published_on(state: dict[str, Any], day: dt.date) -> bool:
+    """True if ``last_publish_at`` falls on ``day`` in New York.
+
+    ``last_publish_at`` is stored in UTC, so an evening run (7:31 PM on
+    2026-11-09 is 00:31 UTC on 11-10) must be converted, or the next morning's
+    run would wrongly think it had already published.
+    """
+    at = state.get("last_publish_at")
+    if not at:
+        return False
+    return dt.datetime.fromisoformat(at).astimezone(NYC).date() == day
+
+
+def begin_attempt(state_path: Path, day: dt.date) -> int:
+    """Count this run as try N for ``day`` (New York date) and save it; return N.
+
+    Saved before any network call, so a run that fails still counts.
+    """
+    state = load_state(state_path)
+    n = state.get("attempt_n", 0) + 1 if state.get("attempt_date") == day.isoformat() else 1
+    state["attempt_date"] = day.isoformat()
+    state["attempt_n"] = n
+    save_state(state_path, state)
+    return n
 
 
 def initial_watermark(cache_311: Path) -> str:
@@ -519,6 +550,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--check-counts", choices=["auto", "yes", "no"], default="auto", help="weekly city count check; auto = Sundays")
     p.add_argument("--publish", action="store_true", help="upload to beta.nyc and swap it live")
     p.add_argument("--notify", metavar="CHANNEL", default=None, help="Discord channel name for alerts (off by default)")
+    p.add_argument("--skip-if-published-today", action="store_true",
+                   help="exit quietly if a run already published today (NYC date); launchd's 5:30 run and 8:30 retry use it")
     return p.parse_args(argv)
 
 
@@ -601,11 +634,22 @@ def run(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    attempt = 1
     try:
+        today = args.today or dt.datetime.now(dt.UTC).astimezone(NYC).date()
+        state_path = args.cache / "nightly" / "state.json"
+        if args.skip_if_published_today:
+            state = load_state(state_path)
+            if published_on(state, today):
+                log("skip_already_published", today=today, last_publish_at=state["last_publish_at"])
+                return 0
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        attempt = begin_attempt(state_path, today)
         return run(args)
     except Exception as exc:  # noqa: BLE001 - every failure must reach staff
-        log("failed", error=str(exc)[:500])
-        notify(args.notify, f"BoardStat nightly FAILED: {str(exc)[:300]}. The site still shows the last good data. Log: ~/Library/Logs/boardstat-nightly/",
+        log("failed", error=str(exc)[:500], attempt=attempt)
+        what = "FAILED" if attempt == 1 else f"FAILED again (try {attempt} today)"
+        notify(args.notify, f"BoardStat nightly {what}: {str(exc)[:300]}. The site still shows the last good data. Log: ~/Library/Logs/boardstat-nightly/",
                tags=FAILURE_TAGS)
         return 2
 

@@ -16,7 +16,8 @@ export DISCORD_TOKEN="$(kc boardstat-rosie-discord-token)"
 
 # Discord channel for alerts; empty means alerts are only written to the log.
 NOTIFY="${BOARDSTAT_NOTIFY:-}"
-args=(--publish)
+# Twice a day (5:30, and 8:30 as a retry): skip if today's run already published.
+args=(--publish --skip-if-published-today)
 [ -n "$NOTIFY" ] && args+=(--notify "$NOTIFY")
 
 cd "$REPO"
