@@ -411,24 +411,21 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 8. **Address lookup is a list of addresses that already appear in 311 data,**
    sorted so a prefix search can skip row groups. It is labeled as not a
    geocoder. No Geoclient / Geosupport call is made.
-9. **Street map: the City's own, with a self-hosted fallback.** Since 2026-11-04 the
-   map first loads NYC OTI's vector basemap (`NYC_Basemap_v3`, hosted by the City on
-   ArcGIS; credited "Street map: NYC OTI"). Its published style uses relative URLs,
-   which `map.js` makes absolute. If the City's style does not load within 6 seconds,
-   the map uses the self-hosted Protomaps street map below. Terms: the ArcGIS item
-   points to the NYC.gov Terms of Use; Noel decided on 2026-11-04 that BoardStat can
-   use it.
-
-   **Fallback: self-hosted Protomaps street map.** `pipeline/basemap_build.sh` extracts
+9. **Street map: self-hosted Protomaps, open source only (#141).** Every map uses
+   one street map: `pipeline/basemap_build.sh` extracts
    NYC plus a margin from a [Protomaps daily build](https://docs.protomaps.com/guide/getting-started)
    (OpenStreetMap data, ODbL) into one `nyc.pmtiles` file, and copies the
    Noto Sans glyphs (SIL OFL) and v4 sprites from
    [protomaps/basemaps-assets](https://github.com/protomaps/basemaps-assets).
    The style is `@protomaps/basemaps` in the `grayscale` flavor, so district
-   colors and request dots stand out. Nothing basemap-related is fetched from
-   anyone else at runtime. District shapes sit under the street labels. If
-   `data/basemap/` is missing, the map falls back to outlines on blank.
-   Refresh the extract a few times a year.
+   colors and request dots stand out. The map credits "Protomaps © OpenStreetMap",
+   linked to openstreetmap.org/copyright. Nothing basemap-related is fetched from
+   anyone else at runtime; from 2026-11-04 to #141 the map first tried NYC OTI's
+   basemap on ArcGIS, and `pipeline/tests/test_no_esri.py` now fails if an ArcGIS or
+   Esri URL comes back into the site code. District shapes sit under the street
+   labels. If `data/basemap/` is missing or the street map cannot load, the map
+   shows the outlines on blank with a short message saying the street map could
+   not load. Refresh the extract a few times a year.
 10. **Comparisons are located-only and whole-month.** `agg/month_type.parquet`
     counts only requests with a district, so district, borough and city shares
     use the same population. The Compare panel ignores problem/agency/status
