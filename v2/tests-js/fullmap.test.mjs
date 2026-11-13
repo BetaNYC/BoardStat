@@ -3,7 +3,7 @@
 // Run: node --test v2/tests-js/   (also run by `uv run pytest` in v2/pipeline)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filtersFromParams, filtersToParams, describeFilters, NOT_CLOSED } from '../site/js/filterstate.js';
+import { filtersFromParams, filtersToParams, describeFilters, keepKnownStatus, isIsoDate, NOT_CLOSED } from '../site/js/filterstate.js';
 import { whereSql, lit } from '../site/js/filtersql.js';
 
 const defaults = { start: '2025-11-01', end: '2026-11-04' };
@@ -63,4 +63,26 @@ test('the filters in words, as the full-page map lists them', () => {
   assert.deepEqual(describeFilters(s, fmt), [
     'Requests created 2025-11-01 to 2026-11-04', 'problems: Noise', 'excluding descriptions: A', 'status: not yet closed',
   ]);
+});
+
+test('a date that is not a real YYYY-MM-DD date falls back to the default (QA #143)', () => {
+  for (const bad of ['garbage', '2026-02-30', '2026-1-01', '20260101', "2026-01-01' OR 1=1"]) {
+    const s = filtersFromParams(new URLSearchParams({ start: bad, end: bad }), defaults);
+    assert.equal(s.start, defaults.start, bad);
+    assert.equal(s.end, defaults.end, bad);
+  }
+  assert.equal(filtersFromParams(new URLSearchParams('start=2024-02-29'), defaults).start, '2024-02-29');
+  assert.equal(isIsoDate('2024-02-29'), true);
+  assert.equal(isIsoDate('2025-02-29'), false);
+});
+
+test('a status the data does not have is dropped the same way on both pages (QA #143)', () => {
+  const known = ['Closed', 'In Progress', 'Open'];
+  const fromLink = (q) => keepKnownStatus(filtersFromParams(new URLSearchParams(q), defaults), known);
+  assert.equal(fromLink('status=weird').status, '');
+  assert.equal(fromLink('status=Open').status, 'Open');
+  assert.equal(fromLink('status=' + NOT_CLOSED).status, NOT_CLOSED);
+  assert.equal(fromLink('').status, '');
+  // Dropped, it no longer goes into the link either, so the back link is clean.
+  assert.equal(filtersToParams('cd', '306', fromLink('status=weird'), defaults).has('status'), false);
 });

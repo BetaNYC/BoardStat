@@ -4,7 +4,7 @@
 // same requests. It has no filter form of its own: the "Back to the district page"
 // link opens the district page with the same filters, where they can be changed.
 import { loadManifest, renderDataStatus, registerData, query, el, setStatus, fmtDate } from './lib.js';
-import { filtersFromParams, filtersToParams, describeFilters } from './filterstate.js';
+import { filtersFromParams, filtersToParams, describeFilters, keepKnownStatus } from './filterstate.js';
 import { whereSql } from './filtersql.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
 
@@ -32,15 +32,16 @@ async function main() {
   }
   const defaults = { start: manifest.window.default_start || manifest.window.start, end: manifest.window.end };
   // A link never carries an address (filtersToParams), and this page ignores one if it does.
-  const state = { ...filtersFromParams(params, defaults), addr: '' };
-  const link = filtersToParams(geo, geoId, state, defaults);
-  $('back-link').href = `district.html?${link.toString()}`;
+  let state = { ...filtersFromParams(params, defaults), addr: '' };
+  const setBackLink = () => { $('back-link').href = `district.html?${filtersToParams(geo, geoId, state, defaults).toString()}`; };
+  setBackLink();
 
   document.title = `Map · ${district.label} · BoardStat 2.0 (prototype)`;
   $('title').textContent = `Map of requests: ${district.label}`;
-  $('filters-summary').textContent = `${describeFilters(state, fmtDate).join('; ')}.`;
+  const showSummary = () => { $('filters-summary').textContent = `${describeFilters(state, fmtDate).join('; ')}.`; };
+  showSummary();
   renderDataStatus(manifest, $('as-of'), $('stale'));
-  renderMapLegend($('map-legend'));
+  renderMapLegend($('map-legend'), { headingLevel: 2 });
 
   setStatus($('status'), 'Loading the map and this district\'s requests…');
   let mapCtx;
@@ -58,6 +59,12 @@ async function main() {
   try {
     // Straight from the district's file: every request matching the filters is in it,
     // the same rows the district page's table holds for these dates.
+    // Drop a status this district's data does not have, as the district page does
+    // (keepKnownStatus), so both pages show the same requests for the same link.
+    const known = (await query(`SELECT DISTINCT status FROM 'd.parquet' WHERE status IS NOT NULL`)).map((r) => r.status);
+    state = keepKnownStatus(state, known);
+    setBackLink();
+    showSummary();
     const where = whereSql(state);
     const [{ n }] = await query(`SELECT count(*)::INTEGER AS n FROM 'd.parquet' WHERE ${where}`);
     const shown = await loadRequestPoints(mapCtx, `'d.parquet'`, where);

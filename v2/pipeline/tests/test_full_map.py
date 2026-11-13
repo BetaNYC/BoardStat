@@ -56,3 +56,23 @@ def test_the_link_updates_whenever_filters_are_applied():
 
 def test_full_page_map_never_takes_an_address_from_its_link():
     assert "addr: ''" in (JS / "fullmap.js").read_text(encoding="utf-8")
+
+
+def test_map_key_draws_circles_at_their_map_size():
+    """QA #143: circle-radius is a radius, so the key's swatch is 2 x radius across."""
+    src = (JS / "requestmap.js").read_text(encoding="utf-8")
+    assert "width:${2 * s.radius}px;height:${2 * s.radius}px" in src
+    assert "width:${2 * POINT_RADIUS}px" in src
+    assert "'circle-radius': POINT_RADIUS" in src
+
+
+def test_map_key_heading_fits_each_pages_outline():
+    """map.html has no h2 above the key, so its key is an h2; the district page's is an h3."""
+    assert "headingLevel: 2" in (JS / "fullmap.js").read_text(encoding="utf-8")
+    assert "renderMapLegend($('map-legend'));" in (JS / "district.js").read_text(encoding="utf-8")
+    assert "headingLevel = 3" in (JS / "requestmap.js").read_text(encoding="utf-8")
+
+
+def test_both_pages_drop_an_unknown_status_with_the_same_helper():
+    for name in ("district.js", "fullmap.js"):
+        assert "keepKnownStatus(state," in (JS / name).read_text(encoding="utf-8"), name

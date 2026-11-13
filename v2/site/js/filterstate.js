@@ -69,11 +69,22 @@ export function sectionCount(s, defaults, section) {
 /** Status value meaning "any status but Closed" (including a missing status). */
 export const NOT_CLOSED = 'not_closed';
 
-/** Filters from a page's link. `defaults` gives { start, end } for a link without dates. */
+/** True for a real calendar date written YYYY-MM-DD (not 2026-02-30, not "garbage"). */
+export function isIsoDate(v) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
+
+/**
+ * Filters from a page's link. `defaults` gives { start, end } for a link without dates,
+ * or with a date that is not a real YYYY-MM-DD date.
+ */
 export function filtersFromParams(params, defaults) {
+  const date = (k) => (isIsoDate(params.get(k)) ? params.get(k) : defaults[k]);
   return {
-    start: params.get('start') || defaults.start,
-    end: params.get('end') || defaults.end,
+    start: date('start'),
+    end: date('end'),
     types: (params.get('type') || '').split('|').filter(Boolean),
     descs: (params.get('desc') || '').split('|').filter(Boolean),
     descEx: params.get('descx') === '1',
@@ -98,6 +109,16 @@ export function filtersToParams(geo, id, s, defaults) {
   if (s.agency) p.set('agency', s.agency);
   if (s.status) p.set('status', s.status);
   return p;
+}
+
+/**
+ * The filters with a status the district's data does not have dropped, so a link with
+ * status=anything-else shows every status on both pages. `known` lists the statuses in
+ * the data; '' (any status) and NOT_CLOSED are always allowed.
+ */
+export function keepKnownStatus(s, known) {
+  if (!s.status || s.status === NOT_CLOSED || known.includes(s.status)) return s;
+  return { ...s, status: '' };
 }
 
 /** The applied filters in words, one part per filter; `fmtDate` formats a YYYY-MM-DD date. */

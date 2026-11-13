@@ -8,6 +8,7 @@ import { makeMap, addBoundaries, featureBounds } from './map.js';
 export const MAP_CAP = 60000;
 
 const BLUE = '#2359a8';
+const POINT_RADIUS = 5;
 const DARK = '#414141';
 // Circle colors and sizes by how many requests a circle holds; the legend lists the same steps.
 const CLUSTER_STEPS = [
@@ -40,7 +41,7 @@ export async function setupRequestMap(container, { geo, geoId }) {
   });
   map.addLayer({
     id: 'point', type: 'circle', source: 'req', filter: ['!', ['has', 'point_count']],
-    paint: { 'circle-color': BLUE, 'circle-radius': 5, 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' },
+    paint: { 'circle-color': BLUE, 'circle-radius': POINT_RADIUS, 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' },
   });
   map.on('click', 'clusters', async (e) => {
     const f = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })[0];
@@ -86,18 +87,20 @@ export function mapNoteText(total, shown) {
     'Circles group nearby requests; select one to zoom in, or select a single point for details.';
 }
 
-/** Fill `box` with the map's legend: circle sizes, a single request, and the district lines. */
-export function renderMapLegend(box) {
+/** Fill `box` with the map's legend: circle sizes, a single request, and the district lines.
+ *  The key is drawn at the map's own sizes (diameter = 2 × circle-radius). `headingLevel`
+ *  fits the page's outline: 3 under the district page's h2, 2 on the full-page map. */
+export function renderMapLegend(box, { headingLevel = 3 } = {}) {
   if (!box) return;
   const swatch = (cls, style) => el('span', { class: `swatch ${cls}`, 'aria-hidden': 'true', style });
   const items = [
-    ...CLUSTER_STEPS.map((s) => [swatch('circle', `background:${s.color};width:${s.radius}px;height:${s.radius}px`), s.label]),
-    [swatch('circle', `background:${BLUE};width:10px;height:10px;border-color:#fff`), 'One request'],
+    ...CLUSTER_STEPS.map((s) => [swatch('circle', `background:${s.color};width:${2 * s.radius}px;height:${2 * s.radius}px`), s.label]),
+    [swatch('circle', `background:${BLUE};width:${2 * POINT_RADIUS}px;height:${2 * POINT_RADIUS}px`), 'One request'],
     [swatch('line selected', ''), 'This district'],
     [swatch('line', ''), 'Other districts'],
   ];
   box.replaceChildren(
-    el('h3', { class: 'legend-title', text: 'Map key' }),
+    el(`h${headingLevel}`, { class: 'legend-title', text: 'Map key' }),
     el('ul', {}, items.map(([sw, text]) => el('li', {}, sw, el('span', { text })))),
   );
 }

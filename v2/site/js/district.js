@@ -5,7 +5,7 @@ import {
 } from './lib.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
 import {
-  copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters,
+  copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus,
 } from './filterstate.js';
 import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
 
@@ -290,7 +290,7 @@ async function setupFilters() {
   $('f-start').value = state.start;
   $('f-end').value = state.end;
   await fillFilterOptions();
-  if (state.status && ![...$('f-status').options].some((o) => o.value === state.status)) state.status = '';
+  state = keepKnownStatus(state, [...$('f-status').options].map((o) => o.value));
   draft = copyFilters(state);
   syncForm();
   setupGroups();
