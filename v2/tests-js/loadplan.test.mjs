@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LOAD_BACK_MONTHS, monthsBefore, periodFrom, priorFrom, loadedBound, missingRanges, priorCoverStart,
-  firstLoadSql, extendSql, createSerial, latestOnly, createLoader, DataChangedError, filesNamedIn,
+  firstLoadSql, extendSql, createSerial, latestOnly, createLoader, DataChangedError, filesNamedIn, freshnessCheck, loadFailedText,
 } from '../site/js/loadplan.js';
 
 const W = '2020-01-01';
@@ -348,4 +348,17 @@ test('filesNamedIn finds the failed file by registered name or by URL, and nothi
   assert.deepEqual(filesNamedIn(range, files).map((f) => f[0]), ['d-312.parquet']);
   assert.deepEqual(filesNamedIn('TProtocolException: Invalid data', files), []);
   assert.deepEqual(filesNamedIn("Opening file 'd.parquet' failed", [['d.parquet', 'data/detail/cd/306.parquet']]).map((f) => f[0]), ['d.parquet']);
+});
+
+test('freshnessCheck: same build passes, a new build throws, an unreadable manifest is not a rebuild', async () => {
+  await freshnessCheck('A', async () => ({ generated_at: 'A' }))();
+  await assert.rejects(freshnessCheck('A', async () => ({ generated_at: 'B' }))(), DataChangedError);
+  await freshnessCheck('A', async () => null)();
+  await freshnessCheck('A', async () => { throw new Error('offline'); })();
+});
+
+test('loadFailedText is plain, and names a rebuild only when there was one', () => {
+  assert.match(loadFailedText(new Error('TProtocolException')), /could not be loaded/);
+  assert.doesNotMatch(loadFailedText(new Error('TProtocolException')), /TProtocol/);
+  assert.match(loadFailedText(new DataChangedError()), /updated its data/);
 });

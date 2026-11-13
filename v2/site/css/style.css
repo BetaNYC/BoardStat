@@ -195,6 +195,15 @@ main.fullmap { flex: 1; display: flex; flex-direction: column; width: 100%; max-
 main.fullmap .status { margin: 0.25rem 0; min-height: 0; }
 main.fullmap .status:empty { display: none; }
 .map.map-full { flex: 1; height: auto; min-height: 65vh; }
+/* Full-page map filters (#149): the district page's form; on a phone it starts closed
+   behind "Change filters" so the map stays in view, and only its status line shows. */
+.filters-toggle-row { margin: 0.35rem 0 0; }
+.filters-toggle-row button { min-height: 44px; }
+main.fullmap #filters { margin: 0.5rem 0; }
+/* Print summary prints the district page; the map page has nothing to add. */
+main.fullmap #print { display: none; }
+main.fullmap #filters.is-collapsed { padding: 0; border: 0; background: none; box-shadow: none; margin: 0; }
+main.fullmap #filters.is-collapsed > :not(.status) { display: none; }
 .fullmap-foot p { margin: 0.25rem 0; }
 
 .status { min-height: 1.5rem; font-style: italic; }

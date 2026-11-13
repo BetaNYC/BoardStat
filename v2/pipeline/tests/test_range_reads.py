@@ -114,7 +114,7 @@ def test_a_failed_first_load_finishes_setup_on_the_retry():
     src = (SITE_JS / "district.js").read_text()
     refresh = src[src.index("async function refresh()"):src.index("/** An instant as NYC local")]
     assert "if (!firstLoadDone) await afterFirstLoad();" in refresh
-    after = src[src.index("async function afterFirstLoad()"):src.index("async function setupFilters()")]
+    after = src[src.index("async function afterFirstLoad()"):src.index("function setupFilters()")]
     assert "keepKnownStatus" in after and "renderAddressLinks" in after
 
 

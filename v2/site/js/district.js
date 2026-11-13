@@ -6,11 +6,14 @@ import {
 } from './lib.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
 import {
-  copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus,
+  NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus,
 } from './filterstate.js';
 import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
+import { createFilterForm, DATE_ORDER_MSG } from './filterform.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl } from './place.js';
-import { periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly, DataChangedError, filesNamedIn } from './loadplan.js';
+import {
+  periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly, DataChangedError, filesNamedIn, freshnessCheck, loadFailedText,
+} from './loadplan.js';
 
 const $ = (id) => document.getElementById(id);
 const PAGE = 50;
@@ -37,10 +40,9 @@ const ADDRESS_MODE = document.body.dataset.mode === 'address';
 let manifest, district, Plot;
 // The SQL that reads this page's rows: 'd.parquet', or read_parquet([...]) for a borough (place.js).
 let SRC = `'d.parquet'`;
-// `state` is the applied filters: what every panel shows and the link carries.
-// `draft` is what the filter form shows; only the Apply button copies it to `state` (#142).
+// `state` is the applied filters: what every panel shows and the link carries. The form
+// (filterform.js) keeps its own draft; only Apply, Reset and shortcuts change `state` (#142).
 let state = {};
-let draft = {};
 let page = 0;
 let total = 0;
 let mapCtx = null;
@@ -144,19 +146,6 @@ function priorFailureText(err) {
     : 'The same months a year earlier could not be loaded, so that line is left out. Everything else on this page is complete. Reload the page, or change a filter and press Apply filters, to try again.';
 }
 
-/**
- * Before anything is added to the table: the nightly build replaces the files in place,
- * so rows added after it would come from a different build than the rest (#144 QA).
- */
-async function checkFresh() {
-  let m;
-  try {
-    const r = await fetch('data/manifest.json', { cache: 'no-cache' });
-    if (!r.ok) return; // cannot tell; the read itself will fail if the files are gone
-    m = await r.json();
-  } catch { return; }
-  if (m.generated_at !== manifest.generated_at) throw new DataChangedError();
-}
 
 // Why the last background load failed; cleared when the page draws again, which retries it.
 let priorFailure = null;
@@ -220,149 +209,39 @@ function where(opts = {}) {
 }
 
 // ------------------------------------------------------------- filter controls
+//
+// The form itself is shared with the full-page map (filterform.js, #149). This page
+// supplies its lists, from the rows it has loaded, and redraws on Apply.
 
-let allTypes = [];
-function renderChips() {
-  $('type-chips').replaceChildren(...draft.types.map((t) => el('li', {},
-    el('button', { type: 'button', 'aria-label': `Remove problem filter ${t}`, onclick: () => { draft.types = draft.types.filter((x) => x !== t); formChanged(); } }, `${t} ×`))));
-  $('desc-chips').classList.toggle('exclude', draft.descEx);
-  $('desc-chips').setAttribute('aria-label', draft.descEx ? 'Excluded descriptions' : 'Selected descriptions');
-  $('desc-chips').replaceChildren(...draft.descs.map((d) => el('li', {},
-    el('button', { type: 'button', 'aria-label': `Remove description filter ${d}`, onclick: () => { draft.descs = draft.descs.filter((x) => x !== d); formChanged(); } },
-      `${draft.descEx ? 'Not: ' : ''}${d} ×`))));
-  $('addr-filter').hidden = ADDRESS_MODE || !draft.addr;
-  $('addr-value').textContent = draft.addr;
-}
-
-/** Put the form controls back in line with `draft` (after a reset or a shortcut button). */
-function syncForm() {
-  $('f-start').value = draft.start;
-  $('f-end').value = draft.end;
-  $('f-agency').value = draft.agency;
-  $('f-status').value = draft.status;
-  $('f-desc-ex').checked = draft.descEx;
-}
+let form = null;
 
 /** The filters a link with no filters opens with (the Reset button's target). */
 function defaultFilters() {
   return { start: viewStart, end: manifest.window.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: ADDRESS_MODE ? state.addr : '' };
 }
 
-/** Show whether the form holds changes the page does not show yet, and what each group has set. */
-function renderPending() {
-  const changed = changedFields(draft, state);
-  const pending = changed.length > 0;
-  $('apply').classList.toggle('is-pending', pending);
-  const msg = pending ? 'Filters changed. Press Apply filters to update the page.' : '';
-  if ($('pending').textContent !== msg) $('pending').textContent = msg;
-  const defaults = defaultFilters();
-  for (const section of Object.keys(SECTIONS)) {
-    const node = document.querySelector(`[data-count-for="${section}"]`);
-    if (!node) continue;
-    const n = sectionCount(draft, defaults, section);
-    const edited = changed.some((k) => SECTIONS[section].includes(k) || (section === 'problem' && k === 'descEx'));
-    const parts = [];
-    if (section === 'dates') parts.push(`${fmtDate(draft.start)} to ${fmtDate(draft.end)}`);
-    else if (n) parts.push(`${n} chosen`);
-    if (edited) parts.push('not applied yet');
-    node.textContent = parts.length ? `(${parts.join(', ')})` : '';
-  }
-}
-
-/** A form control changed the draft: redraw the form, never the panels. */
-function formChanged() {
-  renderChips();
-  renderPending();
-  updateDescOptions().catch((err) => console.error(err));
-}
-
-const DATE_ORDER_MSG = 'The From date is after the To date. Change one of them, then press Apply filters.';
-
-/** Copy the form's filters to the page and run the queries. */
-function applyFilters() {
-  // Text typed but not yet added as a chip is added first, if it matches a choice.
-  // Text that matches nothing stops the Apply and says so, instead of vanishing.
-  const typed = $('f-type').value.trim() || $('f-desc').value.trim();
-  if ($('f-type').value.trim() && !addType($('f-type').value)) return;
-  if ($('f-desc').value.trim() && !addDesc($('f-desc').value)) return;
-  // Date order first, so dates swapped in a link are flagged even with nothing changed.
-  if (draft.start > draft.end) {
-    setStatus($('status'), DATE_ORDER_MSG);
-    $('f-start').focus();
-    return;
-  }
-  // Nothing to change: no need to run every query again (unless the last run failed,
-  // so Apply can retry).
-  if (!typed && !lastRefreshFailed && changedFields(draft, state).length === 0) {
-    setStatus($('status'), `${fmtInt(total)} requests match.`);
-    return;
-  }
-  state = copyFilters(draft);
-  refresh();
-}
-
-/**
- * Shortcut buttons in the panels (an agency, a description, an address, "Show them")
- * apply at once. The same change goes into the form, and any other edits still waiting
- * in the form stay there, unapplied.
- */
+/** Shortcut buttons in the panels (an agency, a description, an address) apply at once. */
 function applyNow(fn) {
-  ({ applied: state, draft } = patchBoth(state, draft, fn));
-  refresh();
+  form.applyNow(fn);
 }
 
-let allDescs = [];
-let descOptionsKey = null;
-/** The Description list offers only descriptors of the selected problems (all if none). */
-async function updateDescOptions() {
-  const key = draft.types.join('|');
-  if (key === descOptionsKey) return;
-  descOptionsKey = key;
-  const rows = await query(`
+/** The lists the form offers, from the rows in the req table. */
+const formLists = {
+  problems: async () => (await query(`SELECT complaint_type AS t, count(*) AS n FROM req GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.t),
+  descriptions: async (types) => (await query(`
     SELECT ${DESC_SQL} AS d, count(*) AS n FROM req
-    ${draft.types.length ? `WHERE complaint_type IN (${draft.types.map(lit).join(', ')})` : ''}
-    GROUP BY 1 ORDER BY 2 DESC, 1`);
-  allDescs = rows.map((r) => r.d);
-  $('desc-options').replaceChildren(...allDescs.map((d) => el('option', { value: d })));
-}
-
-/** Text that matches no choice stays in the box, with a short status saying so. Returns false then. */
-function noMatch(box, kind, text) {
-  setStatus($('status'), `No ${kind} named “${text.trim()}”. Choose one of the suggestions as you type, or clear the box.`);
-  $(box).focus();
-  return false;
-}
-
-function addDesc(d) {
-  const match = allDescs.find((x) => x.toLowerCase() === String(d).trim().toLowerCase());
-  if (!match) return noMatch('f-desc', 'description', String(d));
-  if (!draft.descs.includes(match)) { draft.descs = [...draft.descs, match]; formChanged(); }
-  $('f-desc').value = '';
-  return true;
-}
-
-function addType(t) {
-  const match = allTypes.find((x) => x.toLowerCase() === t.trim().toLowerCase());
-  if (!match) return noMatch('f-type', 'problem', t);
-  if (!draft.types.includes(match)) { draft.types = [...draft.types, match]; formChanged(); }
-  $('f-type').value = '';
-  return true;
-}
+    ${types.length ? `WHERE complaint_type IN (${types.map(lit).join(', ')})` : ''}
+    GROUP BY 1 ORDER BY 2 DESC, 1`)).map((r) => r.d),
+  agencies: async () => query(`SELECT agency, any_value(agency_name) AS label, count(*) AS n FROM req GROUP BY 1 ORDER BY 3 DESC, 1`),
+  statuses: async () => (await query(`SELECT status, count(*) AS n FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.status),
+};
 
 /** Fill the problem, agency and status lists from what is loaded (again after a reload). */
 let optionsFrom;
 async function fillFilterOptions() {
   if (optionsFrom === tableLoads) return;
   optionsFrom = tableLoads;
-  allTypes = (await query(`SELECT complaint_type AS t, count(*) AS n FROM req GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.t);
-  $('type-options').replaceChildren(...allTypes.map((t) => el('option', { value: t })));
-  // Keep the fixed first options ("All agencies", "Any status", "Not yet closed"); replace the rest.
-  $('f-agency').replaceChildren($('f-agency').options[0], ...(await query(`SELECT agency, any_value(agency_name) AS agency_label, count(*) AS n FROM req GROUP BY 1 ORDER BY 3 DESC, 1`))
-    .map((r) => el('option', { value: r.agency, text: `${r.agency}${r.agency_label ? ` (${r.agency_label})` : ''}` })));
-  const fixedStatus = [...$('f-status').options].filter((o) => o.value === '' || o.value === NOT_CLOSED);
-  $('f-status').replaceChildren(...fixedStatus, ...(await query(`SELECT status, count(*) AS n FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY 2 DESC`))
-    .map((r) => el('option', { value: r.status, text: r.status })));
-  syncForm();
+  await form.fillLists();
 }
 
 /**
@@ -374,63 +253,20 @@ let firstLoadDone = false;
 async function afterFirstLoad() {
   firstLoadDone = true;
   await fillFilterOptions();
-  state = keepKnownStatus(state, [...$('f-status').options].map((o) => o.value));
-  draft = copyFilters(state);
-  syncForm();
+  state = keepKnownStatus(state, form.statusChoices());
+  form.set(state);
   if (ADDRESS_MODE) await renderAddressLinks();
 }
 
-async function setupFilters() {
-  const { start, end } = manifest.window;
-  for (const id of ['f-start', 'f-end']) { $(id).min = start; $(id).max = end; }
-  $('f-start').value = state.start;
-  $('f-end').value = state.end;
-  draft = copyFilters(state);
-  syncForm();
-  setupGroups();
-
-  // Changing a control changes only the form (#142). Apply filters, or Enter in a text
-  // or date box, runs the queries.
-  $('f-start').addEventListener('change', (e) => { if (e.target.value) { draft.start = e.target.value; formChanged(); } });
-  $('f-end').addEventListener('change', (e) => { if (e.target.value) { draft.end = e.target.value; formChanged(); } });
-  $('f-agency').addEventListener('change', (e) => { draft.agency = e.target.value; formChanged(); });
-  $('f-status').addEventListener('change', (e) => { draft.status = e.target.value; formChanged(); });
-  // Enter with text in the box adds it as a chip; Enter in an empty box applies the filters.
-  $('f-type').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.value.trim()) { e.preventDefault(); addType(e.target.value); } });
-  $('f-type').addEventListener('change', (e) => { if (allTypes.includes(e.target.value)) addType(e.target.value); });
-  $('f-desc').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.value.trim()) { e.preventDefault(); addDesc(e.target.value); } });
-  $('f-desc').addEventListener('change', (e) => { if (allDescs.includes(e.target.value)) addDesc(e.target.value); });
-  $('f-desc-ex').addEventListener('change', (e) => { draft.descEx = e.target.checked; formChanged(); });
-  $('addr-clear').addEventListener('click', () => { draft.addr = ''; formChanged(); });
-  $('filters').addEventListener('submit', (e) => { e.preventDefault(); applyFilters(); });
-  // Reset is a deliberate "start over", so it applies at once.
-  $('reset').addEventListener('click', () => {
-    state = defaultFilters();
-    draft = copyFilters(state);
-    $('f-type').value = '';
-    $('f-desc').value = '';
-    refresh();
-  });
+function setupFilters() {
+  form.bind(manifest.window.start, manifest.window.end);
+  form.set(state);
+  form.openGroups();
   $('print').addEventListener('click', () => { window.boardstatTrack?.('print_page', { geo, district_id: geoId }); window.print(); });
   window.addEventListener('beforeprint', describeFiltersForPrint);
   $('prev').addEventListener('click', () => { if (page > 0) { page--; renderDetail(); } });
   $('next').addEventListener('click', () => { if ((page + 1) * PAGE < total) { page++; renderDetail(); } });
   $('download').addEventListener('click', downloadCsv);
-}
-
-/**
- * Filter groups open and close with native <details>/<summary>, which keyboards and
- * screen readers already handle. On a phone only groups with something set start open.
- * On a wider screen Dates and Problem start open, and Agency and status opens if set.
- */
-function setupGroups() {
-  const phone = window.matchMedia('(max-width: 640px)').matches;
-  const defaults = defaultFilters();
-  for (const d of document.querySelectorAll('#filters details.filter-group')) {
-    const set = sectionCount(state, defaults, d.dataset.section) > 0;
-    d.open = set || (!phone && d.dataset.section !== 'agency');
-  }
-  renderPending();
 }
 
 function describeFiltersForPrint() {
@@ -1157,9 +993,7 @@ async function refresh() {
   const seq = ++refreshSeq;
   trackFilters();
   writeUrl();
-  syncForm();
-  renderChips();
-  renderPending();
+  form.render();
   describeFiltersForPrint();
   page = 0;
   priorFailure = null; // this refresh retries a failed background load (loadPriorYear)
@@ -1168,11 +1002,10 @@ async function refresh() {
     const before = tableLoads;
     try { await ensureLoaded(); } catch (err) { err.boardstatLoad = true; throw err; }
     if (seq !== refreshSeq) return;
-    if (tableLoads !== before) { descOptionsKey = null; await fillFilterOptions(); }
+    if (tableLoads !== before) await fillFilterOptions();
     // A page whose first load failed finishes its setup after the first load that works.
     if (!firstLoadDone) await afterFirstLoad();
     setStatus($('status'), 'Updating…');
-    await updateDescOptions();
     await renderKpis();
     if (seq !== refreshSeq) return;
     await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgencyResponse(), renderAgency(), renderBacklog(), renderDetail(), renderMap(),
@@ -1246,7 +1079,7 @@ async function main() {
   const names = sourceNames(district);
   SRC = sourceSql(names);
   dataFiles = names.map((n, i) => [n, `data/${district.files[i]}`]);
-  if (rangeLoading()) loader = createLoader({ exec: query, sources: names.map((n) => sourceSql([n])), cols: LOAD_COLUMNS.join(', '), checkFresh });
+  if (rangeLoading()) loader = createLoader({ exec: query, sources: names.map((n) => sourceSql([n])), cols: LOAD_COLUMNS.join(', '), checkFresh: freshnessCheck(manifest.generated_at) });
   try {
     [Plot] = await Promise.all([
       import(PLOT_URL),
@@ -1267,6 +1100,16 @@ async function main() {
   viewStart = manifest.window.default_start || manifest.window.start;
   window.boardstatTrack?.(ADDRESS_MODE ? 'address_viewed' : 'district_selected', { geo, district_id: geoId, page_type: ADDRESS_MODE ? 'address' : 'district' });
   state = readState();
+  form = createFilterForm({
+    defaults: defaultFilters,
+    lists: formLists,
+    onApply: (s) => { state = s; refresh(); },
+    lastFailed: () => lastRefreshFailed,
+    matchText: () => `${fmtInt(total)} requests match.`,
+    setStatus: (msg) => setStatus($('status'), msg),
+    lockAddress: ADDRESS_MODE,
+  });
+  form.set(state);
   if (!ADDRESS_MODE) updateFullMapLink(filtersToParams(geo, geoId, state, defaultDates()));
   // A failed first load must never leave the page waiting: say so, and let Apply retry.
   let loaded = true;
@@ -1281,7 +1124,7 @@ async function main() {
     await freshDataFiles(err);
   }
   if (loaded) await afterFirstLoad();
-  await setupFilters();
+  setupFilters();
   try { await setupMap(); } catch (err) {
     console.error(err);
     $('map').replaceChildren(el('p', { text: `The map could not load (${err.message}). Every number on this page is also in the tables.` }));
@@ -1291,10 +1134,5 @@ async function main() {
   else setStatus($('status'), loadFailedText(loadError));
 }
 
-/** The status line when the requests could not be loaded. */
-function loadFailedText(err) {
-  if (err instanceof DataChangedError) return 'BoardStat updated its data after this page opened. Reload the page to see the new data.';
-  return 'The requests could not be loaded. This can happen if the connection drops or the browser runs low on memory. Press Apply filters to try again, or reload the page.';
-}
 
 main();

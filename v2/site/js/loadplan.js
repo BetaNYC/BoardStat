@@ -142,6 +142,29 @@ export class DataChangedError extends Error {
 }
 
 /**
+ * Before anything is added to the table: the nightly build replaces the files in place,
+ * so rows added after it would come from a different build than the rest (#144 QA).
+ * Returns the loader's checkFresh for a page opened on the build `generatedAt`.
+ */
+export function freshnessCheck(generatedAt, getManifest = async () => {
+  const r = await fetch('data/manifest.json', { cache: 'no-cache' });
+  return r.ok ? r.json() : null;
+}) {
+  return async () => {
+    let m;
+    try { m = await getManifest(); } catch { return; }
+    if (!m) return; // cannot tell; the read itself will fail if the files are gone
+    if (m.generated_at !== generatedAt) throw new DataChangedError();
+  };
+}
+
+/** The status line when the requests could not be loaded (district, address and map pages). */
+export function loadFailedText(err) {
+  if (err instanceof DataChangedError) return 'BoardStat updated its data after this page opened. Reload the page to see the new data.';
+  return 'The requests could not be loaded. This can happen if the connection drops or the browser runs low on memory. Press Apply filters to try again, or reload the page.';
+}
+
+/**
  * The `req` table's loader. `exec(sql)` runs SQL; `sources[i]` is the SQL that reads file
  * i. All changes to the table go through one queue: the page's own loads in statements
  * of up to `perStatement` files, the background load one file per statement, so the

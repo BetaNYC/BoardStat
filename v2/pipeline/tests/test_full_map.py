@@ -79,3 +79,24 @@ def test_map_key_heading_fits_each_pages_outline():
 def test_both_pages_drop_an_unknown_status_with_the_same_helper():
     for name in ("district.js", "fullmap.js"):
         assert "keepKnownStatus(state," in (JS / name).read_text(encoding="utf-8"), name
+
+
+def test_map_page_redraws_on_apply_and_its_links_carry_its_filters():
+    """#149: Apply on the map redraws it, rewrites its link, and the back link carries the
+    same filters (one function writes both, from the same filtersToParams)."""
+    src = (JS / "fullmap.js").read_text(encoding="utf-8")
+    links = re.search(r"function writeLinks\(\) \{.*?\n\}", src, re.DOTALL).group(0)
+    assert "history.replaceState" in links and "$('back-link').href" in links and "filtersToParams(geo, geoId, state, defaults)" in links
+    assert "onApply: (s) => { state = s;" in src
+    redraw = re.search(r"async function redraw\(\) \{.*?\n\}", src, re.DOTALL).group(0)
+    assert "writeLinks();" in redraw and "loadRequestPoints(mapCtx, 'req', where)" in redraw
+
+
+def test_map_page_is_phone_friendly_and_says_what_is_not_carried():
+    html = read("map.html")
+    assert 'id="filters-toggle" aria-controls="filters"' in html
+    assert "except an address filter" in html
+    assert "change them there" not in html
+    for page in ("help.html", "glossary.html"):
+        assert "change them there" not in read(page)
+        assert "never carried between the two pages" in read(page), page
