@@ -165,7 +165,8 @@ details.as-table summary { cursor: pointer; color: var(--bnyc-blue); font-weight
 figure { margin: 0; }
 figure svg { max-width: 100%; height: auto; }
 
-.map { height: 420px; border: 1px solid var(--bnyc-border-gray); border-radius: 6px; }
+.map { position: relative; height: 420px; border: 1px solid var(--bnyc-border-gray); border-radius: 6px; }
+.map-error { position: absolute; top: 0.5rem; left: 0.5rem; right: 3rem; z-index: 2; margin: 0; padding: 0.4rem 0.6rem; font-size: 0.875rem; background: #fff; border: 1px solid var(--bnyc-border-gray); border-radius: 4px; }
 .map-note { font-size: 0.875rem; margin-top: 0.25rem; }
 .maplibregl-popup-content { font-family: var(--font-body); color: var(--bnyc-dark-gray); font-size: 0.875rem; }
 
