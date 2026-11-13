@@ -3,23 +3,21 @@ import {
   PLOT_URL, loadManifest, renderDataStatus, renderChanges, dataUrl, registerData, query, lit, el, table, chartWithTable,
   setStatus, fmtInt, fmtDays, fmtPct, fmtDate, fmtDateTime, monthLabel,
 } from './lib.js';
-import { makeMap, addBoundaries, featureBounds } from './map.js';
-import { copyFilters, changedFields, patchBoth, sectionCount, SECTIONS } from './filterstate.js';
+import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
+import {
+  copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters,
+} from './filterstate.js';
+import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
 
 const $ = (id) => document.getElementById(id);
 const PAGE = 50;
-const MAP_CAP = 60000;
 const BLUE = '#2359a8';
 const GRAY = '#949494';
 const DARK = '#414141';
 const STATUS_COLORS = [BLUE, '#B8D6FF', DARK, GRAY, '#EEF4FF', '#F1F1F1'];
 // Problems over time (address page): six colors that stay visible as bar fills; the last is "Other".
 const PROBLEM_COLORS = [BLUE, '#7fa8e0', DARK, '#c27c0e', '#3f8f5b', '#c8c8c8'];
-// Status shortcut: every status other than Closed (including a missing status).
-const NOT_CLOSED = 'not_closed';
-const NOT_CLOSED_SQL = `status IS DISTINCT FROM 'Closed'`;
-// A missing descriptor is shown and filtered as "(none)", as in the descriptor table.
-const DESC_SQL = `coalesce(descriptor, '(none)')`;
+// Status shortcut NOT_CLOSED, NOT_CLOSED_SQL and DESC_SQL: filterstate.js and filtersql.js.
 // Time to close counts only requests marked Closed. days_to_close is already NULL
 // when there is no close date or the close date is impossible (see README decision 5);
 // this also drops the few not-Closed requests that carry a close date.
@@ -107,47 +105,37 @@ async function ensureLoaded() {
 
 // ------------------------------------------------------------- state <-> URL
 
+/** The page's default dates: what a link without start or end opens with. */
+const defaultDates = () => ({ start: viewStart, end: manifest.window.end });
+
 function readState() {
-  return {
-    start: params.get('start') || viewStart,
-    end: params.get('end') || manifest.window.end,
-    types: (params.get('type') || '').split('|').filter(Boolean),
-    descs: (params.get('desc') || '').split('|').filter(Boolean),
-    descEx: params.get('descx') === '1',
-    agency: params.get('agency') || '',
-    status: params.get('status') || '',
-    addr: params.get('addr') || '',
-  };
+  return filtersFromParams(params, defaultDates());
 }
 
 function writeUrl() {
-  const p = new URLSearchParams({ geo, id: geoId });
-  if (state.start !== viewStart) p.set('start', state.start);
-  if (state.end !== manifest.window.end) p.set('end', state.end);
-  if (state.types.length) p.set('type', state.types.join('|'));
-  if (state.descs.length) p.set('desc', state.descs.join('|'));
-  if (state.descs.length && state.descEx) p.set('descx', '1');
-  if (state.agency) p.set('agency', state.agency);
-  if (state.status) p.set('status', state.status);
   // Street addresses never go back into the URL bar after the page loads, so no
   // later history entry (or analytics page view; see analytics.js) can carry one.
   // The address page keeps the address it was opened with and does not rewrite its
-  // URL at all; the district page's address filter is not kept in the link.
+  // URL at all; the district page's address filter is not kept in the link
+  // (filtersToParams never writes it).
   if (ADDRESS_MODE) return;
+  const p = filtersToParams(geo, geoId, state, defaultDates());
   history.replaceState(null, '', `?${p.toString()}`);
+  updateFullMapLink(p);
 }
 
-function where({ skipType = false, skipDates = false, skipDesc = false, skipStatus = false, skipAgency = false } = {}) {
-  const w = skipDates ? ['TRUE'] : [
-    `created_date >= CAST(${lit(state.start)} AS DATE)`,
-    `created_date < CAST(${lit(state.end)} AS DATE) + INTERVAL 1 DAY`,
-  ];
-  if (!skipType && state.types.length) w.push(`complaint_type IN (${state.types.map(lit).join(', ')})`);
-  if (!skipAgency && state.agency) w.push(`agency = ${lit(state.agency)}`);
-  if (!skipDesc && state.descs.length) w.push(`${DESC_SQL} ${state.descEx ? 'NOT IN' : 'IN'} (${state.descs.map(lit).join(', ')})`);
-  if (!skipStatus && state.status) w.push(state.status === NOT_CLOSED ? NOT_CLOSED_SQL : `status = ${lit(state.status)}`);
-  if (state.addr) w.push(`address_norm = ${lit(state.addr)}`);
-  return w.join(' AND ');
+/** The "Open full-page map" link carries the same district, dates and filters (#143). */
+function updateFullMapLink(p) {
+  const a = $('fullmap-link');
+  if (!a) return;
+  a.href = `map.html?${p.toString()}`;
+  // The address filter never goes into a link, so the full-page map cannot show it.
+  const note = $('fullmap-addr-note');
+  if (note) note.hidden = !state.addr;
+}
+
+function where(opts = {}) {
+  return whereSql(state, opts);
 }
 
 // ------------------------------------------------------------- filter controls
@@ -352,12 +340,7 @@ function setupGroups() {
 }
 
 function describeFiltersForPrint() {
-  const parts = [`Requests created ${fmtDate(state.start)} to ${fmtDate(state.end)}`];
-  if (state.types.length) parts.push(`problems: ${state.types.join(', ')}`);
-  if (state.agency) parts.push(`agency: ${state.agency}`);
-  if (state.descs.length) parts.push(`${state.descEx ? 'excluding descriptions' : 'descriptions'}: ${state.descs.join(', ')}`);
-  if (state.status) parts.push(`status: ${state.status === NOT_CLOSED ? 'not yet closed' : state.status}`);
-  if (state.addr) parts.push(`address: ${state.addr}`);
+  const parts = describeFilters(state, fmtDate);
   $('print-filters').textContent = `${parts.join('; ')}. Printed ${fmtDate(new Date())} from BoardStat 2.0 (prototype).`;
 }
 
@@ -905,58 +888,15 @@ async function downloadCsv() {
 // ------------------------------------------------------------- map
 
 async function setupMap() {
-  const gj = await (await fetch(dataUrl(`data/boundaries/${geo}.geojson`))).json();
-  const feature = gj.features.find((f) => String(f.properties.id) === String(geoId));
-  mapCtx = await makeMap('map', feature ? { bounds: featureBounds(feature) } : {});
-  const { map, ml } = mapCtx;
-  addBoundaries(map, gj, { selectedId: Number(geoId) });
-  // Clustering per https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/
-  map.addSource('req', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, cluster: true, clusterMaxZoom: 15, clusterRadius: 40 });
-  map.addLayer({
-    id: 'clusters', type: 'circle', source: 'req', filter: ['has', 'point_count'],
-    paint: {
-      'circle-color': ['step', ['get', 'point_count'], '#B8D6FF', 100, '#6f9bd6', 1000, BLUE],
-      'circle-radius': ['step', ['get', 'point_count'], 10, 100, 16, 1000, 24],
-      'circle-stroke-width': 1, 'circle-stroke-color': DARK, 'circle-opacity': 0.85,
-    },
-  });
-  map.addLayer({
-    id: 'point', type: 'circle', source: 'req', filter: ['!', ['has', 'point_count']],
-    paint: { 'circle-color': BLUE, 'circle-radius': 5, 'circle-stroke-width': 1, 'circle-stroke-color': '#fff' },
-  });
-  map.on('click', 'clusters', async (e) => {
-    const f = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })[0];
-    const zoom = await map.getSource('req').getClusterExpansionZoom(f.properties.cluster_id);
-    map.easeTo({ center: f.geometry.coordinates, zoom });
-  });
-  map.on('click', 'point', (e) => {
-    const f = e.features[0];
-    const p = f.properties;
-    // setDOMContent avoids injecting 311 text as HTML.
-    const box = el('div', {}, el('strong', { text: p.t }), el('br'), p.d || '', el('br'),
-      `${p.created} · ${p.s}`, el('br'), p.addr || '(no address)');
-    new ml.Popup().setLngLat(f.geometry.coordinates.slice()).setDOMContent(box).addTo(map);
-  });
-  for (const layer of ['clusters', 'point']) {
-    map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
-    map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
-  }
+  mapCtx = await setupRequestMap('map', { geo, geoId });
+  renderMapLegend($('map-legend'));
 }
 
 async function renderMap() {
   if (!mapCtx) return;
-  const rows = await query(`
-    SELECT longitude AS x, latitude AS y, complaint_type AS t, descriptor AS d, status AS s,
-           strftime(created_date, '%Y-%m-%d') AS created,
-           coalesce(incident_address, intersection_street_1 || ' & ' || intersection_street_2) AS addr
-    FROM req WHERE ${where()} AND latitude IS NOT NULL ORDER BY created_date DESC LIMIT ${MAP_CAP}`);
-  if (ADDRESS_MODE && rows.length) mapCtx.map.jumpTo({ center: [rows[0].x, rows[0].y], zoom: 17 });
-  mapCtx.map.getSource('req').setData({
-    type: 'FeatureCollection',
-    features: rows.map((r) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [r.x, r.y] }, properties: { t: r.t, d: r.d, s: r.s, created: r.created, addr: r.addr } })),
-  });
-  $('map-note').textContent = (total > MAP_CAP ? `Showing the ${fmtInt(MAP_CAP)} most recent of ${fmtInt(total)} matching requests. ` : `Showing all ${fmtInt(rows.length)} matching requests. `) +
-    'Circles group nearby requests; select one to zoom in, or select a single point for details.';
+  const shown = await loadRequestPoints(mapCtx, 'req', where());
+  if (ADDRESS_MODE && shown.first) mapCtx.map.jumpTo({ center: shown.first, zoom: 17 });
+  $('map-note').textContent = mapNoteText(total, shown.count);
 }
 
 // ------------------------------------------------------------- about
@@ -1131,6 +1071,7 @@ async function main() {
   viewStart = manifest.window.default_start || manifest.window.start;
   window.boardstatTrack?.(ADDRESS_MODE ? 'address_viewed' : 'district_selected', { geo, district_id: geoId, page_type: ADDRESS_MODE ? 'address' : 'district' });
   state = readState();
+  if (!ADDRESS_MODE) updateFullMapLink(filtersToParams(geo, geoId, state, defaultDates()));
   await ensureLoaded();
   if (ADDRESS_MODE) await renderAddressLinks();
   await setupFilters();

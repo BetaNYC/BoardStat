@@ -170,6 +170,33 @@ figure svg { max-width: 100%; height: auto; }
 .map-note { font-size: 0.875rem; margin-top: 0.25rem; }
 .maplibregl-popup-content { font-family: var(--font-body); color: var(--bnyc-dark-gray); font-size: 0.875rem; }
 
+/* Map key (#143), below the map on both the district page and the full-page map. */
+.map-legend .legend-title { font-size: 0.9375rem; margin: 0.5rem 0 0.25rem; }
+.map-legend ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; font-size: 0.875rem; }
+.map-legend li { display: flex; align-items: center; gap: 0.4rem; }
+.map-legend .swatch { display: inline-block; flex: none; }
+.map-legend .swatch.circle { border-radius: 50%; border: 1px solid var(--bnyc-dark-gray); }
+.map-legend .swatch.line { width: 1.5rem; height: 0; border-top: 1.5px solid #6b6b6b; }
+.map-legend .swatch.line.selected { border-top: 3px solid var(--bnyc-blue); }
+.fullmap-open { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin: 0.75rem 0 0; }
+.fullmap-open .button { min-height: 44px; display: inline-flex; align-items: center; }
+
+/* Full-page map (map.html, #143): a short header, then a map that fills the rest of the window. */
+body.fullmap-page { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+main.fullmap { flex: 1; display: flex; flex-direction: column; width: 100%; max-width: none; padding: 0.5rem 1rem 0.75rem; }
+.fullmap-bar { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.25rem 1.5rem; }
+.fullmap-head { flex: 1 1 28rem; min-width: 0; }
+.fullmap-head h1 { font-size: 1.5rem; margin: 0.1rem 0; }
+.fullmap-head p { margin: 0; }
+.fullmap-back { margin: 0.25rem 0; text-align: right; }
+.fullmap-back a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
+.fullmap-back .muted { display: block; }
+@media screen and (max-width: 640px) { .fullmap-back { text-align: left; } }
+main.fullmap .status { margin: 0.25rem 0; min-height: 0; }
+main.fullmap .status:empty { display: none; }
+.map.map-full { flex: 1; height: auto; min-height: 65vh; }
+.fullmap-foot p { margin: 0.25rem 0; }
+
 .status { min-height: 1.5rem; font-style: italic; }
 .results { list-style: none; padding: 0; }
 .results li { padding: 0.4rem 0; border-bottom: 1px solid var(--bnyc-light-gray); }

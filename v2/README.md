@@ -34,7 +34,7 @@ internal reports, in Noel's private vault).
    agg/month_type.parquet · addresses.parquet · build-log.md
                 │  plain HTTP, any static host
                 ▼
- v2/site/  index.html + district.html (ES modules, no build step)
+ v2/site/  index.html + district.html + map.html (ES modules, no build step)
    DuckDB-WASM ── queries ONE district's Parquet file in the browser, loading only
                   the dates the view needs (see "Loading only what the view needs")
    MapLibre GL ── self-hosted Protomaps street map, district boundaries, clustered points
@@ -43,8 +43,24 @@ internal reports, in Noel's private vault).
    incl. "not yet closed", address) in groups that open and close, run by an Apply
    button and kept in the URL; at-a-glance numbers; top problems
    and descriptions; monthly chart; agency responsiveness table; older requests
-   still open; map; top addresses; compare; request list with days open; CSV; print
+   still open; map with a key; full-page map; top addresses; compare; request list
+   with days open; CSV; print
 ```
+
+**Full-page map (`site/map.html`, #143).** The district map's "Open full-page map"
+button opens the same map as big as the window, for the same district, dates and
+filters. Everything is in the link (`geo`, `id`, `start`, `end`, `type`, `desc`,
+`descx`, `agency`, `status`, the same parameters as `district.html`), so the link
+can be shared, and "Back to the district page" carries them back. The two pages
+share code so they cannot drift: `js/filterstate.js` reads and writes the link
+(`filtersFromParams`, `filtersToParams`), `js/filtersql.js` builds the SQL filter
+(`whereSql`), and `js/requestmap.js` draws the map (lines, grouped circles, popups,
+the map key) and its "Showing ..." line, with the same 60,000 most-recent cap. The
+full-page map reads the district's Parquet file directly instead of loading the
+district page's table, and has no filter form of its own: it lists the filters in
+use and sends people back to the district page to change them. The address filter
+never goes into a link (see the analytics notes below), so the full-page map shows
+the whole district; the district page says so when an address filter is on.
 
 ## How to run
 
