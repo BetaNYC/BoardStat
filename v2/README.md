@@ -75,6 +75,14 @@ Publishing to the demo at https://www.beta.nyc/boardstat/ (DreamPress; access in
 the workspace's `team/engineering/hosting/README.md`):
 
 ```sh
+python3 v2/whats_changed.py check WHATS-CHANGED.md --release
+#   fails while WHATS-CHANGED.md has an "## Unreleased:" entry. Before uploading, change that
+#   heading to today's date (same title), rebuild the page with the render command below,
+#   and merge that change, so the page never says "Not released yet" about something live.
+python3 v2/whats_changed.py render WHATS-CHANGED.md --format fragment \
+  --into v2/site/whats-changed.html --site-prefix v2/site/ --repo-url https://github.com/BetaNYC/BoardStat
+#   the What's changed page (site/whats-changed.html) is built from WHATS-CHANGED.md at the
+#   top of the repository. CI (.github/workflows/whats-changed.yml) fails if it is stale.
 python3 v2/stamp_assets.py
 #   adds ?v=<hash> to CSS/JS links and writes an import map. beta.nyc tells browsers
 #   to keep .js/.css for 120 days, so without this visitors keep old code.

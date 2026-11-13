@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>What's changed · BoardStat 2.0 (prototype)</title>
+  <meta name="description" content="Every change to BoardStat a reader would notice, newest first, including corrections.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css?v=cbb35afbba">
+  <script src="js/analytics.js?v=6ed76567f7"></script>
+  <!-- The list between the whats-changed markers is generated from WHATS-CHANGED.md at the
+       top of the repository. Do not edit it by hand. Rebuild it from the repository root with:
+         python3 v2/whats_changed.py render WHATS-CHANGED.md --format fragment \
+           --into v2/site/whats-changed.html --site-prefix v2/site/ \
+           --repo-url https://github.com/BetaNYC/BoardStat
+       CI runs the same command with --check. The page around it is hand-written, like the
+       other pages here. -->
+  <!-- importmap:start -->
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=37c09701c6","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=e01ca749c3","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <!-- importmap:end -->
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site">
+    <a class="brand" href="./">BoardStat 2.0</a><span class="tag">prototype</span>
+    <nav class="site-nav" aria-label="Site"><a href="./">Districts</a> <a href="about.html">About</a> <a href="glossary.html">Glossary</a> <a href="help.html">Help &amp; feedback</a></nav>
+  </header>
+
+  <main id="main">
+<!-- whats-changed:start -->
+<div class="whats-changed" data-whats-changed>
+<style>
+.whats-changed{color:#414141;font-size:1.0625rem;line-height:1.76;max-width:750px;overflow-wrap:anywhere}
+.whats-changed a{color:#2359a8;text-decoration:underline}
+.whats-changed a:focus-visible,.whats-changed input:focus-visible{outline:3px solid #2359a8;outline-offset:2px}
+.whats-changed fieldset{border:1px solid #949494;border-radius:4px;margin:1.5rem 0 .5rem;padding:.25rem 1rem .5rem}
+.whats-changed legend{font-weight:700;padding:0 .25rem}
+.whats-changed .wc-option{display:inline-flex;align-items:center;gap:.5rem;min-height:44px;margin-right:1.25rem;cursor:pointer}
+.whats-changed .wc-option input{width:1.25rem;height:1.25rem;margin:0;accent-color:#2359a8}
+.whats-changed .wc-status{font-style:italic}
+.whats-changed .wc-entry{border-top:1px solid #949494;padding:1.5rem 0 .5rem}
+.whats-changed .wc-entry[hidden]{display:none}
+.whats-changed .wc-entry h2{font-size:1.5rem;line-height:1.35;margin:0 0 .25rem}
+.whats-changed .wc-meta{margin:0 0 .75rem}
+.whats-changed .wc-tag{display:inline-block;border:1px solid #414141;border-radius:4px;padding:0 .5rem;margin:0 .375rem .25rem 0;line-height:1.6}
+.whats-changed .wc-tag-correction{border:2px solid #2359a8;color:#2359a8;font-weight:700}
+.whats-changed .wc-old-numbers{background:#EEF4FF;border-left:4px solid #2359a8;padding:.75rem 1rem;margin:1rem 0}
+.whats-changed .wc-old-numbers p{margin:0}
+.whats-changed .wc-permalink a{display:inline-block;min-height:44px;line-height:44px}
+.whats-changed .wc-visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media (max-width:600px){.whats-changed .wc-entry h2{font-size:1.25rem}}
+</style>
+<h1>What&#x27;s changed</h1>
+<div class="wc-intro">
+<p>This page lists the changes to BoardStat that a reader would notice: new pages, new data, data fixes, and corrections when BoardStat showed something wrong. Newest first. BoardStat&#x27;s 311 data refreshes every night, and those refreshes are not listed. The &quot;What changed since&quot; box on a district page lists the 311 requests that changed overnight; this page lists changes to BoardStat itself.</p>
+<ul><li><strong>History begins:</strong> 2017-05-18, the day BoardStat&#x27;s GitHub repository opened. Entries before November 2026 cover the original BoardStat, one per release, from its README and issues. Corrections made before November 2026 may be missing.</li><li><strong>Data refresh:</strong> nightly from NYC Open Data, at 5:30 AM, with a second try at 8:30 AM if the first fails</li></ul>
+<p>BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change reaches the site at the next upload. Entries since November 2026 are dated by the day the change was merged on GitHub. BetaNYC&#x27;s <a href="https://github.com/BetaNYC/nyc-311-mcp">nyc-311-mcp</a> server reads BoardStat&#x27;s data files, so a change to BoardStat&#x27;s data can change its answers too. To report a bug or ask for a new feature, email <a href="mailto:boardstat@beta.nyc">boardstat@beta.nyc</a> or <a href="https://github.com/BetaNYC/BoardStat/issues">open an issue on GitHub</a>.</p>
+</div>
+<div class="wc-filters" hidden>
+<fieldset>
+<legend>Show changes to</legend>
+<label class="wc-option"><input type="checkbox" name="wc-tag" value="Site" checked> Site</label>
+<label class="wc-option"><input type="checkbox" name="wc-tag" value="Data" checked> Data</label>
+<label class="wc-option"><input type="checkbox" name="wc-tag" value="MCP" checked> MCP</label>
+<label class="wc-option"><input type="checkbox" name="wc-corrections" value="Correction"> Corrections only</label>
+</fieldset>
+</div>
+<p class="wc-status" role="status" aria-live="polite" aria-atomic="true">Showing all 19 changes.</p>
+<article class="wc-entry" id="unreleased-a-whats-changed-page" data-tags="Site" aria-labelledby="unreleased-a-whats-changed-page-title">
+<h2 id="unreleased-a-whats-changed-page-title">A What&#x27;s changed page</h2>
+<p class="wc-meta">Not released yet</p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span></p>
+<p>A new page lists every change to BoardStat a reader would notice, newest first, with a filter for site changes, data changes and corrections. Every page links to it at the bottom.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/blob/HEAD/WHATS-CHANGED.md">What&#x27;s changed on GitHub</a></p>
+<p class="wc-permalink"><a href="#unreleased-a-whats-changed-page">Link to this change<span class="wc-visually-hidden">: A What&#x27;s changed page</span></a></p>
+</article>
+<article class="wc-entry" id="2026-11-09-the-data-paused-for-two-days-and-the-nightly-refresh-now-tries-twice" data-tags="Data" aria-labelledby="2026-11-09-the-data-paused-for-two-days-and-the-nightly-refresh-now-tries-twice-title">
+<h2 id="2026-11-09-the-data-paused-for-two-days-and-the-nightly-refresh-now-tries-twice-title">The data paused for two days, and the nightly refresh now tries twice</h2>
+<p class="wc-meta"><time datetime="2026-11-09">November 9, 2026</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Data</span></p>
+<p>On November 8 and 9, 2026, NYC Open Data turned away the 5:30 AM refresh, so BoardStat kept showing data built on the morning of November 7 until a refresh run by hand on the evening of November 9. When the first try fails, the refresh now tries again at 8:30 AM.</p>
+<p><strong>Who it affects:</strong> Anyone who used BoardStat on November 8 or 9, 2026. The About page always shows when the data was last built.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/issues/137">The data is out of date</a> · <a href="https://github.com/BetaNYC/BoardStat/pull/139">The second try</a></p>
+<p class="wc-permalink"><a href="#2026-11-09-the-data-paused-for-two-days-and-the-nightly-refresh-now-tries-twice">Link to this change<span class="wc-visually-hidden">: The data paused for two days, and the nightly refresh now tries twice</span></a></p>
+</article>
+<article class="wc-entry" id="2026-11-08-boardstats-data-files-have-an-open-license" data-tags="Data" aria-labelledby="2026-11-08-boardstats-data-files-have-an-open-license-title">
+<h2 id="2026-11-08-boardstats-data-files-have-an-open-license-title">BoardStat&#x27;s data files have an open license</h2>
+<p class="wc-meta"><time datetime="2026-11-08">November 8, 2026</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Data</span></p>
+<p>The data files BoardStat 2.0 publishes are under the Open Database License (ODbL) 1.0, crediting NYC Open Data as the source. Each nightly build carries the license notice with the files. BoardStat&#x27;s code is under the MIT License.</p>
+<p><strong>Who it affects:</strong> Anyone who reuses BoardStat&#x27;s data files.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/blob/HEAD/LICENSE-DATA.md">The data license</a> · <a href="https://github.com/BetaNYC/BoardStat/pull/135">Pull request</a></p>
+<p class="wc-permalink"><a href="#2026-11-08-boardstats-data-files-have-an-open-license">Link to this change<span class="wc-visually-hidden">: BoardStat&#x27;s data files have an open license</span></a></p>
+</article>
+<article class="wc-entry" id="2026-11-06-large-districts-load-faster" data-tags="Site" aria-labelledby="2026-11-06-large-districts-load-faster-title">
+<h2 id="2026-11-06-large-districts-load-faster-title">Large districts load faster</h2>
+<p class="wc-meta"><time datetime="2026-11-06">November 6, 2026</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span></p>
+<p>A district page now downloads only the parts of the data file it shows, instead of the whole file. For Council District 11, the largest district, the data a page downloads by default fell from 30.0 MB to 13.8 MB. Moving the From date further back downloads more.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/pull/132">Pull request</a></p>
+<p class="wc-permalink"><a href="#2026-11-06-large-districts-load-faster">Link to this change<span class="wc-visually-hidden">: Large districts load faster</span></a></p>
+</article>
+<article class="wc-entry" id="2026-11-06-boardstat-20-moved-to-wwwbetanycboardstat" data-tags="Site" aria-labelledby="2026-11-06-boardstat-20-moved-to-wwwbetanycboardstat-title">
+<h2 id="2026-11-06-boardstat-20-moved-to-wwwbetanycboardstat-title">BoardStat 2.0 moved to www.beta.nyc/boardstat/</h2>
+<p class="wc-meta"><time datetime="2026-11-06">November 6, 2026</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span></p>
+<p>BoardStat 2.0 moved from www.beta.nyc/boardstat/v2/ to www.beta.nyc/boardstat/. Old links, including links to boardstat.beta.nyc, go to the new address.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/pull/130">The move</a> · <a href="https://github.com/BetaNYC/BoardStat/pull/131">The old pages</a></p>
+<p class="wc-permalink"><a href="#2026-11-06-boardstat-20-moved-to-wwwbetanycboardstat">Link to this change<span class="wc-visually-hidden">: BoardStat 2.0 moved to www.beta.nyc/boardstat/</span></a></p>
+</article>
+<article class="wc-entry" id="2026-11-06-boardstat-counts-visits-and-never-sends-an-address" data-tags="Site" aria-labelledby="2026-11-06-boardstat-counts-visits-and-never-sends-an-address-title">
+<h2 id="2026-11-06-boardstat-counts-visits-and-never-sends-an-address-title">BoardStat counts visits, and never sends an address</h2>
+<p class="wc-meta"><time datetime="2026-11-06">November 6, 2026</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span></p>
+<p>BoardStat now counts visits with Google Analytics, through the same Google tag the rest of beta.nyc uses. Before anything is sent to Google, BoardStat removes any address and map coordinates from the page&#x27;s link. The About page says in plain words what is measured.</p>
+<p><strong>More detail:</strong> <a href="about.html#measure-h">What we measure about visits</a> · <a href="https://github.com/BetaNYC/BoardStat/pull/126">Pull request</a></p>
+<p class="wc-permalink"><a href="#2026-11-06-boardstat-counts-visits-and-never-sends-an-address">Link to this change<span class="wc-visually-hidden">: BoardStat counts visits, and never sends an address</span></a></p>
+</article>
+<article class="wc-entry" id="2026-11-06-311-requests-back-to-january-1-2020" data-tags="Data" aria-labelledby="2026-11-06-311-requests-back-to-january-1-2020-title">
+<h2 id="2026-11-06-311-requests-back-to-january-1-2020-title">311 requests back to January 1, 2020</h2>
+<p class="wc-meta"><time datetime="2026-11-06">November 6, 2026</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Data</span></p>
+<p>BoardStat 2.0 now covers 311 requests from January 1, 2020, on, instead of the last three years. Pages still open on about the last year, and you can move the From date back to 2020. Requests from 2010 to 2019 are in a separate City dataset and are not included yet.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/pull/126">Pull request</a> · <a href="https://github.com/BetaNYC/BoardStat/issues/108">History back to 2010</a></p>
+<p class="wc-permalink"><a href="#2026-11-06-311-requests-back-to-january-1-2020">Link to this change<span class="wc-visually-hidden">: 311 requests back to January 1, 2020</span></a></p>
+</article>
+<article class="wc-entry" id="2026-11-05-a-help-and-feedback-page" data-tags="Site" aria-labelledby="2026-11-05-a-help-and-feedback-page-title">
+<h2 id="2026-11-05-a-help-and-feedback-page-title">A Help and feedback page</h2>
+<p class="wc-meta"><time datetime="2026-11-05">November 5, 2026</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span></p>
+<p>A new Help and feedback page, in the top menu of every page, explains how to use BoardStat, answers common questions, and says how to send feedback by email or on GitHub.</p>
+<p><strong>More detail:</strong> <a href="help.html">Help and feedback</a> · <a href="https://github.com/BetaNYC/BoardStat/pull/123">Pull request</a></p>
+<p class="wc-permalink"><a href="#2026-11-05-a-help-and-feedback-page">Link to this change<span class="wc-visually-hidden">: A Help and feedback page</span></a></p>
+</article>
+<article class="wc-entry" id="2026-11-05-the-data-refreshes-every-night" data-tags="Data" aria-labelledby="2026-11-05-the-data-refreshes-every-night-title">
+<h2 id="2026-11-05-the-data-refreshes-every-night-title">The data refreshes every night</h2>
+<p class="wc-meta"><time datetime="2026-11-05">November 5, 2026</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Data</span></p>
+<p>BoardStat 2.0&#x27;s data now refreshes every night. Each night picks up new 311 requests and changes to older ones, such as a request that was closed. A district page shows what changed since the last refresh.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/pull/120">Pull request</a> · <a href="https://github.com/BetaNYC/BoardStat/blob/HEAD/v2/README.md">How the nightly refresh works</a></p>
+<p class="wc-permalink"><a href="#2026-11-05-the-data-refreshes-every-night">Link to this change<span class="wc-visually-hidden">: The data refreshes every night</span></a></p>
+</article>
+<article class="wc-entry" id="2026-11-05-the-old-boardstat-pages-send-visitors-to-boardstat-20" data-tags="Site" aria-labelledby="2026-11-05-the-old-boardstat-pages-send-visitors-to-boardstat-20-title">
+<h2 id="2026-11-05-the-old-boardstat-pages-send-visitors-to-boardstat-20-title">The old BoardStat pages send visitors to BoardStat 2.0</h2>
+<p class="wc-meta"><time datetime="2026-11-05">November 5, 2026</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span></p>
+<p>The original BoardStat pages at boardstat.beta.nyc, one per borough, now send visitors to BoardStat 2.0. The old Power BI dashboards had stopped refreshing, and they cannot be linked into 2.0, so every old page goes to the 2.0 front page.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/pull/122">Pull request</a></p>
+<p class="wc-permalink"><a href="#2026-11-05-the-old-boardstat-pages-send-visitors-to-boardstat-20">Link to this change<span class="wc-visually-hidden">: The old BoardStat pages send visitors to BoardStat 2.0</span></a></p>
+</article>
+<article class="wc-entry" id="2026-11-05-boardstat-20-a-rebuilt-boardstat" data-tags="Site Data" aria-labelledby="2026-11-05-boardstat-20-a-rebuilt-boardstat-title">
+<h2 id="2026-11-05-boardstat-20-a-rebuilt-boardstat-title">BoardStat 2.0, a rebuilt BoardStat</h2>
+<p class="wc-meta"><time datetime="2026-11-05">November 5, 2026</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span><span class="wc-visually-hidden">, </span><span class="wc-tag">Data</span></p>
+<p>BoardStat 2.0 is a new BoardStat that does not depend on Power BI. It shows 311 requests for any community district, council district or single address: the most common problems, how long agencies take to close requests, a map, and how a district compares with its borough and the city. It places each request in today&#x27;s district lines itself and launched with three years of data, from November 1, 2023.</p>
+<p><strong>More detail:</strong> <a href="about.html">About BoardStat 2.0</a> · <a href="https://github.com/BetaNYC/BoardStat/pull/119">Pull request</a> · <a href="https://github.com/BetaNYC/BoardStat/issues/106">The rebuild</a></p>
+<p class="wc-permalink"><a href="#2026-11-05-boardstat-20-a-rebuilt-boardstat">Link to this change<span class="wc-visually-hidden">: BoardStat 2.0, a rebuilt BoardStat</span></a></p>
+</article>
+<article class="wc-entry" id="2026-01-14-a-notice-that-the-data-had-stopped-refreshing" data-tags="Site Data" aria-labelledby="2026-01-14-a-notice-that-the-data-had-stopped-refreshing-title">
+<h2 id="2026-01-14-a-notice-that-the-data-had-stopped-refreshing-title">A notice that the data had stopped refreshing</h2>
+<p class="wc-meta"><time datetime="2026-01-14">January 14, 2026</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span><span class="wc-visually-hidden">, </span><span class="wc-tag">Data</span></p>
+<p>The City&#x27;s Office of Technology and Innovation told BetaNYC that BoardStat&#x27;s connection to NYC Open Data had stopped working. Its data had not refreshed since early 2025, and the pages did not say so until this notice was added to every page.</p>
+<p><strong>Who it affects:</strong> Anyone who used the original BoardStat in 2025.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/issues/99">The issue</a> · <a href="https://github.com/BetaNYC/BoardStat/pull/100">Pull request</a></p>
+<p class="wc-permalink"><a href="#2026-01-14-a-notice-that-the-data-had-stopped-refreshing">Link to this change<span class="wc-visually-hidden">: A notice that the data had stopped refreshing</span></a></p>
+</article>
+<article class="wc-entry" id="2019-07-23-version-07-a-new-look-and-a-home-page" data-tags="Site" aria-labelledby="2019-07-23-version-07-a-new-look-and-a-home-page-title">
+<h2 id="2019-07-23-version-07-a-new-look-and-a-home-page-title">Version 0.7, a new look and a home page</h2>
+<p class="wc-meta"><time datetime="2019-07-23">July 23, 2019</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span></p>
+<p>Every page moved to the NYC Core Framework design, and a new home page described BoardStat and showed a map with links to the five borough pages at boardstat.beta.nyc.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/blob/HEAD/README.md">README change log</a> · <a href="https://github.com/BetaNYC/BoardStat/issues/89">Issue 89</a> · <a href="https://github.com/BetaNYC/BoardStat/issues/90">Issue 90</a></p>
+<p class="wc-permalink"><a href="#2019-07-23-version-07-a-new-look-and-a-home-page">Link to this change<span class="wc-visually-hidden">: Version 0.7, a new look and a home page</span></a></p>
+</article>
+<article class="wc-entry" id="2018-08-09-version-06b-easier-to-use-with-two-new-pages" data-tags="Site" aria-labelledby="2018-08-09-version-06b-easier-to-use-with-two-new-pages-title">
+<h2 id="2018-08-09-version-06b-easier-to-use-with-two-new-pages-title">Version 0.6b, easier to use, with two new pages</h2>
+<p class="wc-meta"><time datetime="2018-08-09">August 9, 2018</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span></p>
+<p>The pages were reordered and gained clear-all buttons and a way to select several addresses at once. Two new pages, &quot;Complaints Over Time&quot; and &quot;Compare Complaint Types&quot;, were added.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/issues/84">Version 0.6b changes</a> · <a href="https://github.com/BetaNYC/BoardStat/blob/HEAD/README.md">README change log</a></p>
+<p class="wc-permalink"><a href="#2018-08-09-version-06b-easier-to-use-with-two-new-pages">Link to this change<span class="wc-visually-hidden">: Version 0.6b, easier to use, with two new pages</span></a></p>
+</article>
+<article class="wc-entry" id="2018-07-11-tutorial-videos-for-each-page" data-tags="Site" aria-labelledby="2018-07-11-tutorial-videos-for-each-page-title">
+<h2 id="2018-07-11-tutorial-videos-for-each-page-title">Tutorial videos for each page</h2>
+<p class="wc-meta"><time datetime="2018-07-11">July 11, 2018</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span></p>
+<p>BetaNYC published page-by-page tutorial videos for BoardStat. They teach the original Power BI version, which no longer runs.</p>
+<p><strong>More detail:</strong> <a href="https://youtu.be/Q8JJfaizWik">Tutorial videos</a> · <a href="about.html#history-h">History</a></p>
+<p class="wc-permalink"><a href="#2018-07-11-tutorial-videos-for-each-page">Link to this change<span class="wc-visually-hidden">: Tutorial videos for each page</span></a></p>
+</article>
+<article class="wc-entry" id="2018-07-11-some-requests-had-been-shown-under-the-wrong-community-board" data-tags="Data Correction" aria-labelledby="2018-07-11-some-requests-had-been-shown-under-the-wrong-community-board-title">
+<h2 id="2018-07-11-some-requests-had-been-shown-under-the-wrong-community-board-title">Some requests had been shown under the wrong community board</h2>
+<p class="wc-meta"><time datetime="2018-07-11">July 11, 2018</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Data</span><span class="wc-visually-hidden">, </span><span class="wc-tag wc-tag-correction">Correction</span></p>
+<p>BoardStat read each request&#x27;s community board from the City&#x27;s 311 data as published. That field was wrong for some requests: requests from Marble Hill showed up under Manhattan Community Board 8, reported in September 2017, and Community Board 1 received requests that belonged elsewhere, noted for Manhattan in April 2018 and for every borough in May 2018, when the issue counted tens of thousands of requests across complaint types such as Street Light Condition and Heat/Hot Water. On this date the README recorded that NYC&#x27;s Open Data team had addressed these problems.</p>
+<div class="wc-old-numbers"><p><strong>If you used the old numbers:</strong> Counts for Manhattan Community Board 8, or for Community Board 1 in any borough, taken from BoardStat before July 2018 may include requests from other districts. The record does not say how many requests each board gained. The original BoardStat no longer runs, so to re-check a count from those years, use the City&#x27;s 311 Service Requests 2010 to 2019 dataset on NYC Open Data and check each request&#x27;s location, not only its community board field. BoardStat 2.0 does not use that field: it places each request by its location.</p></div>
+<p><strong>Who it affects:</strong> Anyone who used the original BoardStat&#x27;s numbers for those boards from 2017 to July 2018.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/issues/24">Marble Hill</a> · <a href="https://github.com/BetaNYC/BoardStat/issues/36">Community Board 1</a> · <a href="https://data.cityofnewyork.us/d/76ig-c548">311 Service Requests 2010 to 2019</a></p>
+<p class="wc-update"><strong>Update, <time datetime="2019-11-21">November 21, 2019</time>:</strong> The Community Board 1 issue was closed that day with the note that it had been fixed.</p>
+<p class="wc-permalink"><a href="#2018-07-11-some-requests-had-been-shown-under-the-wrong-community-board">Link to this change<span class="wc-visually-hidden">: Some requests had been shown under the wrong community board</span></a></p>
+</article>
+<article class="wc-entry" id="2018-05-21-version-06a-the-borough-edition" data-tags="Site" aria-labelledby="2018-05-21-version-06a-the-borough-edition-title">
+<h2 id="2018-05-21-version-06a-the-borough-edition-title">Version 0.6a, the Borough Edition</h2>
+<p class="wc-meta"><time datetime="2018-05-21">May 21, 2018</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span></p>
+<p>One dashboard per community board became five borough dashboards. Each had a board picker, so you could look at one board, compare several, or look at parks by their board number.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/blob/HEAD/README.md">README change log</a> · <a href="about.html#history-h">History</a></p>
+<p class="wc-permalink"><a href="#2018-05-21-version-06a-the-borough-edition">Link to this change<span class="wc-visually-hidden">: Version 0.6a, the Borough Edition</span></a></p>
+</article>
+<article class="wc-entry" id="2018-04-16-version-05e-one-date-filter-for-every-page" data-tags="Site Data" aria-labelledby="2018-04-16-version-05e-one-date-filter-for-every-page-title">
+<h2 id="2018-04-16-version-05e-one-date-filter-for-every-page-title">Version 0.5e, one date filter for every page</h2>
+<p class="wc-meta"><time datetime="2018-04-16">April 16, 2018</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span><span class="wc-visually-hidden">, </span><span class="wc-tag">Data</span></p>
+<p>The date filter stayed the same as you moved from page to page, and the data tables became sharper. Data came from NYC Open Data&#x27;s 311 dataset; by May 14, 2018, the README said it streamed 10,000 rows per query through 12 special views of that dataset.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/blob/HEAD/README.md">README change log</a> · <a href="https://github.com/BetaNYC/BoardStat/issues/14">The data feed</a></p>
+<p class="wc-permalink"><a href="#2018-04-16-version-05e-one-date-filter-for-every-page">Link to this change<span class="wc-visually-hidden">: Version 0.5e, one date filter for every page</span></a></p>
+</article>
+<article class="wc-entry" id="2017-05-18-boardstat-begins-for-manhattans-community-boards" data-tags="Site" aria-labelledby="2017-05-18-boardstat-begins-for-manhattans-community-boards-title">
+<h2 id="2017-05-18-boardstat-begins-for-manhattans-community-boards-title">BoardStat begins, for Manhattan&#x27;s community boards</h2>
+<p class="wc-meta"><time datetime="2017-05-18">May 18, 2017</time></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span></p>
+<p>BoardStat started as a 311 tool in Power BI, conceived with the office of then-Manhattan Borough President Gale A. Brewer and built by BetaNYC&#x27;s Civic Innovation Fellows and staff. Its GitHub repository opened on this date. The first issues, in June 2017, record feedback from district offices on the first dashboards.</p>
+<p><strong>More detail:</strong> <a href="about.html#history-h">History</a> · <a href="https://github.com/BetaNYC/BoardStat/issues?q=is%3Aissue+created%3A2017-06-20..2017-06-23">First issues</a></p>
+<p class="wc-permalink"><a href="#2017-05-18-boardstat-begins-for-manhattans-community-boards">Link to this change<span class="wc-visually-hidden">: BoardStat begins, for Manhattan&#x27;s community boards</span></a></p>
+</article>
+<script>
+(function () {
+  var roots = document.querySelectorAll("[data-whats-changed]");
+  Array.prototype.forEach.call(roots, function (root) {
+    var box = root.querySelector(".wc-filters");
+    var status = root.querySelector(".wc-status");
+    var entries = root.querySelectorAll(".wc-entry");
+    if (!box || !status || !entries.length) return;
+    var tagBoxes = box.querySelectorAll("input[name='wc-tag']");
+    var corrBox = box.querySelector("input[name='wc-corrections']");
+    var total = entries.length;
+    var noun = total === 1 ? "change" : "changes";
+    function apply() {
+      var on = {};
+      Array.prototype.forEach.call(tagBoxes, function (b) { on[b.value] = b.checked; });
+      var shown = 0;
+      Array.prototype.forEach.call(entries, function (el) {
+        var tags = (el.getAttribute("data-tags") || "").split(" ");
+        var ok = tags.some(function (t) { return on[t]; });
+        if (corrBox.checked && tags.indexOf("Correction") < 0) ok = false;
+        el.hidden = !ok;
+        if (ok) shown++;
+      });
+      status.textContent = shown === total
+        ? "Showing all " + total + " " + noun + "."
+        : "Showing " + shown + " of " + total + " " + noun + ".";
+    }
+    function reveal() {
+      var id = decodeURIComponent(location.hash.slice(1));
+      var el = id && document.getElementById(id);
+      if (el && root.contains(el) && el.closest(".wc-entry[hidden]")) {
+        Array.prototype.forEach.call(tagBoxes, function (b) { b.checked = true; });
+        corrBox.checked = false;
+        apply();
+        el.scrollIntoView();
+      }
+    }
+    box.addEventListener("change", apply);
+    window.addEventListener("hashchange", reveal);
+    box.hidden = false;
+  });
+})();
+</script>
+</div>
+<!-- whats-changed:end -->
+  </main>
+
+  <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html" aria-current="page">What&rsquo;s changed</a>.</footer>
+</body>
+</html>
