@@ -6,6 +6,7 @@ it here). These tests check what CI checks, plus the page structure the standard
 (section 6) and that every page links to it.
 """
 
+import json
 import subprocess
 import sys
 from html.parser import HTMLParser
@@ -77,7 +78,16 @@ def test_every_page_links_to_whats_changed_in_its_footer():
         assert 'href="whats-changed.html"' in footer, f"{page.name}: no What's changed link in the footer"
 
 
+def parsed_file() -> dict:
+    """The file as the renderer reads it (`whats_changed.py json`), so expected counts follow
+    the file instead of being written into this test."""
+    r = run([sys.executable, str(SCRIPT), "json", "WHATS-CHANGED.md"])
+    assert r.returncode == 0, r.stdout + r.stderr
+    return json.loads(r.stdout)
+
+
 def test_page_structure():
+    entries = [e for e in parsed_file()["entries"] if e.get("valid", True)]
     p = parse(PAGE)
     assert len(p.find("h1")) == 1
     assert p.text["h1"].strip() == "What's changed"
@@ -85,21 +95,29 @@ def test_page_structure():
         assert p.find(tag), f"no <{tag}>"
     assert p.find("a", href="#main"), "no skip link"
     assert p.find("main", id="main")
-    # Dates are <time datetime="YYYY-MM-DD">, entries are <article>s labeled by their h2.
-    times = [a["datetime"] for a in p.find("time") if "datetime" in a]
-    assert len(times) >= 18
+    # Every entry is an <article> labeled by its h2, and every dated entry's date is a <time>
+    # (Update lines add more <time>s, so this is a subset check, not a count).
     articles = p.find("article")
-    assert len(articles) == 19
+    assert len(articles) == len(entries)
     assert all("aria-labelledby" in a for a in articles)
-    # The filter: a fieldset with its legend, four checkboxes, a polite live region, and
-    # hidden until its script runs, so with JavaScript off every entry shows.
+    times = {a["datetime"] for a in p.find("time") if "datetime" in a}
+    assert {e["date"] for e in entries if e["date"]} <= times
+    # The filter offers a box per subject tag in use, plus "Corrections only" when there is a
+    # correction, and appears only with two or more choices. It is hidden until its script
+    # runs, so with JavaScript off every entry shows.
+    used = {t for e in entries for t in e["tags"] if t in ("Site", "Data", "MCP")}
+    choices = len(used) + (1 if any("Correction" in e["tags"] for e in entries) else 0)
+    boxes = p.find("input", type="checkbox")
+    if choices < 2:
+        assert not p.find("fieldset") and not boxes
+        return
     assert len(p.find("fieldset")) == 1
     wrappers = p.find("div", **{"class": "wc-filters"})
     assert len(wrappers) == 1 and "hidden" in wrappers[0]
     assert p.text["legend"].strip() == "Show changes to"
-    assert len(p.find("input", type="checkbox")) == 4
-    assert p.find("p", role="status") or p.find("div", role="status")
-    assert any(a.get("aria-live") == "polite" for _, a in p.tags if a.get("role") == "status")
+    assert len(boxes) == choices
+    assert {b["value"] for b in boxes if b.get("name") == "wc-tag"} == used
+    assert any(a.get("role") == "status" and a.get("aria-live") == "polite" for _, a in p.tags)
 
 
 def test_page_is_stamped_like_the_other_pages():

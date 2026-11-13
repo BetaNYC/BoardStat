@@ -61,7 +61,6 @@
 <legend>Show changes to</legend>
 <label class="wc-option"><input type="checkbox" name="wc-tag" value="Site" checked> Site</label>
 <label class="wc-option"><input type="checkbox" name="wc-tag" value="Data" checked> Data</label>
-<label class="wc-option"><input type="checkbox" name="wc-tag" value="MCP" checked> MCP</label>
 <label class="wc-option"><input type="checkbox" name="wc-corrections" value="Correction"> Corrections only</label>
 </fieldset>
 </div>
@@ -156,14 +155,15 @@
 <p><strong>More detail:</strong> <a href="about.html">About BoardStat 2.0</a> · <a href="https://github.com/BetaNYC/BoardStat/pull/119">Pull request</a> · <a href="https://github.com/BetaNYC/BoardStat/issues/106">The rebuild</a></p>
 <p class="wc-permalink"><a href="#2026-11-05-boardstat-20-a-rebuilt-boardstat">Link to this change<span class="wc-visually-hidden">: BoardStat 2.0, a rebuilt BoardStat</span></a></p>
 </article>
-<article class="wc-entry" id="2026-01-14-a-notice-that-the-data-had-stopped-refreshing" data-tags="Site Data" aria-labelledby="2026-01-14-a-notice-that-the-data-had-stopped-refreshing-title">
-<h2 id="2026-01-14-a-notice-that-the-data-had-stopped-refreshing-title">A notice that the data had stopped refreshing</h2>
+<article class="wc-entry" id="2026-01-14-the-original-boardstat-showed-data-from-early-2025-without-saying-it-was-out-of-date" data-tags="Data Correction" aria-labelledby="2026-01-14-the-original-boardstat-showed-data-from-early-2025-without-saying-it-was-out-of-date-title">
+<h2 id="2026-01-14-the-original-boardstat-showed-data-from-early-2025-without-saying-it-was-out-of-date-title">The original BoardStat showed data from early 2025 without saying it was out of date</h2>
 <p class="wc-meta"><time datetime="2026-01-14">January 14, 2026</time></p>
-<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Site</span><span class="wc-visually-hidden">, </span><span class="wc-tag">Data</span></p>
-<p>The City&#x27;s Office of Technology and Innovation told BetaNYC that BoardStat&#x27;s connection to NYC Open Data had stopped working. Its data had not refreshed since early 2025, and the pages did not say so until this notice was added to every page.</p>
-<p><strong>Who it affects:</strong> Anyone who used the original BoardStat in 2025.</p>
-<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/issues/99">The issue</a> · <a href="https://github.com/BetaNYC/BoardStat/pull/100">Pull request</a></p>
-<p class="wc-permalink"><a href="#2026-01-14-a-notice-that-the-data-had-stopped-refreshing">Link to this change<span class="wc-visually-hidden">: A notice that the data had stopped refreshing</span></a></p>
+<p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Data</span><span class="wc-visually-hidden">, </span><span class="wc-tag wc-tag-correction">Correction</span></p>
+<p>The City&#x27;s Office of Technology and Innovation told BetaNYC that BoardStat&#x27;s connection to NYC Open Data had stopped working, and that its data had not refreshed since early 2025. Until this date the pages did not say so. On January 14, 2026, a notice went on the home page saying the data could no longer be refreshed. The five borough pages, where the numbers were, carried no notice until they began sending visitors to BoardStat 2.0 on November 5, 2026.</p>
+<div class="wc-old-numbers"><p><strong>If you used the old numbers:</strong> Numbers from the original BoardStat taken from early 2025 until November 5, 2026, stop in early 2025. Re-check them in BoardStat 2.0, which covers 2020 on.</p></div>
+<p><strong>Who it affects:</strong> Anyone who used the original BoardStat from early 2025 on.</p>
+<p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/issues/99">The issue</a> · <a href="https://github.com/BetaNYC/BoardStat/pull/100">The notice</a> · <a href="https://github.com/BetaNYC/BoardStat/pull/122">The redirect</a></p>
+<p class="wc-permalink"><a href="#2026-01-14-the-original-boardstat-showed-data-from-early-2025-without-saying-it-was-out-of-date">Link to this change<span class="wc-visually-hidden">: The original BoardStat showed data from early 2025 without saying it was out of date</span></a></p>
 </article>
 <article class="wc-entry" id="2019-07-23-version-07-a-new-look-and-a-home-page" data-tags="Site" aria-labelledby="2019-07-23-version-07-a-new-look-and-a-home-page-title">
 <h2 id="2019-07-23-version-07-a-new-look-and-a-home-page-title">Version 0.7, a new look and a home page</h2>
@@ -193,9 +193,9 @@
 <h2 id="2018-07-11-some-requests-had-been-shown-under-the-wrong-community-board-title">Some requests had been shown under the wrong community board</h2>
 <p class="wc-meta"><time datetime="2018-07-11">July 11, 2018</time></p>
 <p class="wc-tags"><span class="wc-visually-hidden">Tags: </span><span class="wc-tag">Data</span><span class="wc-visually-hidden">, </span><span class="wc-tag wc-tag-correction">Correction</span></p>
-<p>BoardStat read each request&#x27;s community board from the City&#x27;s 311 data as published. That field was wrong for some requests: requests from Marble Hill showed up under Manhattan Community Board 8, reported in September 2017, and Community Board 1 received requests that belonged elsewhere, noted for Manhattan in April 2018 and for every borough in May 2018, when the issue counted tens of thousands of requests across complaint types such as Street Light Condition and Heat/Hot Water. On this date the README recorded that NYC&#x27;s Open Data team had addressed these problems.</p>
-<div class="wc-old-numbers"><p><strong>If you used the old numbers:</strong> Counts for Manhattan Community Board 8, or for Community Board 1 in any borough, taken from BoardStat before July 2018 may include requests from other districts. The record does not say how many requests each board gained. The original BoardStat no longer runs, so to re-check a count from those years, use the City&#x27;s 311 Service Requests 2010 to 2019 dataset on NYC Open Data and check each request&#x27;s location, not only its community board field. BoardStat 2.0 does not use that field: it places each request by its location.</p></div>
-<p><strong>Who it affects:</strong> Anyone who used the original BoardStat&#x27;s numbers for those boards from 2017 to July 2018.</p>
+<p>BoardStat showed each request under the community board listed in the City&#x27;s 311 data. For some requests, that board did not match where the request was. Requests from Marble Hill showed up under Manhattan Community Board 8, reported in September 2017. Community Board 1 received requests that belonged elsewhere, noted for Manhattan on May 14, 2018, and for every borough later that month, when the issue counted tens of thousands of requests across complaint types such as Street Light Condition and Heat/Hot Water. On this date the README recorded that NYC&#x27;s Open Data team had addressed these problems.</p>
+<div class="wc-old-numbers"><p><strong>If you used the old numbers:</strong> Counts for Manhattan Community Board 8, or for Community Board 1 in any borough, taken from the original BoardStat from 2017 until as late as November 2019 may include requests from other districts. The record does not say how many requests each board gained. The original BoardStat no longer runs, so to re-check a count from those years, use the City&#x27;s 311 Service Requests 2010 to 2019 dataset on NYC Open Data and check each request&#x27;s location, not only its community board field. BoardStat 2.0 does not use that field: it places each request by its location.</p></div>
+<p><strong>Who it affects:</strong> Anyone who used the original BoardStat&#x27;s numbers for those boards from 2017 to November 2019.</p>
 <p><strong>More detail:</strong> <a href="https://github.com/BetaNYC/BoardStat/issues/24">Marble Hill</a> · <a href="https://github.com/BetaNYC/BoardStat/issues/36">Community Board 1</a> · <a href="https://data.cityofnewyork.us/d/76ig-c548">311 Service Requests 2010 to 2019</a></p>
 <p class="wc-update"><strong>Update, <time datetime="2019-11-21">November 21, 2019</time>:</strong> The Community Board 1 issue was closed that day with the note that it had been fixed.</p>
 <p class="wc-permalink"><a href="#2018-07-11-some-requests-had-been-shown-under-the-wrong-community-board">Link to this change<span class="wc-visually-hidden">: Some requests had been shown under the wrong community board</span></a></p>
@@ -243,7 +243,7 @@
       Array.prototype.forEach.call(entries, function (el) {
         var tags = (el.getAttribute("data-tags") || "").split(" ");
         var ok = tags.some(function (t) { return on[t]; });
-        if (corrBox.checked && tags.indexOf("Correction") < 0) ok = false;
+        if (corrBox && corrBox.checked && tags.indexOf("Correction") < 0) ok = false;
         el.hidden = !ok;
         if (ok) shown++;
       });
@@ -256,7 +256,7 @@
       var el = id && document.getElementById(id);
       if (el && root.contains(el) && el.closest(".wc-entry[hidden]")) {
         Array.prototype.forEach.call(tagBoxes, function (b) { b.checked = true; });
-        corrBox.checked = false;
+        if (corrBox) corrBox.checked = false;
         apply();
         el.scrollIntoView();
       }

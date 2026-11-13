@@ -75,12 +75,13 @@ BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change re
 - **What changed:** BoardStat 2.0 is a new BoardStat that does not depend on Power BI. It shows 311 requests for any community district, council district or single address: the most common problems, how long agencies take to close requests, a map, and how a district compares with its borough and the city. It places each request in today's district lines itself and launched with three years of data, from November 1, 2023.
 - **More detail:** [About BoardStat 2.0](v2/site/about.html) · [Pull request](https://github.com/BetaNYC/BoardStat/pull/119) · [The rebuild](https://github.com/BetaNYC/BoardStat/issues/106)
 
-## 2026-01-14: A notice that the data had stopped refreshing
+## 2026-01-14: The original BoardStat showed data from early 2025 without saying it was out of date
 
-- **Tags:** Site, Data
-- **What changed:** The City's Office of Technology and Innovation told BetaNYC that BoardStat's connection to NYC Open Data had stopped working. Its data had not refreshed since early 2025, and the pages did not say so until this notice was added to every page.
-- **Who it affects:** Anyone who used the original BoardStat in 2025.
-- **More detail:** [The issue](https://github.com/BetaNYC/BoardStat/issues/99) · [Pull request](https://github.com/BetaNYC/BoardStat/pull/100)
+- **Tags:** Data, Correction
+- **What changed:** The City's Office of Technology and Innovation told BetaNYC that BoardStat's connection to NYC Open Data had stopped working, and that its data had not refreshed since early 2025. Until this date the pages did not say so. On January 14, 2026, a notice went on the home page saying the data could no longer be refreshed. The five borough pages, where the numbers were, carried no notice until they began sending visitors to BoardStat 2.0 on November 5, 2026.
+- **If you used the old numbers:** Numbers from the original BoardStat taken from early 2025 until November 5, 2026, stop in early 2025. Re-check them in BoardStat 2.0, which covers 2020 on.
+- **Who it affects:** Anyone who used the original BoardStat from early 2025 on.
+- **More detail:** [The issue](https://github.com/BetaNYC/BoardStat/issues/99) · [The notice](https://github.com/BetaNYC/BoardStat/pull/100) · [The redirect](https://github.com/BetaNYC/BoardStat/pull/122)
 
 ## 2019-07-23: Version 0.7, a new look and a home page
 
@@ -103,9 +104,9 @@ BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change re
 ## 2018-07-11: Some requests had been shown under the wrong community board
 
 - **Tags:** Data, Correction
-- **What changed:** BoardStat read each request's community board from the City's 311 data as published. That field was wrong for some requests: requests from Marble Hill showed up under Manhattan Community Board 8, reported in September 2017, and Community Board 1 received requests that belonged elsewhere, noted for Manhattan in April 2018 and for every borough in May 2018, when the issue counted tens of thousands of requests across complaint types such as Street Light Condition and Heat/Hot Water. On this date the README recorded that NYC's Open Data team had addressed these problems.
-- **If you used the old numbers:** Counts for Manhattan Community Board 8, or for Community Board 1 in any borough, taken from BoardStat before July 2018 may include requests from other districts. The record does not say how many requests each board gained. The original BoardStat no longer runs, so to re-check a count from those years, use the City's 311 Service Requests 2010 to 2019 dataset on NYC Open Data and check each request's location, not only its community board field. BoardStat 2.0 does not use that field: it places each request by its location.
-- **Who it affects:** Anyone who used the original BoardStat's numbers for those boards from 2017 to July 2018.
+- **What changed:** BoardStat showed each request under the community board listed in the City's 311 data. For some requests, that board did not match where the request was. Requests from Marble Hill showed up under Manhattan Community Board 8, reported in September 2017. Community Board 1 received requests that belonged elsewhere, noted for Manhattan on May 14, 2018, and for every borough later that month, when the issue counted tens of thousands of requests across complaint types such as Street Light Condition and Heat/Hot Water. On this date the README recorded that NYC's Open Data team had addressed these problems.
+- **If you used the old numbers:** Counts for Manhattan Community Board 8, or for Community Board 1 in any borough, taken from the original BoardStat from 2017 until as late as November 2019 may include requests from other districts. The record does not say how many requests each board gained. The original BoardStat no longer runs, so to re-check a count from those years, use the City's 311 Service Requests 2010 to 2019 dataset on NYC Open Data and check each request's location, not only its community board field. BoardStat 2.0 does not use that field: it places each request by its location.
+- **Who it affects:** Anyone who used the original BoardStat's numbers for those boards from 2017 to November 2019.
 - **More detail:** [Marble Hill](https://github.com/BetaNYC/BoardStat/issues/24) · [Community Board 1](https://github.com/BetaNYC/BoardStat/issues/36) · [311 Service Requests 2010 to 2019](https://data.cityofnewyork.us/d/76ig-c548)
 - **Update 2019-11-21:** The Community Board 1 issue was closed that day with the note that it had been fixed.
 

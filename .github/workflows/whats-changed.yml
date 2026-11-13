@@ -41,3 +41,10 @@ jobs:
           python3 v2/whats_changed.py render WHATS-CHANGED.md --format fragment
           --into v2/site/whats-changed.html --site-prefix v2/site/
           --repo-url https://github.com/BetaNYC/BoardStat --check
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Page tests (structure, footer links on every page, the two checks above)
+        working-directory: v2/pipeline
+        run: uv run pytest -q tests/test_whats_changed_page.py

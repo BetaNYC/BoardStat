@@ -35,7 +35,7 @@ a:hover { text-decoration-thickness: 2px; }
 
 :focus-visible { outline: 3px solid var(--bnyc-blue); outline-offset: 2px; box-shadow: 0 0 0 5px var(--bnyc-white); }
 
-.skip-link { position: absolute; left: -9999px; top: 0; background: var(--bnyc-blue); color: #fff; padding: 0.5rem 1rem; z-index: 10; }
+.skip-link { position: absolute; left: -9999px; top: 0; background: var(--bnyc-blue); color: #fff; padding: 0 1rem; min-height: 44px; display: inline-flex; align-items: center; z-index: 10; }
 .skip-link:focus { left: 0.5rem; }
 
 header.site {
