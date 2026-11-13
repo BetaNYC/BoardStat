@@ -1,4 +1,5 @@
-// District page: every query runs in DuckDB-WASM over ONE district's Parquet file.
+// District page: every query runs in DuckDB-WASM over ONE district's Parquet file, or,
+// for a whole borough (geo=boro, #144), over all of its community districts' files at once.
 import {
   PLOT_URL, loadManifest, renderDataStatus, renderChanges, dataUrl, registerData, query, lit, el, table, chartWithTable,
   setStatus, fmtInt, fmtDays, fmtPct, fmtDate, fmtDateTime, monthLabel,
@@ -8,6 +9,7 @@ import {
   copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus,
 } from './filterstate.js';
 import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
+import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl } from './place.js';
 
 const $ = (id) => document.getElementById(id);
 const PAGE = 50;
@@ -24,13 +26,16 @@ const PROBLEM_COLORS = [BLUE, '#7fa8e0', DARK, '#c27c0e', '#3f8f5b', '#c8c8c8'];
 const CLOSED_DAYS = `CASE WHEN status = 'Closed' THEN days_to_close END`;
 
 const params = new URLSearchParams(window.location.search);
-const geo = params.get('geo') === 'cc' ? 'cc' : 'cd';
-const geoId = params.get('id');
+// geo is cd, cc or boro (a whole borough, #144); for boro the id is the borough's slug.
+const { geo, id: geoId } = parsePlace(params);
+const IS_BORO = geo === 'boro';
 // address.html reuses this page for one address: the address filter is fixed,
 // and the district-wide panels (top addresses, compare) are left out.
 const ADDRESS_MODE = document.body.dataset.mode === 'address';
 
 let manifest, district, Plot;
+// The SQL that reads this page's rows: 'd.parquet', or read_parquet([...]) for a borough (place.js).
+let SRC = `'d.parquet'`;
 // `state` is the applied filters: what every panel shows and the link carries.
 // `draft` is what the filter form shows; only the Apply button copies it to `state` (#142).
 let state = {};
@@ -87,7 +92,7 @@ function neededFrom() {
 /** (Re)build the req table if the view needs Closed requests older than what is loaded. */
 async function ensureLoaded() {
   if (!rangeLoading()) {
-    if (loadedFrom === null) { await query(`CREATE TABLE req AS SELECT * FROM 'd.parquet'`); loadedFrom = manifest.window.start; }
+    if (loadedFrom === null) { await query(`CREATE TABLE req AS SELECT * FROM ${SRC}`); loadedFrom = manifest.window.start; }
     return;
   }
   const need = neededFrom();
@@ -97,9 +102,9 @@ async function ensureLoaded() {
   setStatus($('status'), `Loading requests from ${fmtDate(from > manifest.window.start ? from : manifest.window.start)} on…`);
   await query(`
     CREATE OR REPLACE TABLE req AS
-    SELECT ${cols} FROM 'd.parquet' WHERE is_closed = true AND created_date >= CAST(${lit(from)} AS TIMESTAMP)
+    SELECT ${cols} FROM ${SRC} WHERE is_closed = true AND created_date >= CAST(${lit(from)} AS TIMESTAMP)
     UNION ALL
-    SELECT ${cols} FROM 'd.parquet' WHERE is_closed = false`);
+    SELECT ${cols} FROM ${SRC} WHERE is_closed = false`);
   loadedFrom = from;
 }
 
@@ -129,6 +134,10 @@ function updateFullMapLink(p) {
   const a = $('fullmap-link');
   if (!a) return;
   a.href = `map.html?${p.toString()}`;
+  // The link to the whole borough keeps the dates and filters too (#144).
+  const bl = $('boro-link');
+  const b = geo === 'cd' ? boroughOfCd(geoId) : null;
+  if (bl && b) bl.href = `district.html?${filtersToParams('boro', b.slug, state, defaultDates()).toString()}`;
   // The address filter never goes into a link, so the full-page map cannot show it.
   const note = $('fullmap-addr-note');
   if (note) note.hidden = !state.addr;
@@ -801,42 +810,46 @@ async function renderCompare() {
   const boro = district.borough;
   const ymStart = state.start.slice(0, 7);
   const ymEnd = state.end.slice(0, 7);
+  // A borough page compares the borough with the city only (no "borough vs itself", #144).
+  const series = IS_BORO
+    ? [{ key: 'd', kind: 'borough', id: boro, name: `${boro} (this borough)`, color: BLUE, symbol: 'circle' }]
+    : [{ key: 'd', kind: geo, id: geoId, name: 'This district', color: BLUE, symbol: 'circle' },
+      { key: 'b', kind: 'borough', id: boro || '', name: boro || 'Borough', color: DARK, symbol: 'square' }];
+  series.push({ key: 'c', kind: 'city', id: null, name: 'New York City', color: GRAY, symbol: 'triangle' });
   $('cmp-note').textContent = `Share of each problem among all located requests, ${monthLabel(ymStart)} to ${monthLabel(ymEnd)} (whole months). ` +
-    `Compared with ${boro || 'the borough'}${geo === 'cc' ? ' (the borough where most of this district\'s requests are)' : ''} and the whole city. Problem, agency, status and address filters do not apply here.`;
+    (IS_BORO ? 'Compared with the whole city.'
+      : `Compared with ${boro || 'the borough'}${geo === 'cc' ? ' (the borough where most of this district\'s requests are)' : ''} and the whole city.`) +
+    ' Problem, agency, status and address filters do not apply here.';
+  const first = series[0].kind;
   const rows = await query(`
     WITH a AS (
       SELECT geo_kind, complaint_type AS t, sum(n) AS n
-      FROM ${aggRows(ymStart, ymEnd, [[geo, geoId], ['borough', boro || ''], ['city', null]])}
+      FROM ${aggRows(ymStart, ymEnd, series.map((x) => [x.kind, x.id]))}
       GROUP BY ALL
     ), s AS (SELECT geo_kind, t, n / sum(n) OVER (PARTITION BY geo_kind) AS share FROM a),
-    top_types AS (SELECT t FROM s WHERE geo_kind = ${lit(geo)} ORDER BY share DESC LIMIT 10)
+    top_types AS (SELECT t FROM s WHERE geo_kind = ${lit(first)} ORDER BY share DESC LIMIT 10)
     SELECT top_types.t,
-      max(share) FILTER (WHERE geo_kind = ${lit(geo)}) AS d,
-      max(share) FILTER (WHERE geo_kind = 'borough') AS b,
-      max(share) FILTER (WHERE geo_kind = 'city') AS c
+      ${series.map((x) => `max(share) FILTER (WHERE geo_kind = ${lit(x.kind)}) AS ${x.key}`).join(',\n      ')}
     FROM top_types LEFT JOIN s USING (t) GROUP BY top_types.t ORDER BY d DESC`);
-  const long = rows.flatMap((r) => [
-    { t: r.t, where: 'This district', share: r.d ?? 0 },
-    { t: r.t, where: boro || 'Borough', share: r.b ?? 0 },
-    { t: r.t, where: 'New York City', share: r.c ?? 0 },
-  ]);
+  const long = rows.flatMap((r) => series.map((x) => ({ t: r.t, where: x.name, share: r[x.key] ?? 0 })));
+  const names = series.map((x) => x.name);
   const chart = Plot.plot({
-    ariaLabel: 'Share of top problems: district, borough, city',
-    ariaDescription: 'Dot chart comparing each top problem\'s share of requests in this district, its borough, and the city.',
+    ariaLabel: IS_BORO ? 'Share of top problems: borough, city' : 'Share of top problems: district, borough, city',
+    ariaDescription: IS_BORO
+      ? 'Dot chart comparing each top problem\'s share of requests in this borough and the city.'
+      : 'Dot chart comparing each top problem\'s share of requests in this district, its borough, and the city.',
     width: chartWidth('compare', 420),
     marginLeft: 180,
     height: 50 + 30 * rows.length,
     x: { label: 'Share of requests', tickFormat: '.0%', grid: true },
     y: { label: null, domain: rows.map((r) => r.t) },
-    color: { domain: ['This district', boro || 'Borough', 'New York City'], range: [BLUE, DARK, GRAY], legend: true },
-    symbol: { domain: ['This district', boro || 'Borough', 'New York City'], range: ['circle', 'square', 'triangle'] },
+    color: { domain: names, range: series.map((x) => x.color), legend: true },
+    symbol: { domain: names, range: series.map((x) => x.symbol) },
     marks: [Plot.dot(long, { x: 'share', y: 't', fill: 'where', symbol: 'where', r: 5, tip: true })],
   });
   chartWithTable($('compare'), chart, rows, [
     { key: 't', label: 'Problem' },
-    { key: 'd', label: 'This district', num: true, fmt: fmtPct },
-    { key: 'b', label: boro || 'Borough', num: true, fmt: fmtPct },
-    { key: 'c', label: 'New York City', num: true, fmt: fmtPct },
+    ...series.map((x) => ({ key: x.key, label: x.name, num: true, fmt: fmtPct })),
   ], 'Share of requests by problem');
 }
 
@@ -876,7 +889,7 @@ async function downloadCsv() {
   setStatus($('status'), 'Preparing CSV…');
   const sel = CSV_COLUMNS.map((c) => (c.endsWith('_date') ? `strftime(${c}, '%Y-%m-%dT%H:%M:%S') AS ${c}` : c)).join(', ');
   // Straight from the file, so every column is there without keeping it in memory.
-  const rows = await query(`SELECT ${sel} FROM 'd.parquet' WHERE ${where()} ORDER BY created_date, unique_key`);
+  const rows = await query(`SELECT ${sel} FROM ${SRC} WHERE ${where()} ORDER BY created_date, unique_key`);
   const lines = [CSV_COLUMNS.join(',')].concat(rows.map((r) => CSV_COLUMNS.map((c) => csvCell(r[c])).join(',')));
   const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
   const a = el('a', { href: URL.createObjectURL(blob), download: `boardstat-${geo}-${geoId}-${state.start}-to-${state.end}.csv` });
@@ -889,7 +902,7 @@ async function downloadCsv() {
 
 async function setupMap() {
   mapCtx = await setupRequestMap('map', { geo, geoId });
-  renderMapLegend($('map-legend'));
+  renderMapLegend($('map-legend'), { borough: IS_BORO });
 }
 
 async function renderMap() {
@@ -902,14 +915,50 @@ async function renderMap() {
 // ------------------------------------------------------------- about
 
 function renderAbout() {
-  const unloc = geo === 'cd' && !ADDRESS_MODE ? district.unlocated_city_assigned : null;
+  const unloc = !ADDRESS_MODE ? district.unlocated : null;
+  const text = IS_BORO
+    ? boroughCountsText(district, unloc)
+    : 'Every request with a location was placed in this district by BoardStat, using where it happened and today\'s boundary lines.' +
+      (unloc ? ` ${fmtInt(unloc)} requests that have no usable location are assigned to this community district by the city's own records; they are not counted on this page.` : '');
   $('about').replaceChildren(
-    el('p', {}, ADDRESS_MODE ? 'This page shows only requests whose address matches exactly, as the city spelled it. ' : '', 'Every request with a location was placed in this district by BoardStat, using where it happened and today\'s boundary lines.' +
-      (unloc ? ` ${fmtInt(unloc)} requests that have no usable location are assigned to this community district by the city's own records; they are not counted on this page.` : '')),
+    el('p', {}, ADDRESS_MODE ? 'This page shows only requests whose address matches exactly, as the city spelled it. ' : '', text),
     el('ul', { class: 'more-links' },
       el('li', {}, el('a', { class: 'button', href: 'about.html', text: 'About BoardStat: sources and history' })),
       el('li', {}, el('a', { class: 'button secondary', href: 'glossary.html', text: 'Glossary: terms and how numbers are counted' }))),
   );
+}
+
+/**
+ * Links between a district and its borough (#144). A community district page links to its
+ * borough; a borough page lists its districts. Council districts cross borough lines, so a
+ * council district page gets no borough link.
+ */
+function renderBoroughLink() {
+  const box = $('place-links');
+  if (!box || ADDRESS_MODE) return;
+  if (IS_BORO) {
+    const link = (d) => el('a', { href: `district.html?geo=cd&id=${encodeURIComponent(d.id)}` }, d.jia ? `JIA ${d.id}` : d.label.replace(`${district.borough} `, ''));
+    const out = ['Districts in this borough: '];
+    district.parts.forEach((d, i) => { if (i) out.push(', '); out.push(link(d)); });
+    box.replaceChildren(...out, '.');
+    box.hidden = false;
+  } else if (geo === 'cd') {
+    const b = boroughOfCd(geoId);
+    if (!b) return;
+    box.replaceChildren(el('a', { id: 'boro-link', href: boroughUrl(b.slug) }, `See all of ${b.name}`), el('span', { class: 'muted', text: ' (every community district and park area in the borough, with the same charts, map and list)' }));
+    box.hidden = false;
+  }
+}
+
+/** What a borough page counts (#144), in words: the same sentence the glossary explains. */
+function boroughCountsText(place, unloc) {
+  const cds = place.parts.filter((d) => !d.jia);
+  const jias = place.parts.filter((d) => d.jia);
+  return `This page counts every request with a location that BoardStat placed inside ${place.borough}: ` +
+    `its ${cds.length} community districts` +
+    (jias.length ? ` and ${jias.length === 1 ? 'its Joint Interest Area' : `its ${jias.length} Joint Interest Areas`} (parks and other areas outside every community district: ${jias.map((d) => d.id).join(', ')})` : '') +
+    '. These are the same requests the district pages count, added together, and the same as the borough in every Compare panel.' +
+    (unloc ? ` Not counted: ${fmtInt(unloc)} requests that have no usable location but that the city's own records assign to ${place.borough}, and requests with no location and no district at all.` : ' Requests with no usable location are not counted.');
 }
 
 /** Address page: the ZIP code and the two districts the address is in, with links. */
@@ -1039,10 +1088,10 @@ async function main() {
     $('as-of').textContent = String(err.message || err);
     return;
   }
-  district = manifest.districts[geo]?.find((d) => String(d.id) === String(geoId));
-  if (!district || !district.file) {
-    $('title').textContent = 'District not found';
-    $('as-of').replaceChildren('No data for this district. ', el('a', { href: './', text: 'Choose another district.' }));
+  district = resolvePlace(manifest, geo, geoId);
+  if (!district || (ADDRESS_MODE && IS_BORO)) {
+    $('title').textContent = IS_BORO ? 'Borough not found' : 'District not found';
+    $('as-of').replaceChildren(`No data for this ${IS_BORO ? 'borough' : 'district'}. `, el('a', { href: './', text: 'Choose another place.' }));
     return;
   }
   if (ADDRESS_MODE && !params.get('addr')) {
@@ -1054,18 +1103,28 @@ async function main() {
   document.title = `${label} · BoardStat 2.0 (prototype)`;
   $('title').textContent = label;
   renderDataStatus(manifest, $('as-of'), $('stale'));
-  renderChanges($('changes'), { geo, id: geoId, label: ADDRESS_MODE ? `in ${district.label}` : 'in this district' });
+  renderChanges($('changes'), {
+    geo: IS_BORO ? 'cd' : geo, ids: district.parts.map((d) => d.id),
+    label: ADDRESS_MODE ? `in ${district.label}` : IS_BORO ? 'in this borough' : 'in this district',
+  });
   asOfSql = `CAST(${lit(nycLocal(manifest.generated_at))} AS TIMESTAMP)`;
-  const b = geo === 'cd' ? manifest.sources.community_districts : manifest.sources.council_districts;
-  $('boundary-note').textContent = `Boundary: ${geo === 'cd' ? 'Community District' : 'City Council District'} lines, Department of City Planning release ${b.version || 'unknown'}.` +
-    (district.jia ? ' This is a Joint Interest Area (a park or other area outside every community district), not a community district.' : '');
+  const b = geo === 'cc' ? manifest.sources.council_districts : manifest.sources.community_districts;
+  $('boundary-note').textContent = IS_BORO
+    ? `The whole borough: all ${district.parts.length} of its Community District and Joint Interest Area shapes, Department of City Planning release ${b.version || 'unknown'}.`
+    : `Boundary: ${geo === 'cd' ? 'Community District' : 'City Council District'} lines, Department of City Planning release ${b.version || 'unknown'}.` +
+      (district.jia ? ' This is a Joint Interest Area (a park or other area outside every community district), not a community district.' : '');
+  renderBoroughLink();
   if (geo === 'cc') { $('cc-banner').hidden = false; document.querySelectorAll('.bver').forEach((n) => { n.textContent = b.version || ''; }); }
   renderAbout();
 
-  setStatus($('status'), 'Loading the query engine and this district\'s data…');
+  setStatus($('status'), IS_BORO
+    ? `Loading the query engine and the borough's data (${district.parts.length} district files; this takes longer than one district)…`
+    : 'Loading the query engine and this district\'s data…');
+  const names = sourceNames(district);
+  SRC = sourceSql(names);
   [Plot] = await Promise.all([
     import(PLOT_URL),
-    registerData('d.parquet', `data/${district.file}`),
+    ...names.map((n, i) => registerData(n, `data/${district.files[i]}`)),
     registerData('agg.parquet', 'data/agg/month_type.parquet'),
   ]);
   viewStart = manifest.window.default_start || manifest.window.start;

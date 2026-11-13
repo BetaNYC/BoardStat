@@ -3,6 +3,7 @@
 // map (map.html, #143), so both draw the same thing from the same query.
 import { dataUrl, query, el, fmtInt } from './lib.js';
 import { makeMap, addBoundaries, featureBounds } from './map.js';
+import { boroughBySlug } from './place.js';
 
 /** At most this many requests go on the map, the most recent first. */
 export const MAP_CAP = 60000;
@@ -18,16 +19,34 @@ const CLUSTER_STEPS = [
 ];
 
 /**
- * Make the map in `container` for one district: its lines, an empty request layer,
- * click to zoom into a circle, click a single request for its popup.
+ * The boundary file and the shapes to highlight for a place: one district, or for a
+ * borough (geo=boro, #144) every community district shape whose number starts with the
+ * borough's digit (Joint Interest Areas included), drawn on the community district lines.
+ */
+export function placeShapes(geo, geoId, features) {
+  if (geo === 'boro') {
+    const b = boroughBySlug(geoId);
+    const sel = b ? features.filter((f) => Math.floor(Number(f.properties.id) / 100) === b.code) : [];
+    return { selected: sel, selectedId: sel.map((f) => f.properties.id) };
+  }
+  const f = features.find((x) => String(x.properties.id) === String(geoId));
+  return { selected: f ? [f] : [], selectedId: Number(geoId) };
+}
+
+/** The boundary file a place's map draws: council lines for a council district, community district lines otherwise. */
+export const boundaryFile = (geo) => (geo === 'cc' ? 'cc' : 'cd');
+
+/**
+ * Make the map in `container` for one district or borough: its lines, an empty request
+ * layer, click to zoom into a circle, click a single request for its popup.
  * Returns { ml, map }.
  */
 export async function setupRequestMap(container, { geo, geoId }) {
-  const gj = await (await fetch(dataUrl(`data/boundaries/${geo}.geojson`))).json();
-  const feature = gj.features.find((f) => String(f.properties.id) === String(geoId));
-  const ctx = await makeMap(container, feature ? { bounds: featureBounds(feature) } : {});
+  const gj = await (await fetch(dataUrl(`data/boundaries/${boundaryFile(geo)}.geojson`))).json();
+  const { selected, selectedId } = placeShapes(geo, geoId, gj.features);
+  const ctx = await makeMap(container, selected.length ? { bounds: featureBounds(selected) } : {});
   const { map, ml } = ctx;
-  addBoundaries(map, gj, { selectedId: Number(geoId) });
+  addBoundaries(map, gj, { selectedId });
   // Clustering per https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/
   map.addSource('req', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, cluster: true, clusterMaxZoom: 15, clusterRadius: 40 });
   const [s0, s1, s2] = CLUSTER_STEPS;
@@ -89,14 +108,15 @@ export function mapNoteText(total, shown) {
 
 /** Fill `box` with the map's legend: circle sizes, a single request, and the district lines.
  *  The key is drawn at the map's own sizes (diameter = 2 × circle-radius). `headingLevel`
- *  fits the page's outline: 3 under the district page's h2, 2 on the full-page map. */
-export function renderMapLegend(box, { headingLevel = 3 } = {}) {
+ *  fits the page's outline: 3 under the district page's h2, 2 on the full-page map.
+ *  `borough` labels the highlighted lines as a borough's districts (#144). */
+export function renderMapLegend(box, { headingLevel = 3, borough = false } = {}) {
   if (!box) return;
   const swatch = (cls, style) => el('span', { class: `swatch ${cls}`, 'aria-hidden': 'true', style });
   const items = [
     ...CLUSTER_STEPS.map((s) => [swatch('circle', `background:${s.color};width:${2 * s.radius}px;height:${2 * s.radius}px`), s.label]),
     [swatch('circle', `background:${BLUE};width:${2 * POINT_RADIUS}px;height:${2 * POINT_RADIUS}px`), 'One request'],
-    [swatch('line selected', ''), 'This district'],
+    [swatch('line selected', ''), borough ? 'Districts in this borough' : 'This district'],
     [swatch('line', ''), 'Other districts'],
   ];
   box.replaceChildren(

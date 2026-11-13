@@ -296,6 +296,50 @@ text columns from the file). The tradeoff: before, the whole file was already
 in the browser, so moving the From date back cost no download; now it costs
 about one more file's worth. If that proves common, split files by year.
 
+## Whole-borough view (#144)
+
+`district.html?geo=boro&id=<slug>` (and `map.html` with the same parameters)
+shows a whole borough with the same panels, map, list and filters as a district.
+Slugs: `manhattan`, `bronx`, `brooklyn`, `queens`, `staten-island`
+(`js/place.js`). The index page has a "A whole borough" choice; every community
+district page links to its borough with the current filters.
+
+**What it counts.** A borough is every community district file whose number
+starts with the borough's digit, Joint Interest Areas included (Brooklyn:
+301–318, 355, 356). That is the rule the pipeline already uses for the
+`borough` rows of `agg/month_type.parquet` (`cd // 100`), so the page and the
+Compare panel agree: verified exactly for all five boroughs against `agg`, and
+for filtered views against DuckDB in Python (2026-11-13). Requests with no
+usable location are in no district file and so on no borough page; the page
+states how many of those the city's own records assign to the borough.
+Council districts are never used, because they cross borough lines.
+
+**How it reads the data (no pipeline change).** The page registers each
+district file and reads them as one table with
+`read_parquet(['d-301.parquet', ...])`
+([DuckDB: reading multiple files](https://duckdb.org/docs/stable/data/multiple_files/overview)).
+Range loading works per file, as on a district page. A single prebuilt
+borough file was measured too (a scratch Brooklyn file built from the same
+rows, same sort and row groups) and downloaded the same bytes in the same
+time, so the pipeline writes nothing new.
+
+Measured 2026-11-13, default view (Nov 2025 on), cold browser, headless
+Chromium, 2020+ nightly data, bytes counted at a local range-answering server;
+"50 Mbps" paces that server to 50 Mbit/s shared across connections:
+
+| Page | Page data | Rows loaded | DuckDB memory | Local | 50 Mbps |
+|---|---:|---:|---:|---:|---:|
+| Brooklyn CD 6 | 7.8 MB | 119,332 | 38 MB | 3.1 s | 4.1 s |
+| Staten Island | 18.3 MB | 301,898 | 103 MB | 2.9 s | 6.8 s |
+| **Brooklyn** | **133.4 MB** | **2,364,674** | **768 MB** | **6.2 s** | **36.2 s** |
+| Brooklyn, one prebuilt file | 132.9 MB | 2,364,674 | 760 MB | 6.6 s | — |
+
+Half of what loads is the year before the chosen dates (the "same month a year
+earlier" line). Ways to make Brooklyn faster if needed: load that year after
+the page first draws; open borough pages with a shorter default period; or
+have the pipeline write per-borough summaries for the charts and read detail
+only for the list and map.
+
 ## Traffic measurement (Google Analytics)
 
 Every page loads `site/js/analytics.js`, which adds the beta.nyc Google tag
@@ -512,6 +556,8 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 - Detail files for the busiest districts are the largest downloads; on slow
   connections the first load of a district takes a few seconds.
 - The map shows at most the 60,000 most recent matching requests.
+- A borough page (#144) downloads far more than a district page: see
+  "Whole-borough view" below.
 - "Same month a year earlier" only exists where the data covers both months
   (none before January 2021).
 - Boundary simplification (about 10 m) is per polygon, so hairline gaps can show

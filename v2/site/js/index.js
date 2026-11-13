@@ -1,7 +1,8 @@
-// Landing page: Step 1 picks what to look at (community district, council district, or an
-// address); Step 2 shows the matching chooser. An address opens address.html directly.
+// Landing page: Step 1 picks what to look at (community district, council district, a whole
+// borough, or an address); Step 2 shows the matching chooser. An address opens address.html directly.
 import { loadManifest, renderDataStatus, renderChanges, dataUrl, registerData, query, lit, el, setStatus, fmtInt, districtLabel } from './lib.js';
 import { makeMap, addBoundaries } from './map.js';
+import { BOROUGHS, boroughParts, boroughOfCd, boroughUrl } from './place.js';
 
 const form = document.getElementById('chooser');
 const select = document.getElementById('district-select');
@@ -15,7 +16,10 @@ const geojson = {};
 let mapCtx = null;
 
 const currentGeo = () => form.querySelector('input[name="geo"]:checked').value;
-const districtUrl = (geo, id) => `district.html?geo=${geo}&id=${encodeURIComponent(id)}`;
+const districtUrl = (geo, id) => (geo === 'boro' ? boroughUrl(id) : `district.html?geo=${geo}&id=${encodeURIComponent(id)}`);
+// A borough is chosen on the community district map (#144): every shape is a district, and
+// selecting one opens its borough.
+const boundaryKind = (geo) => (geo === 'cc' ? 'cc' : 'cd');
 const addressUrl = (r) => `address.html?geo=cd&id=${encodeURIComponent(r.cd)}&addr=${encodeURIComponent(r.address)}`;
 const titleCase = (s) => (s ? s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : '');
 let lastResults = [];
@@ -28,9 +32,14 @@ async function applyMode() {
   document.getElementById('step-addr').hidden = !isAddr;
   document.getElementById('map-panel').hidden = isAddr;
   ccNote.hidden = geo !== 'cc';
+  document.getElementById('boro-note').hidden = geo !== 'boro';
   history.replaceState(null, '', isAddr ? '#addr' : location.pathname + location.search);
   if (isAddr) { addrInput.focus(); return; }
-  document.getElementById('district-legend').textContent = `Step 2: Pick your ${geo === 'cc' ? 'council' : 'community'} district`;
+  const isBoro = geo === 'boro';
+  document.getElementById('district-legend').textContent = isBoro ? 'Step 2: Pick a borough' : `Step 2: Pick your ${geo === 'cc' ? 'council' : 'community'} district`;
+  document.querySelector('label[for="district-select"]').textContent = isBoro ? 'Borough' : 'District';
+  document.getElementById('show-btn').textContent = isBoro ? 'Show this borough' : 'Show this district';
+  document.getElementById('map-hint').textContent = isBoro ? 'Or select any district in the borough on the map below.' : 'Or select a district on the map below.';
   fillSelect(geo);
   try { await showMap(geo); } catch (err) {
     document.getElementById('map').replaceChildren(el('p', { text: `The map could not load (${err.message}). Use the list above.` }));
@@ -38,8 +47,14 @@ async function applyMode() {
 }
 
 function fillSelect(geo) {
-  const list = manifest.districts[geo].filter((d) => d.rows > 0);
   select.replaceChildren();
+  if (geo === 'boro') {
+    for (const b of BOROUGHS) {
+      if (boroughParts(manifest, b.slug).length) select.append(el('option', { value: b.slug, text: b.name }));
+    }
+    return;
+  }
+  const list = manifest.districts[geo].filter((d) => d.rows > 0);
   if (geo === 'cd') {
     for (const boro of manifest.boroughs) {
       const group = el('optgroup', { label: boro });
@@ -53,7 +68,8 @@ function fillSelect(geo) {
   }
 }
 
-async function showMap(geo) {
+async function showMap(mode) {
+  const geo = boundaryKind(mode);
   if (!geojson[geo]) geojson[geo] = await (await fetch(dataUrl(`data/boundaries/${geo}.geojson`))).json();
   const first = !mapCtx;
   if (first) mapCtx = await makeMap('map');
@@ -67,23 +83,32 @@ async function showMap(geo) {
 
 function wireMap() {
   const { map } = mapCtx;
-  let hovered = null;
+  // In borough mode, hovering any district lights up its whole borough.
+  let hovered = [];
+  const setHover = (ids, on) => ids.forEach((id) => map.setFeatureState({ source: 'districts', id }, { hover: on }));
+  const sameBorough = (id) => {
+    const b = boroughOfCd(id);
+    return geojson.cd.features.map((f) => f.properties.id).filter((x) => boroughOfCd(x) === b);
+  };
   map.on('mousemove', 'districts-fill', (e) => {
     map.getCanvas().style.cursor = 'pointer';
     const f = e.features[0];
-    if (hovered !== null) map.setFeatureState({ source: 'districts', id: hovered }, { hover: false });
-    hovered = f.id;
-    map.setFeatureState({ source: 'districts', id: hovered }, { hover: true });
-    map.getCanvas().title = f.properties.label;
+    const boro = currentGeo() === 'boro';
+    setHover(hovered, false);
+    hovered = boro ? sameBorough(f.properties.id) : [f.id];
+    setHover(hovered, true);
+    map.getCanvas().title = boro ? boroughOfCd(f.properties.id)?.name || '' : f.properties.label;
   });
   map.on('mouseleave', 'districts-fill', () => {
     map.getCanvas().style.cursor = '';
-    if (hovered !== null) map.setFeatureState({ source: 'districts', id: hovered }, { hover: false });
-    hovered = null;
+    setHover(hovered, false);
+    hovered = [];
   });
   map.on('click', 'districts-fill', (e) => {
     const id = e.features[0].properties.id;
-    window.location.href = districtUrl(currentGeo(), id);
+    const geo = currentGeo();
+    if (geo === 'boro') { const b = boroughOfCd(id); if (b) window.location.href = boroughUrl(b.slug); return; }
+    window.location.href = districtUrl(geo, id);
   });
 }
 

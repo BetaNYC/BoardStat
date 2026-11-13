@@ -158,9 +158,15 @@ function firstSymbolLayer(map) {
   return map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
 }
 
-/** Add district polygons (fill + outline). selectedId is highlighted. */
+/**
+ * Add district polygons (fill + outline). selectedId is highlighted: one id, or an array
+ * of ids for a whole borough (#144), matched with the "in" expression
+ * (https://maplibre.org/maplibre-style-spec/expressions/#in).
+ */
 export function addBoundaries(map, geojson, { selectedId = null, id = 'districts' } = {}) {
-  const sel = ['==', ['get', 'id'], selectedId ?? -1];
+  const sel = Array.isArray(selectedId)
+    ? ['in', ['get', 'id'], ['literal', selectedId]]
+    : ['==', ['get', 'id'], selectedId ?? -1];
   const before = firstSymbolLayer(map);
   map.addSource(id, { type: 'geojson', data: geojson, promoteId: 'id' });
   map.addLayer({
@@ -180,8 +186,9 @@ export function addBoundaries(map, geojson, { selectedId = null, id = 'districts
   }, before);
 }
 
-/** Bounding box of one feature's (Multi)Polygon coordinates. */
+/** Bounding box of one feature's (Multi)Polygon coordinates, or of several features together. */
 export function featureBounds(feature) {
+  const features = Array.isArray(feature) ? feature : [feature];
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const walk = (c) => {
     if (typeof c[0] === 'number') {
@@ -189,6 +196,6 @@ export function featureBounds(feature) {
       minY = Math.min(minY, c[1]); maxY = Math.max(maxY, c[1]);
     } else c.forEach(walk);
   };
-  walk(feature.geometry.coordinates);
+  for (const f of features) walk(f.geometry.coordinates);
   return [[minX, minY], [maxX, maxY]];
 }

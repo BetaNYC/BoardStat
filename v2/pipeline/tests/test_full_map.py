@@ -69,7 +69,10 @@ def test_map_key_draws_circles_at_their_map_size():
 def test_map_key_heading_fits_each_pages_outline():
     """map.html has no h2 above the key, so its key is an h2; the district page's is an h3."""
     assert "headingLevel: 2" in (JS / "fullmap.js").read_text(encoding="utf-8")
-    assert "renderMapLegend($('map-legend'));" in (JS / "district.js").read_text(encoding="utf-8")
+    # The district page takes the default heading level (it passes only the borough flag, #144).
+    district = (JS / "district.js").read_text(encoding="utf-8")
+    assert "renderMapLegend($('map-legend'), { borough: IS_BORO });" in district
+    assert "headingLevel" not in district
     assert "headingLevel = 3" in (JS / "requestmap.js").read_text(encoding="utf-8")
 
 

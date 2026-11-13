@@ -8,7 +8,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css?v=54507c9a6e">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=29a8380e23","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=8cedf6c7e3","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=15e5f110aa","./js/map.js":"./js/map.js?v=594c10b1ab","./js/requestmap.js":"./js/requestmap.js?v=f7e51d115c"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=ca5e3415f7","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=a3e98058db","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=9e0b9d7e15","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -20,11 +20,12 @@
   </header>
 
   <main id="main">
-    <p class="no-print"><a href="./">← Choose another district</a></p>
+    <p class="no-print"><a href="./">← Choose another district or borough</a></p>
     <h1 id="title">Loading district…</h1>
     <p class="muted" id="as-of"></p>
     <p class="muted" id="changes" hidden></p>
     <p class="muted" id="boundary-note"></p>
+    <p class="no-print" id="place-links" hidden></p>
     <div class="banner warn" id="stale" role="status" hidden></div>
     <div class="banner info" id="cc-banner" hidden>Council district view uses the current Department of City Planning lines (release <span class="bver"></span>). Older requests are re-mapped to today's lines by where they happened.</div>
     <p class="print-only" id="print-filters"></p>
@@ -118,7 +119,7 @@
       <p class="map-note" id="map-note">Circles group nearby requests; select one to zoom in, or select a single point for details.</p>
       <div class="map-legend" id="map-legend"></div>
       <p class="fullmap-open"><a class="button secondary" id="fullmap-link" href="map.html">Open full-page map</a>
-        <span class="muted">Opens a bigger map with the same district, dates and filters. Its link can be shared.</span></p>
+        <span class="muted">Opens a bigger map with the same place, dates and filters. Its link can be shared.</span></p>
       <p class="muted" id="fullmap-addr-note" hidden>The full-page map does not keep the address filter, because BoardStat never puts a street address in a link. It shows the whole district with the other filters.</p>
     </section>
 
@@ -155,6 +156,6 @@
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html">What&rsquo;s changed</a>.</footer>
-  <script type="module" src="js/district.js?v=29a8380e23"></script>
+  <script type="module" src="js/district.js?v=ca5e3415f7"></script>
 </body>
 </html>

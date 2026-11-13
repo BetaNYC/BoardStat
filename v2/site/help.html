@@ -8,7 +8,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css?v=54507c9a6e">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=29a8380e23","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=8cedf6c7e3","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=15e5f110aa","./js/map.js":"./js/map.js?v=594c10b1ab","./js/requestmap.js":"./js/requestmap.js?v=f7e51d115c"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=ca5e3415f7","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=a3e98058db","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=9e0b9d7e15","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -49,7 +49,7 @@
     <section class="panel" aria-labelledby="start-h">
       <h2 id="start-h">How to use BoardStat</h2>
       <ol>
-        <li><strong>Pick what to look at.</strong> On the <a href="./">first page</a>, choose a community district, a council district or an address. For a district, pick it from the list or click it on the map. For an address, type it the way you normally would (for example <code>114 Nassau Ave, Brooklyn, NY 11222</code>) and select a match.</li>
+        <li><strong>Pick what to look at.</strong> On the <a href="./">first page</a>, choose a community district, a council district, a whole borough or an address. For a district or a borough, pick it from the list or click it on the map. Every community district page also has a <strong>See all of</strong> link to its borough. For an address, type it the way you normally would (for example <code>114 Nassau Ave, Brooklyn, NY 11222</code>) and select a match.</li>
         <li><strong>Narrow it down.</strong> Use the filters at the top: dates, problem, description, agency and status. Select a group&rsquo;s heading to open or close it. When you have chosen, press <strong>Apply filters</strong> (or Enter in an empty text box) and every part of the page updates. Until you do, the page says the filters have changed. <strong>Reset filters</strong> starts over and updates the page at once.</li>
         <li><strong>Read the page.</strong> Start with "At a glance", then the top problems, requests per month, how long agencies take to close requests, and the map. Select a problem or an agency to filter the page to it. For a bigger map, press <strong>Open full-page map</strong> under the map: it opens with the same district, dates and filters, and <strong>Back to the district page</strong> brings you back with them.</li>
         <li><strong>Share or keep it.</strong> The page's web address keeps your filters, so you can bookmark it or send it to someone. The full-page map's web address does too. "Print summary" makes a printable page, and "Download CSV" gives you every matching request in a spreadsheet.</li>
@@ -62,6 +62,9 @@
       <dl class="glossary">
         <dt>Why can't it find my address?</dt>
         <dd><p>BoardStat only knows addresses that already appear in 311 requests in its data, spelled the way the city records them. Write numbered streets with numbers (<code>5 Ave</code>, not <code>Fifth Ave</code>). If a building has never had a 311 request with its address, it won't be found. Requests that gave only a cross street are not on address pages.</p></dd>
+
+        <dt>Why does a borough page take longer to open?</dt>
+        <dd><p>A borough page reads every community district in the borough, so it downloads much more data than one district. Brooklyn, the largest, is about 130 MB the first time, which can take half a minute or more. What a borough page counts is in the <a href="glossary.html#borough-view">Glossary</a>.</p></dd>
 
         <dt>How up to date is the data?</dt>
         <dd><p>BoardStat updates every night. The city publishes 311 data with a delay of a day or more, so the newest requests are usually from the day before. Each page says when the data was built and what changed since the last update. If a page says the data is out of date, the nightly update did not run; we are alerted when that happens.</p></dd>

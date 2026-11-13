@@ -121,6 +121,7 @@ export function renderDataStatus(manifest, asOfEl, staleEl) {
  * "What changed since the last update" from data/changes.json, which the nightly
  * refresh writes (new requests, updated requests, requests that became Closed).
  * No file, no line: a one-off build has nothing to compare against.
+ * `where` is { geo, id, label } for one district, or { geo, ids, label } for several.
  */
 export async function renderChanges(target, where = null) {
   if (!target) return;
@@ -132,7 +133,13 @@ export async function renderChanges(target, where = null) {
   } catch { return; }
   const part = (x = {}) => `${fmtInt(x.new || 0)} new, ${fmtInt(x.updated || 0)} updated, ${fmtInt(x.closed || 0)} closed`;
   let text = `What changed ${c.since ? `since ${fmtDateTime(c.since)}` : 'in the latest update'}: citywide ${part(c.city)}`;
-  if (where) text += `; ${where.label} ${part(c[where.geo]?.[String(where.id)])}`;
+  // where.ids (a borough, #144) adds up the districts it is made of.
+  const ids = where ? (where.ids || [where.id]).map(String) : [];
+  if (where) {
+    const sum = { new: 0, updated: 0, closed: 0 };
+    for (const id of ids) for (const k of Object.keys(sum)) sum[k] += c[where.geo]?.[id]?.[k] || 0;
+    text += `; ${where.label} ${part(sum)}`;
+  }
   target.textContent = `${text}.`;
   target.hidden = false;
 }
