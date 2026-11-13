@@ -419,13 +419,21 @@ Run on office-mac, 2026-11-04, with an app token, default window.
    [protomaps/basemaps-assets](https://github.com/protomaps/basemaps-assets).
    The style is `@protomaps/basemaps` in the `grayscale` flavor, so district
    colors and request dots stand out. The map credits "Protomaps © OpenStreetMap",
-   linked to openstreetmap.org/copyright. Nothing basemap-related is fetched from
-   anyone else at runtime; from 2026-11-04 to #141 the map first tried NYC OTI's
-   basemap on ArcGIS, and `pipeline/tests/test_no_esri.py` now fails if an ArcGIS or
-   Esri URL comes back into the site code. District shapes sit under the street
-   labels. If `data/basemap/` is missing or the street map cannot load, the map
-   shows the outlines on blank with a short message saying the street map could
-   not load. Refresh the extract a few times a year.
+   linked to openstreetmap.org/copyright, and stays expanded at every width. The
+   map tiles, fonts and sprites are all served from BoardStat's own folder; only
+   the map's code libraries load from jsDelivr, at pinned versions. From
+   2026-11-04 until this change (#141), the map first tried NYC OTI's basemap on
+   ArcGIS; `pipeline/tests/test_no_esri.py` now fails if an ArcGIS or Esri URL
+   comes back into the site code. At low zoom (z0-z7) the Protomaps build also
+   carries Natural Earth land and water (public domain) and Daylight landcover
+   from ESA WorldCover 2020 (CC BY 4.0), per
+   [the Protomaps layer docs](https://docs.protomaps.com/basemaps/layers); the
+   About page credits both. District shapes sit under the street labels. Before
+   using the street map, `map.js` checks `basemap.json`, the `nyc.pmtiles`
+   header, the sprite and one glyph file (5-second timeout each); if any fails, or
+   a street-map error comes later, the map keeps the outlines and requests on
+   blank and shows a short message saying the street map could not load.
+   Refresh the extract a few times a year.
 10. **Comparisons are located-only and whole-month.** `agg/month_type.parquet`
     counts only requests with a district, so district, borough and city shares
     use the same population. The Compare panel ignores problem/agency/status
