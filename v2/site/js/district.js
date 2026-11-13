@@ -194,8 +194,8 @@ function renderPending() {
     const edited = changed.some((k) => SECTIONS[section].includes(k) || (section === 'problem' && k === 'descEx'));
     const parts = [];
     if (section === 'dates') parts.push(`${fmtDate(draft.start)} to ${fmtDate(draft.end)}`);
-    else if (n) parts.push(`${n} set`);
-    if (edited) parts.push('not applied');
+    else if (n) parts.push(`${n} chosen`);
+    if (edited) parts.push('not applied yet');
     node.textContent = parts.length ? `(${parts.join(', ')})` : '';
   }
 }
@@ -210,8 +210,15 @@ function formChanged() {
 /** Copy the form's filters to the page and run the queries. */
 function applyFilters() {
   // Text typed but not yet added as a chip is added first, if it matches a choice.
-  if ($('f-type').value.trim()) addType($('f-type').value);
-  if ($('f-desc').value.trim()) addDesc($('f-desc').value);
+  // Text that matches nothing stops the Apply and says so, instead of vanishing.
+  const typed = $('f-type').value.trim() || $('f-desc').value.trim();
+  if ($('f-type').value.trim() && !addType($('f-type').value)) return;
+  if ($('f-desc').value.trim() && !addDesc($('f-desc').value)) return;
+  // Nothing to change: no need to run every query again.
+  if (!typed && changedFields(draft, state).length === 0) {
+    setStatus($('status'), `${fmtInt(total)} requests match.`);
+    return;
+  }
   if (draft.start > draft.end) {
     setStatus($('status'), 'The From date is after the To date. Change one of them, then press Apply filters.');
     $('f-start').focus();
@@ -246,16 +253,27 @@ async function updateDescOptions() {
   $('desc-options').replaceChildren(...allDescs.map((d) => el('option', { value: d })));
 }
 
+/** Text that matches no choice stays in the box, with a short status saying so. Returns false then. */
+function noMatch(box, kind, text) {
+  setStatus($('status'), `No ${kind} named “${text.trim()}”. Pick one from the list, or clear the box.`);
+  $(box).focus();
+  return false;
+}
+
 function addDesc(d) {
   const match = allDescs.find((x) => x.toLowerCase() === String(d).trim().toLowerCase());
-  if (match && !draft.descs.includes(match)) { draft.descs = [...draft.descs, match]; formChanged(); }
+  if (!match) return noMatch('f-desc', 'description', String(d));
+  if (!draft.descs.includes(match)) { draft.descs = [...draft.descs, match]; formChanged(); }
   $('f-desc').value = '';
+  return true;
 }
 
 function addType(t) {
   const match = allTypes.find((x) => x.toLowerCase() === t.trim().toLowerCase());
-  if (match && !draft.types.includes(match)) { draft.types = [...draft.types, match]; formChanged(); }
+  if (!match) return noMatch('f-type', 'problem', t);
+  if (!draft.types.includes(match)) { draft.types = [...draft.types, match]; formChanged(); }
   $('f-type').value = '';
+  return true;
 }
 
 /** Fill the problem, agency and status lists from what is loaded (again after a reload). */
@@ -389,7 +407,7 @@ async function renderDescriptors() {
         render: (r) => (state.descs.includes(r.d)
           ? el('span', {}, r.d, el('span', { class: 'muted', text: state.descEx ? ' (excluded)' : ' (in the filter)' }))
           : el('button', { type: 'button', class: 'link', 'aria-label': `${verb} description ${r.d} ${state.descEx ? 'from' : 'to'} the filter`,
-            onclick: () => applyNow((s) => ({ descs: s.descs.includes(r.d) ? s.descs : [...s.descs, r.d], descEx: state.descEx })) }, r.d)),
+            onclick: () => applyNow((s) => ({ descs: s.descs.includes(r.d) ? s.descs : [...s.descs, r.d] })) }, r.d)),
       },
       { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
     ], `Select a description to ${state.descEx ? 'exclude it' : 'add it to the filter'}. The description filter does not narrow this table.`),

@@ -61,3 +61,15 @@ def test_every_chart_is_drawn_at_its_box_width():
     js = (SITE / "js" / "district.js").read_text()
     for m in re.finditer(r"Plot\.plot\(\{(.*?)\n\s*marks", js, re.DOTALL):
         assert re.search(r"\bwidth\b", m.group(1)), m.group(1)[:120]
+
+
+def test_description_shortcut_keeps_the_forms_exclude_setting():
+    """QA on #142: a description shortcut must not overwrite a pending Exclude toggle."""
+    js = (SITE / "js" / "district.js").read_text()
+    assert "descEx: state.descEx" not in js
+
+
+@pytest.mark.parametrize("page", [*PAGES, "help.html", "glossary.html"])
+def test_pages_say_reset_applies_at_once(page):
+    # Reset applies without the Apply button; every page that explains Apply says so.
+    assert re.search(r"<strong>Reset filters</strong>[^<]*(at once|not applied)", (SITE / page).read_text())
