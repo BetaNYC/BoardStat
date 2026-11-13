@@ -116,3 +116,27 @@ def test_form_says_how_the_suggestions_are_ordered():
     for box in ("type", "desc"):
         assert f'<p class="field-hint" id="{box}-order">Suggestions are listed with the most requests in these dates first.</p>' in form
         assert f'aria-describedby="{box}-order {box}-help"' in form
+
+
+@pytest.mark.parametrize("page", FORM_PAGES)
+def test_every_page_has_the_panel_toggle_outside_the_form(page):
+    """#149: the filter panel opens and closes on every page. The toggle and the summary
+    line are outside the form, so the form's markup stays the same on every page."""
+    html = (SITE / page).read_text()
+    form_at = html.index('<form id="filters"')
+    toggle = re.search(r'<button type="button" class="secondary" id="filters-toggle" aria-controls="filters" aria-expanded="(true|false)">(Hide|Change) filters</button>', html)
+    assert toggle and toggle.start() < form_at
+    assert html.index('id="filters-summary"') < form_at
+    # The markup's starting state matches the wide-screen default (filterform.js panelStartsOpen).
+    assert toggle.group(1) == ("false" if page == "map.html" else "true")
+
+
+def test_pages_set_up_the_panel_through_the_shared_module():
+    district = (JS / "district.js").read_text()
+    fullmap = (JS / "fullmap.js").read_text()
+    assert "form.setupPanel({ scrollTo: $('filters-bar') });" in district
+    assert "form.setupPanel({ mapPage: true, scrollTo: $('main') });" in fullmap
+    for src in (district, fullmap):
+        assert "form.afterRedraw();" in src
+    # The open/close rules live in one place.
+    assert "is-collapsed" not in district and "is-collapsed" not in fullmap

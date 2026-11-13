@@ -120,3 +120,17 @@ test('the lists offer rows in the applied dates or not yet closed, most requests
   assert.deepEqual(await lists.statuses(), ['Open', 'Closed']);
   for (const sql of seen) { assert.ok(sql.includes(scope), sql); assert.ok(sql.includes(listOrderSql(s)), sql); }
 });
+
+test('the filter panel: open on a wide district page, closed on a phone and always on the map', async () => {
+  const { panelStartsOpen, panelClosesAfterApply, toggleLabel } = await import('../site/js/filterform.js');
+  assert.equal(panelStartsOpen({ mapPage: false, phone: false }), true);
+  assert.equal(panelStartsOpen({ mapPage: false, phone: true }), false);
+  assert.equal(panelStartsOpen({ mapPage: true, phone: false }), false);
+  assert.equal(panelStartsOpen({ mapPage: true, phone: true }), false);
+  // After the form's own Apply: a wide district page stays open; a phone and the map close.
+  assert.equal(panelClosesAfterApply({ mapPage: false, phone: false }), false);
+  assert.equal(panelClosesAfterApply({ mapPage: false, phone: true }), true);
+  assert.equal(panelClosesAfterApply({ mapPage: true, phone: false }), true);
+  assert.equal(toggleLabel(true), 'Hide filters');
+  assert.equal(toggleLabel(false), 'Change filters');
+});

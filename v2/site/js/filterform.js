@@ -12,7 +12,7 @@
 // on Apply. The pure decisions are exported for v2/tests-js.
 import { el, fmtDate } from './lib.js';
 import { whereSql, DESC_SQL, NOT_CLOSED_SQL, lit } from './filtersql.js';
-import { copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED } from './filterstate.js';
+import { copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED, describeFilters } from './filterstate.js';
 
 export const DATE_ORDER_MSG = 'The From date is after the To date. Change one of them, then press Apply filters.';
 export const PENDING_MSG = 'Filters changed. Press Apply filters to update the page.';
@@ -91,6 +91,24 @@ export function tableLists(query, getState) {
   };
 }
 
+/**
+ * Whether the filter panel starts open (#149): the district, borough, council district and
+ * address pages start open on a wide screen, where the form is the main control, and
+ * closed at 640 px or less, where it pushes everything down. The full-page map starts
+ * closed everywhere, so the map stays in view.
+ */
+export function panelStartsOpen({ mapPage, phone }) {
+  return !mapPage && !phone;
+}
+
+/** Whether the panel closes after the form's own Apply or Reset: always on the map, on a phone elsewhere. */
+export function panelClosesAfterApply({ mapPage, phone }) {
+  return mapPage || phone;
+}
+
+/** The text of the toggle button for an open or closed panel. */
+export const toggleLabel = (open) => (open ? 'Hide filters' : 'Change filters');
+
 /** The menu values a status filter may hold: '' (any), "not yet closed", and the data's statuses. */
 export function statusChoices(known) {
   return ['', NOT_CLOSED, ...known];
@@ -117,6 +135,25 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   let descKey = null;
   let listsReady = false; // the page has rows to list (fillLists has run)
   let knownStatuses = []; // what lists.statuses() returned: the data's statuses, and "Closed"
+  let panel = null; // the open/close toggle (setupPanel): { mapPage, scrollTo }
+  let formApplied = false; // the last change came from the form's own Apply or Reset
+
+  /** Open or close the panel. When closed, only its status line stays, under the summary line. */
+  function showPanel(open) {
+    if (!$('filters-toggle')) return;
+    $('filters').classList.toggle('is-collapsed', !open);
+    $('filters-toggle').setAttribute('aria-expanded', String(open));
+    $('filters-toggle').textContent = toggleLabel(open);
+    renderSummary();
+  }
+
+  /** The applied filters in one line, above the panel (always on the map; elsewhere only while closed). */
+  function renderSummary() {
+    const node = $('filters-summary');
+    if (!node) return;
+    node.textContent = `${describeFilters(applied, fmtDate).join('; ')}.`;
+    if (panel && !panel.mapPage) node.hidden = !$('filters').classList.contains('is-collapsed');
+  }
 
   function renderChips() {
     $('type-chips').replaceChildren(...draft.types.map((t) => el('li', {},
@@ -214,6 +251,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
     if (check === 'date-order') { setStatus(DATE_ORDER_MSG); $('f-start').focus(); return; }
     if (check === 'no-change') { setStatus(matchText()); return; }
     applied = copyFilters(draft);
+    formApplied = true;
     onApply(copyFilters(applied));
   }
 
@@ -223,6 +261,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
     draft = copyFilters(applied);
     $('f-type').value = '';
     $('f-desc').value = '';
+    formApplied = true;
     onApply(copyFilters(applied));
   }
 
@@ -257,6 +296,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
       syncControls();
       renderChips();
       renderPending();
+      renderSummary();
       updateDescriptions().catch((err) => console.error(err));
     },
     /**
@@ -265,6 +305,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
      */
     applyNow(fn) {
       ({ applied, draft } = patchBoth(applied, draft, fn));
+      formApplied = false; // a shortcut elsewhere on the page never closes or moves to the panel
       onApply(copyFilters(applied));
     },
     /** Fill the problem, agency and status lists (again after the page's rows changed). */
@@ -285,6 +326,31 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
     /** The status values the data allows (never what the menu happens to show). */
     statusChoices: () => statusChoices(knownStatuses),
     openGroups,
+    /**
+     * The panel's open/close toggle (#149): a "Hide filters" / "Change filters" button
+     * outside the form (#filters-toggle, aria-expanded) and the summary line
+     * (#filters-summary). `mapPage` picks the defaults (panelStartsOpen); `scrollTo` is
+     * where the page goes back to when the panel closes after an Apply.
+     */
+    setupPanel({ mapPage = false, scrollTo = null } = {}) {
+      panel = { mapPage, scrollTo };
+      const phone = window.matchMedia('(max-width: 640px)').matches;
+      showPanel(panelStartsOpen({ mapPage, phone }));
+      $('filters-toggle').addEventListener('click', () => showPanel($('filters').classList.contains('is-collapsed')));
+    },
+    /** The page drew the filters it was given. After the form's own Apply or Reset, close
+     *  the panel where that is the rule, and keep keyboard focus on the toggle. */
+    afterRedraw() {
+      if (!panel || !formApplied) return;
+      formApplied = false;
+      const phone = window.matchMedia('(max-width: 640px)').matches;
+      if (!panelClosesAfterApply({ mapPage: panel.mapPage, phone })) return;
+      showPanel(false);
+      panel.scrollTo?.scrollIntoView({ block: 'start' });
+      // The control that had focus is now hidden: keep keyboard and screen-reader users
+      // on the button that opens the form again (the status line has just said the count).
+      $('filters-toggle').focus({ preventScroll: true });
+    },
     /** Wire up the controls. Changing a control changes only the form (#142); Apply, or
      *  Enter in a text or date box, runs the page's queries. */
     bind(min, max) {

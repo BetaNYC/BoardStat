@@ -255,6 +255,8 @@ function setupFilters() {
   form.bind(manifest.window.start, manifest.window.end);
   form.set(state);
   form.openGroups();
+  // Open on a wide screen, closed on a phone (filterform.js setupPanel, #149).
+  form.setupPanel({ scrollTo: $('filters-bar') });
   $('print').addEventListener('click', () => { window.boardstatTrack?.('print_page', { geo, district_id: geoId }); window.print(); });
   window.addEventListener('beforeprint', describeFiltersForPrint);
   $('prev').addEventListener('click', () => { if (page > 0) { page--; renderDetail(); } });
@@ -551,7 +553,7 @@ function dayBefore(iso) {
 function showBacklog(agency) {
   const patch = { end: dayBefore(state.start), start: manifest.window.start, status: NOT_CLOSED, ...(agency ? { agency } : {}) };
   applyNow(() => patch);
-  $('filters-h').scrollIntoView({ block: 'start' });
+  $('filters-bar').scrollIntoView({ block: 'start' });
 }
 
 async function renderBacklog() {
@@ -1006,6 +1008,8 @@ async function refresh() {
     if (seq === refreshSeq) setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
     lastRefreshFailed = false;
     lastChartWidth = chartWidthKey();
+    // After the form's own Apply or Reset on a phone: close the panel, focus its toggle.
+    if (seq === refreshSeq) form.afterRedraw();
     // Only once the page has drawn, so it never waits for the year before.
     if (seq === refreshSeq) loadPriorYear();
   } catch (err) {

@@ -6,9 +6,9 @@
   <title>Address · BoardStat 2.0 (prototype)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css?v=4cec144e8e">
+  <link rel="stylesheet" href="css/style.css?v=9c7410fbb0">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=b26ecaf04a","./js/filterform.js":"./js/filterform.js?v=eae460fd42","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=e2fb4a9eab","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=de61fbb9d4","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=9522a551e1","./js/filterform.js":"./js/filterform.js?v=d9e37282ef","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=07d8618c8c","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=de61fbb9d4","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -30,6 +30,12 @@
     <div class="banner info" id="cc-banner" hidden>Council district view uses the current Department of City Planning lines (release <span class="bver"></span>). Older requests are re-mapped to today's lines by where they happened.</div>
     <p class="print-only" id="print-filters"></p>
 
+    <!-- The filter panel opens and closes (#149). The toggle and the summary line sit
+         outside the form, so the form's markup stays the same on every page. -->
+    <div class="filters-bar no-print" id="filters-bar">
+      <p class="muted" id="filters-summary" hidden></p>
+      <p class="filters-toggle-row"><button type="button" class="secondary" id="filters-toggle" aria-controls="filters" aria-expanded="true">Hide filters</button></p>
+    </div>
     <form id="filters" class="panel no-print" aria-labelledby="filters-h">
       <h2 id="filters-h">Filter requests</h2>
       <p class="muted">Choose filters, then press <strong>Apply filters</strong> to update the page. <strong>Reset filters</strong> clears every filter and updates the page at once. Select a heading to open or close a group.</p>
@@ -158,6 +164,6 @@
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html">What&rsquo;s changed</a>.</footer>
-  <script type="module" src="js/district.js?v=b26ecaf04a"></script>
+  <script type="module" src="js/district.js?v=9522a551e1"></script>
 </body>
 </html>

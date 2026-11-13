@@ -9,7 +9,7 @@
 // (plus every request not yet closed). Moving the From date earlier appends only what is
 // missing, so a change of filters reads nothing again.
 import { loadManifest, renderDataStatus, registerData, reregisterData, query, el, setStatus, fmtDate, fmtInt } from './lib.js';
-import { filtersFromParams, filtersToParams, describeFilters, keepKnownStatus } from './filterstate.js';
+import { filtersFromParams, filtersToParams, keepKnownStatus } from './filterstate.js';
 import { whereSql } from './filtersql.js';
 import { createFilterForm, tableLists, DATE_ORDER_MSG } from './filterform.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
@@ -36,7 +36,6 @@ let firstLoadDone = false;
 let dataFiles = [];
 let loadCount = 0;
 let listsKey = null; // the loads and dates the form's lists were made for
-let firstApplied = false; // the page's own first draw leaves focus alone
 
 /** The filters a link with no filters opens with (Reset's target). This page never has an address. */
 const defaultFilters = () => ({ ...defaults, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' });
@@ -49,7 +48,6 @@ function writeLinks() {
   const p = filtersToParams(geo, geoId, state, defaults);
   history.replaceState(null, '', `?${p.toString()}`);
   $('back-link').href = `district.html?${p.toString()}`;
-  $('filters-summary').textContent = `${describeFilters(state, fmtDate).join('; ')}.`;
 }
 
 /** Make sure the table has every row these filters need (Closed requests from the From date on). */
@@ -68,13 +66,6 @@ function freshDataFiles(err) {
       try { await reregisterData(name, path); } catch (e) { console.error(e); }
     }
   });
-}
-
-/** The form starts closed and closes again after Apply, so the map stays in view. */
-function showForm(open) {
-  $('filters').classList.toggle('is-collapsed', !open);
-  $('filters-toggle').setAttribute('aria-expanded', String(open));
-  $('filters-toggle').textContent = open ? 'Hide filters' : 'Change filters';
 }
 
 let seq = 0;
@@ -105,13 +96,8 @@ async function redraw() {
     $('map-note').textContent = mapNoteText(total, shown.count);
     setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
     lastFailed = false;
-    if (firstApplied) {
-      showForm(false);
-      $('main').scrollIntoView({ block: 'start' }); // back up to the summary line and the map
-      // The control that had focus is now hidden: keep keyboard and screen-reader users
-      // on the button that opens the form again (the status line has just said the count).
-      $('filters-toggle').focus({ preventScroll: true });
-    }
+    // The panel closes after Apply at every width here, focus on its toggle (filterform.js).
+    form.afterRedraw();
   } catch (err) {
     console.error(err);
     lastFailed = true;
@@ -151,7 +137,7 @@ async function main() {
   form = createFilterForm({
     defaults: defaultFilters,
     lists: formLists,
-    onApply: (s) => { state = s; firstApplied = true; redraw(); },
+    onApply: (s) => { state = s; redraw(); },
     lastFailed: () => lastFailed,
     matchText: () => `${fmtInt(total)} requests match.`,
     setStatus: (msg) => setStatus($('status'), msg),
@@ -159,8 +145,8 @@ async function main() {
   form.set(state);
   form.bind(manifest.window.start, manifest.window.end);
   form.openGroups({ compact: true });
-  showForm(false);
-  $('filters-toggle').addEventListener('click', () => showForm($('filters').classList.contains('is-collapsed')));
+  // Closed at every width, with the summary line above it (filterform.js setupPanel).
+  form.setupPanel({ mapPage: true, scrollTo: $('main') });
   writeLinks();
 
   setStatus($('status'), IS_BORO ? 'Loading the map and the borough\'s requests…' : 'Loading the map and this district\'s requests…');

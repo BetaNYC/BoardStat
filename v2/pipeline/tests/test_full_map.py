@@ -96,10 +96,11 @@ def test_map_page_is_phone_friendly_and_says_what_is_not_carried():
     html = read("map.html")
     assert 'id="filters-toggle" aria-controls="filters" aria-expanded="false">Change filters<' in html
     assert "(keeps the filters set here)" in html
-    # The form starts closed and closes after Apply on every screen (#149 QA).
+    # The form starts closed and closes after Apply on every screen (#149 QA); the rule
+    # and the focus move live in filterform.js (panelStartsOpen, afterRedraw).
     src = (JS / "fullmap.js").read_text(encoding="utf-8")
-    assert "showForm(false);" in src and "matchMedia" not in src
-    assert "$('filters-toggle').focus(" in src
+    assert "form.setupPanel({ mapPage: true" in src and "matchMedia" not in src
+    assert "$('filters-toggle').focus(" in (JS / "filterform.js").read_text(encoding="utf-8")
     assert "change them there" not in html
     for page in ("help.html", "glossary.html"):
         assert "change them there" not in read(page)

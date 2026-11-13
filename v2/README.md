@@ -66,10 +66,24 @@ changed reruns nothing). Each page gives it the lists to offer and what to redra
 Apply on the map redraws the map and rewrites the link (`history.replaceState`), and
 the back link always carries the map's current filters; "Open full-page map" carries
 the district page's. That holds for community districts, council districts and
-boroughs. On every screen the form starts closed behind **Change filters**, under
-the one-line summary, and closes again after Apply (focus moves to that button), and
-its groups start closed unless something in them is set, so the map stays in view. The map page's Print summary button is hidden. The address page gets the
+boroughs. The map page's Print summary button is hidden. The address page gets the
 shared module for free, with no change in what it does.
+
+**The filter panel opens and closes, on every page** (`setupPanel` in
+`js/filterform.js`). A "Hide filters" / "Change filters" button (`#filters-toggle`,
+`aria-expanded`) and a one-line summary of the applied filters (`#filters-summary`)
+sit just outside the form, so the form's markup stays the same on every page.
+Closed, the panel shows only its status line, under the summary.
+
+| Page | Starts | After the form's Apply or Reset |
+|---|---|---|
+| District, borough, council district, address, wider than 640 px | open (summary hidden) | stays open |
+| Same pages, 640 px or narrower | closed | closes, focus on the toggle |
+| Full-page map, any width | closed (summary always shown) | closes, focus on the toggle |
+
+Shortcut buttons elsewhere on a page (an agency, "Show these requests") apply at once
+whether the panel is open or closed, update the summary, and never open, close or
+move to the panel. On the map its groups start closed unless something in them is set.
 
 The map page loads its rows like the district page (`js/loadplan.js`): a table of
 the columns the map and the filters use, in the compressed in-memory database,
