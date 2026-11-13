@@ -207,6 +207,8 @@ function formChanged() {
   updateDescOptions().catch((err) => console.error(err));
 }
 
+const DATE_ORDER_MSG = 'The From date is after the To date. Change one of them, then press Apply filters.';
+
 /** Copy the form's filters to the page and run the queries. */
 function applyFilters() {
   // Text typed but not yet added as a chip is added first, if it matches a choice.
@@ -214,14 +216,16 @@ function applyFilters() {
   const typed = $('f-type').value.trim() || $('f-desc').value.trim();
   if ($('f-type').value.trim() && !addType($('f-type').value)) return;
   if ($('f-desc').value.trim() && !addDesc($('f-desc').value)) return;
-  // Nothing to change: no need to run every query again.
-  if (!typed && changedFields(draft, state).length === 0) {
-    setStatus($('status'), `${fmtInt(total)} requests match.`);
+  // Date order first, so dates swapped in a link are flagged even with nothing changed.
+  if (draft.start > draft.end) {
+    setStatus($('status'), DATE_ORDER_MSG);
+    $('f-start').focus();
     return;
   }
-  if (draft.start > draft.end) {
-    setStatus($('status'), 'The From date is after the To date. Change one of them, then press Apply filters.');
-    $('f-start').focus();
+  // Nothing to change: no need to run every query again (unless the last run failed,
+  // so Apply can retry).
+  if (!typed && !lastRefreshFailed && changedFields(draft, state).length === 0) {
+    setStatus($('status'), `${fmtInt(total)} requests match.`);
     return;
   }
   state = copyFilters(draft);
@@ -255,7 +259,7 @@ async function updateDescOptions() {
 
 /** Text that matches no choice stays in the box, with a short status saying so. Returns false then. */
 function noMatch(box, kind, text) {
-  setStatus($('status'), `No ${kind} named “${text.trim()}”. Pick one from the list, or clear the box.`);
+  setStatus($('status'), `No ${kind} named “${text.trim()}”. Choose one of the suggestions as you type, or clear the box.`);
   $(box).focus();
   return false;
 }
@@ -321,6 +325,8 @@ async function setupFilters() {
   $('reset').addEventListener('click', () => {
     state = defaultFilters();
     draft = copyFilters(state);
+    $('f-type').value = '';
+    $('f-desc').value = '';
     refresh();
   });
   $('print').addEventListener('click', () => { window.boardstatTrack?.('print_page', { geo, district_id: geoId }); window.print(); });
@@ -1042,6 +1048,7 @@ function watchChartWidth() {
 }
 
 let refreshSeq = 0;
+let lastRefreshFailed = false; // Apply always reruns after a failed refresh
 async function refresh() {
   const seq = ++refreshSeq;
   trackFilters();
@@ -1063,10 +1070,13 @@ async function refresh() {
     if (seq !== refreshSeq) return;
     await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgencyResponse(), renderAgency(), renderBacklog(), renderDetail(), renderMap(),
       ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare()] : [renderAddresses(), renderCompare()])]);
-    if (seq === refreshSeq) setStatus($('status'), `${fmtInt(total)} requests match.`);
+    // A link can carry dates in the wrong order: say so instead of just "0 requests match."
+    if (seq === refreshSeq) setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
+    lastRefreshFailed = false;
     lastChartWidth = chartWidthKey();
   } catch (err) {
     console.error(err);
+    lastRefreshFailed = true;
     setStatus($('status'), `Something went wrong: ${err.message}`);
   }
 }

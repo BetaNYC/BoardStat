@@ -73,3 +73,23 @@ def test_description_shortcut_keeps_the_forms_exclude_setting():
 def test_pages_say_reset_applies_at_once(page):
     # Reset applies without the Apply button; every page that explains Apply says so.
     assert re.search(r"<strong>Reset filters</strong>[^<]*(at once|not applied)", (SITE / page).read_text())
+
+
+def apply_filters_source() -> str:
+    js = (SITE / "js" / "district.js").read_text()
+    m = re.search(r"function applyFilters\(\) \{.*?\n\}", js, re.DOTALL)
+    assert m
+    return m.group(0)
+
+
+def test_apply_checks_date_order_before_skipping_and_retries_after_a_failure():
+    """QA round 2 on #142: swapped dates in a link are flagged; a failed refresh can be retried."""
+    src = apply_filters_source()
+    assert src.index("draft.start > draft.end") < src.index("changedFields(draft, state)")
+    assert "!lastRefreshFailed" in src
+
+
+def test_reset_clears_typed_text():
+    js = (SITE / "js" / "district.js").read_text()
+    m = re.search(r"\$\('reset'\)\.addEventListener\('click', \(\) => \{.*?\n  \}\);", js, re.DOTALL)
+    assert m and "$('f-type').value = ''" in m.group(0) and "$('f-desc').value = ''" in m.group(0)
