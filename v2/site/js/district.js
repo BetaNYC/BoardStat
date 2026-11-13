@@ -10,7 +10,7 @@ import {
 } from './filterstate.js';
 import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl } from './place.js';
-import { periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly, DataChangedError } from './loadplan.js';
+import { periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly, DataChangedError, filesNamedIn } from './loadplan.js';
 
 const $ = (id) => document.getElementById(id);
 const PAGE = 50;
@@ -121,7 +121,7 @@ function loadPriorYear() {
     if (!r.ok) {
       console.error(r.error);
       priorFailure = r.error;
-      if (!(r.error instanceof DataChangedError)) await freshDataFiles();
+      if (!(r.error instanceof DataChangedError)) await freshDataFiles(r.error);
     }
     // A load for newer filters is still running: its refresh draws Requests per month
     // once the table is complete, so drawing now would count a half-loaded table.
@@ -161,11 +161,17 @@ async function checkFresh() {
 // Why the last background load failed; cleared when the page draws again, which retries it.
 let priorFailure = null;
 let dataFiles = []; // [name, path] of each detail file this page reads
-/** After a failed read: register the detail files again, so a retry does not reuse a bad buffer (lib.js). */
-function freshDataFiles() {
+/**
+ * After a failed read: register again only the files the error names, so a retry does
+ * not reuse a bad buffer (lib.js). Files that were read without trouble are left alone:
+ * re-registering one of those made its next read fail ("Failed to open file", #144 QA).
+ */
+function freshDataFiles(err) {
+  const failed = filesNamedIn(String(err?.message || err || ''), dataFiles);
+  if (!failed.length) return Promise.resolve();
   const redo = async () => {
-    for (const [name, path] of dataFiles) {
-      try { await reregisterData(name, path); } catch (err) { console.error(err); }
+    for (const [name, path] of failed) {
+      try { await reregisterData(name, path); } catch (e) { console.error(e); }
     }
   };
   return loader ? loader.queue(redo) : redo();
@@ -359,16 +365,26 @@ async function fillFilterOptions() {
   syncForm();
 }
 
-async function setupFilters(loaded = true) {
+/**
+ * What the page needs once, right after its first load works: the filter lists, a
+ * status the data does not have dropped from the link, and the address page's links.
+ * main() runs it; if the first load failed, the first refresh that loads runs it.
+ */
+let firstLoadDone = false;
+async function afterFirstLoad() {
+  firstLoadDone = true;
+  await fillFilterOptions();
+  state = keepKnownStatus(state, [...$('f-status').options].map((o) => o.value));
+  draft = copyFilters(state);
+  syncForm();
+  if (ADDRESS_MODE) await renderAddressLinks();
+}
+
+async function setupFilters() {
   const { start, end } = manifest.window;
   for (const id of ['f-start', 'f-end']) { $(id).min = start; $(id).max = end; }
   $('f-start').value = state.start;
   $('f-end').value = state.end;
-  // Without a table there are no lists to fill; a later Apply fills them after it loads.
-  if (loaded) {
-    await fillFilterOptions();
-    state = keepKnownStatus(state, [...$('f-status').options].map((o) => o.value));
-  }
   draft = copyFilters(state);
   syncForm();
   setupGroups();
@@ -663,7 +679,7 @@ async function renderMonthly() {
   if (byYear) $('monthly').append(el('p', { class: 'muted', text: 'Each line is one calendar year, so you can compare the same month across years. The newest year is the thickest line. The table lists every month.' }));
   if (part.length) {
     const list = rows.filter((r) => r.span).map((r) => `${monthLabel(r.ym)} (${spanText(r.span).replace('partial month: ', '')})`).join(' and ');
-    $('monthly').append(el('p', { class: 'muted', text: `Hollow dots are partial months, so they are lower than a full month would be: ${list}. The newest request in the data is from ${lc ? fmtDateTime(lc.replace(' ', 'T')) : fmtDate(lastDataDay())}, because the city publishes 311 data with a delay. Year-earlier values cover the same days, up to the same time, one year earlier.` }));
+    $('monthly').append(el('p', { class: 'muted', text: `Hollow dots are partial months, so they are lower than a full month would be: ${list}. The newest request in the data is from ${lc ? fmtDateTime(lc.replace(' ', 'T')) : fmtDate(lastDataDay())}, because the city publishes 311 data with a delay.${priorMissing ? '' : ' Year-earlier values cover the same days, up to the same time, one year earlier.'}` }));
   }
 }
 
@@ -1150,9 +1166,11 @@ async function refresh() {
   setStatus($('status'), 'Updating…');
   try {
     const before = tableLoads;
-    await ensureLoaded();
+    try { await ensureLoaded(); } catch (err) { err.boardstatLoad = true; throw err; }
     if (seq !== refreshSeq) return;
     if (tableLoads !== before) { descOptionsKey = null; await fillFilterOptions(); }
+    // A page whose first load failed finishes its setup after the first load that works.
+    if (!firstLoadDone) await afterFirstLoad();
     setStatus($('status'), 'Updating…');
     await updateDescOptions();
     await renderKpis();
@@ -1168,8 +1186,10 @@ async function refresh() {
   } catch (err) {
     console.error(err);
     lastRefreshFailed = true;
-    if (!(err instanceof DataChangedError)) freshDataFiles().catch((e) => console.error(e));
-    setStatus($('status'), err instanceof DataChangedError || tableLoads === 0 ? loadFailedText(err) : `Something went wrong: ${err.message}`);
+    if (!(err instanceof DataChangedError)) freshDataFiles(err).catch((e) => console.error(e));
+    // The error itself stays in the console; the page says what to do.
+    setStatus($('status'), err.boardstatLoad || err instanceof DataChangedError ? loadFailedText(err)
+      : 'Something went wrong while updating the page. Press Apply filters to try again, or reload the page.');
   }
 }
 
@@ -1227,21 +1247,27 @@ async function main() {
   SRC = sourceSql(names);
   dataFiles = names.map((n, i) => [n, `data/${district.files[i]}`]);
   if (rangeLoading()) loader = createLoader({ exec: query, sources: names.map((n) => sourceSql([n])), cols: LOAD_COLUMNS.join(', '), checkFresh });
-  [Plot] = await Promise.all([
-    import(PLOT_URL),
-    ...names.map((n, i) => registerData(n, `data/${district.files[i]}`)),
-    registerData('agg.parquet', 'data/agg/month_type.parquet'),
-  ]);
+  try {
+    [Plot] = await Promise.all([
+      import(PLOT_URL),
+      ...names.map((n, i) => registerData(n, `data/${district.files[i]}`)),
+      registerData('agg.parquet', 'data/agg/month_type.parquet'),
+    ]);
+    // The page's table lives in an in-memory database stored compressed ("COMPRESS: whether
+    // the database is compressed. Only applicable for in-memory databases",
+    // https://duckdb.org/docs/1.4/sql/statements/attach). Brooklyn's default view takes
+    // about 140 MB instead of 770 MB, and a whole borough from 2020 fits at all.
+    await query(`ATTACH ':memory:' AS boardstat (COMPRESS true)`);
+    await query('USE boardstat');
+  } catch (err) {
+    console.error(err);
+    setStatus($('status'), 'BoardStat could not start: the query engine or the charts did not load. This can happen if the connection drops. Reload the page to try again.');
+    return;
+  }
   viewStart = manifest.window.default_start || manifest.window.start;
   window.boardstatTrack?.(ADDRESS_MODE ? 'address_viewed' : 'district_selected', { geo, district_id: geoId, page_type: ADDRESS_MODE ? 'address' : 'district' });
   state = readState();
   if (!ADDRESS_MODE) updateFullMapLink(filtersToParams(geo, geoId, state, defaultDates()));
-  // The page's table lives in an in-memory database stored compressed ("COMPRESS: whether
-  // the database is compressed. Only applicable for in-memory databases",
-  // https://duckdb.org/docs/1.4/sql/statements/attach). Brooklyn's default view takes
-  // about 140 MB instead of 770 MB, and a whole borough from 2020 fits at all.
-  await query(`ATTACH ':memory:' AS boardstat (COMPRESS true)`);
-  await query('USE boardstat');
   // A failed first load must never leave the page waiting: say so, and let Apply retry.
   let loaded = true;
   let loadError = null;
@@ -1252,10 +1278,10 @@ async function main() {
     loaded = false;
     loadError = err;
     lastRefreshFailed = true;
-    await freshDataFiles();
+    await freshDataFiles(err);
   }
-  if (loaded && ADDRESS_MODE) await renderAddressLinks();
-  await setupFilters(loaded);
+  if (loaded) await afterFirstLoad();
+  await setupFilters();
   try { await setupMap(); } catch (err) {
     console.error(err);
     $('map').replaceChildren(el('p', { text: `The map could not load (${err.message}). Every number on this page is also in the tables.` }));
@@ -1268,7 +1294,7 @@ async function main() {
 /** The status line when the requests could not be loaded. */
 function loadFailedText(err) {
   if (err instanceof DataChangedError) return 'BoardStat updated its data after this page opened. Reload the page to see the new data.';
-  return 'The requests could not be loaded (the connection failed or was interrupted). Press Apply filters to try again, or reload the page.';
+  return 'The requests could not be loaded. This can happen if the connection drops or the browser runs low on memory. Press Apply filters to try again, or reload the page.';
 }
 
 main();

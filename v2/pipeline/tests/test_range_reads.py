@@ -99,3 +99,30 @@ def test_year_before_note_is_announced_once():
         html = (SITE_JS.parent / page).read_text()
         assert re.search(r'id="monthly-live" role="status" aria-live="polite"', html)
         assert html.index('id="monthly"') < html.index('id="monthly-live"')
+
+
+def test_errors_reach_the_page_only_as_plain_text():
+    """#144 QA round 2: no raw error text (TProtocolException ...) on the status line."""
+    src = (SITE_JS / "district.js").read_text()
+    assert "Something went wrong: ${err.message}" not in src
+    assert "setStatus($('status'), `${err" not in src
+
+
+def test_a_failed_first_load_finishes_setup_on_the_retry():
+    """#144 QA round 2: after a failed first load, the first refresh that loads runs what
+    main() skipped (address links, keepKnownStatus)."""
+    src = (SITE_JS / "district.js").read_text()
+    refresh = src[src.index("async function refresh()"):src.index("/** An instant as NYC local")]
+    assert "if (!firstLoadDone) await afterFirstLoad();" in refresh
+    after = src[src.index("async function afterFirstLoad()"):src.index("async function setupFilters()")]
+    assert "keepKnownStatus" in after and "renderAddressLinks" in after
+
+
+def test_engine_start_failure_is_caught():
+    """#144 QA round 2: a failed Plot import, file registration, ATTACH or USE says so."""
+    src = (SITE_JS / "district.js").read_text()
+    main = src[src.index("async function main()"):]
+    plot = main.index("import(PLOT_URL)")
+    t = main.rindex("try {", 0, plot)
+    assert main.index("USE boardstat") < main.index("} catch (err)", t)
+    assert "Reload the page" in main[main.index("} catch (err)", t):main.index("} catch (err)", t) + 400]

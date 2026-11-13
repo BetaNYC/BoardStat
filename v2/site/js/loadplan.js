@@ -103,6 +103,15 @@ export function chunks(list, n) {
   return out;
 }
 
+/**
+ * The [name, path] entries of `files` that an error message names, by registered name
+ * ('d-312.parquet') or by URL path ('detail/cd/312.parquet'). DuckDB-WASM names the
+ * file either way, depending on whether opening it or reading a range failed.
+ */
+export function filesNamedIn(message, files) {
+  return files.filter(([name, path]) => message.includes(`'${name}'`) || message.includes(`/${path}`) || message.includes(`${path}?`));
+}
+
 /** Run async functions one at a time, in the order they were queued. A failure does not stop the queue. */
 export function createSerial() {
   let tail = Promise.resolve();

@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LOAD_BACK_MONTHS, monthsBefore, periodFrom, priorFrom, loadedBound, missingRanges, priorCoverStart,
-  firstLoadSql, extendSql, createSerial, latestOnly, createLoader, DataChangedError,
+  firstLoadSql, extendSql, createSerial, latestOnly, createLoader, DataChangedError, filesNamedIn,
 } from '../site/js/loadplan.js';
 
 const W = '2020-01-01';
@@ -338,4 +338,14 @@ test('after a nightly rebuild nothing is appended: the first load still runs, ap
   await assert.rejects(L.loadFor('2025-03-01'), DataChangedError);
   assert.equal(db.statements(), 2); // no rows from the new build were mixed in
   assert.deepEqual(L.fileFrom(), ['2025-11-01', '2025-11-01', '2025-11-01']);
+});
+
+test('filesNamedIn finds the failed file by registered name or by URL, and nothing else', () => {
+  const files = [['d-31.parquet', 'data/detail/cd/31.parquet'], ['d-302.parquet', 'data/detail/cd/302.parquet'], ['d-312.parquet', 'data/detail/cd/312.parquet']];
+  const open = "Invalid Error: Opening file 'd-312.parquet' failed with error: NetworkError";
+  const range = 'Range request for http://127.0.0.1:8791/data/detail/cd/312.parquet?v=2026-11-13T10%3A42%3A22Z failed with error';
+  assert.deepEqual(filesNamedIn(open, files).map((f) => f[0]), ['d-312.parquet']);
+  assert.deepEqual(filesNamedIn(range, files).map((f) => f[0]), ['d-312.parquet']);
+  assert.deepEqual(filesNamedIn('TProtocolException: Invalid data', files), []);
+  assert.deepEqual(filesNamedIn("Opening file 'd.parquet' failed", [['d.parquet', 'data/detail/cd/306.parquet']]).map((f) => f[0]), ['d.parquet']);
 });

@@ -337,17 +337,28 @@ only what is still missing, and the background redraw is skipped while such a
 load runs (its own redraw follows).
 
 If the background load fails, the page says so under the chart, leaves the
-year-earlier line out, and registers the files again (a failed range read can
-leave DuckDB-WASM 1.32.0 serving a bad read-ahead buffer; seen as
-"TProtocolException: Invalid data" on the retry). The next Apply or Reset that
+year-earlier line out, and registers again the files the error names (a failed
+range read can leave DuckDB-WASM 1.32.0 serving a bad read-ahead buffer; seen as
+"TProtocolException: Invalid data" on the retry). Only those: re-registering a
+file that had been read without trouble made its next read fail with "Failed
+to open file". The next Apply or Reset that
 changes the page tries again, as does reloading the page. If the first load
-fails, on any page, the status line says so and Apply tries again.
+fails, on any page, the status line says so and Apply tries again; the first
+load that works then finishes the page's setup (filter lists, and the address
+page's ZIP and district links). If the query engine itself does not start, the
+status line says to reload.
 
 **A tab left open across the nightly build.** The build replaces the files in
 place, so rows appended after it would come from a different build than the rest.
 Before anything is appended (the background load, or a From date moved earlier),
 the page reads `manifest.json` again; if `generated_at` changed, it adds nothing
-and asks the reader to reload.
+and asks the reader to reload. Limit: the check only sees the manifest, so it
+misses a rebuild whose data files changed before its manifest did. On beta.nyc
+the nightly job swaps the whole `data/` folder with a few `mv` commands
+(`publish()` in `boardstat_nightly.py`), so that window is a moment; on a
+machine serving the build folder directly (as `serve.py` does from
+`data-nightly`), the build writes the district files minutes before
+`manifest.json`. Nothing guards that window.
 
 **Memory.** The table lives in an in-memory database stored compressed
 (`ATTACH ':memory:' AS boardstat (COMPRESS true)`, then `USE boardstat`;
