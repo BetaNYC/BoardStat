@@ -1,0 +1,50 @@
+# The What's changed standard (betanyc-ai-workspace platform/system/whats-changed-standard.md,
+# section 10). This is the repository's first workflow that runs on pull requests;
+# boardstat-freshness.yml only runs on a schedule.
+#
+# v2/whats_changed.py is a copy of the workspace's canonical file: never edit it here.
+# `check --base-ref` needs the base branch's history (fetch-depth: 0), because old entries are
+# append-only. `render --check` fails when v2/site/whats-changed.html no longer matches
+# WHATS-CHANGED.md; rebuild it with the same command without --check. Standard library only,
+# so nothing to install, and no request to NYC Open Data.
+name: What's changed
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  whats-changed:
+    name: What's changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check WHATS-CHANGED.md
+        run: python3 v2/whats_changed.py check WHATS-CHANGED.md --base-ref "origin/${{ github.base_ref || 'master' }}"
+
+      - name: The site's What's changed page matches the file
+        run: >-
+          python3 v2/whats_changed.py render WHATS-CHANGED.md --format fragment
+          --into v2/site/whats-changed.html --site-prefix v2/site/
+          --repo-url https://github.com/BetaNYC/BoardStat --check
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Page tests (structure, footer links on every page, the two checks above)
+        working-directory: v2/pipeline
+        run: uv run pytest -q tests/test_whats_changed_page.py

@@ -3,6 +3,8 @@
 
 The original Power BI BoardStat stopped refreshing in early 2025. **BoardStat 2.0** replaces it: an open-source, browser-based tool for 311 data by community district, council district, or a single address. It covers requests from January 1, 2020, on, and refreshes every night. Requests from 2010 to 2019 are in a separate city dataset, and adding them is planned ([#108](https://github.com/BetaNYC/BoardStat/issues/108)). Its code and documentation are in [`v2/`](v2/README.md). The old addresses at boardstat.beta.nyc, and the earlier `beta.nyc/boardstat/v2/` address, now send visitors to https://www.beta.nyc/boardstat/.
 
+**What's changed:** every change a reader would notice, including corrections, is in [`WHATS-CHANGED.md`](WHATS-CHANGED.md), back to 2017. BoardStat 2.0 shows it at https://www.beta.nyc/boardstat/whats-changed.html once BetaNYC next uploads the site; the page is built from that file.
+
 Questions or feedback on BoardStat 2.0: email [boardstat@beta.nyc](mailto:boardstat@beta.nyc?subject=BoardStat%202.0%20feedback) or see [how to give feedback](https://www.beta.nyc/boardstat/help.html#feedback-h).
 
 ## The original BoardStat (v0.x), kept for history
@@ -45,6 +47,8 @@ For help with BoardStat 2.0, use [boardstat@beta.nyc](mailto:boardstat@beta.nyc)
 The original BoardStat read the city's 311 Service Requests dataset ([`erm2-nwe9`](https://data.cityofnewyork.us/d/erm2-nwe9), then titled "from 2010 to Present") through special views on NYC Open Data, filtered by the Community Board column. The city has since split 311 data in two: [311 Service Requests from 2020 to Present](https://data.cityofnewyork.us/d/erm2-nwe9) (`erm2-nwe9`, which BoardStat 2.0 uses) and [311 Service Requests 2010–2019](https://data.cityofnewyork.us/d/76ig-c548) (`76ig-c548`). See the [data sources in `v2/README.md`](v2/README.md).
 
 # Change Log
+
+The full, dated record, including corrections, is [`WHATS-CHANGED.md`](WHATS-CHANGED.md). The release notes below are kept as they were written.
 
 ## BoardStat 2.0 (prototype) - 2026
  * A rebuild that no longer depends on Power BI: a Python + DuckDB pipeline and a static site that queries the data in your browser. See [`v2/README.md`](v2/README.md).
