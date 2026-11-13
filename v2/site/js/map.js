@@ -46,6 +46,26 @@ async function mustFetch(url, ok = [200], headers = {}) {
   return r;
 }
 
+/** Read only the first n bytes of a response, then cancel the rest, so a server
+ *  that ignores Range (200 with the whole 200+ MB file) costs one chunk. */
+async function firstBytes(r, n) {
+  const out = new Uint8Array(n);
+  let got = 0;
+  const reader = r.body.getReader();
+  try {
+    while (got < n) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const take = Math.min(n - got, value.length);
+      out.set(value.subarray(0, take), got);
+      got += take;
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+  return out.subarray(0, got);
+}
+
 /** Check every self-hosted basemap file the style needs before using it:
  *  basemap.json, the PMTiles header (magic "PMTiles", version 3, per
  *  https://github.com/protomaps/PMTiles/blob/main/spec/v3/spec.md), the sprite,
@@ -53,7 +73,7 @@ async function mustFetch(url, ok = [200], headers = {}) {
 async function checkBasemapFiles(base) {
   await mustFetch(base + 'basemap.json');
   const r = await mustFetch(base + 'nyc.pmtiles', [200, 206], { Range: 'bytes=0-7' });
-  const head = new Uint8Array(await r.arrayBuffer()).slice(0, 8);
+  const head = await firstBytes(r, 8);
   if (new TextDecoder().decode(head.slice(0, 7)) !== 'PMTiles' || head[7] !== 3) throw new Error('nyc.pmtiles: not PMTiles v3');
   await mustFetch(base + 'sprites/' + FLAVOR + '.json');
   await mustFetch(base + 'fonts/Noto%20Sans%20Regular/0-255.pbf');

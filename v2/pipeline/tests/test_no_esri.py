@@ -89,3 +89,10 @@ def test_street_map_failure_is_shown_with_a_timeout():
     src = map_js()
     assert "AbortSignal.timeout(" in src and "withTimeout(" in src
     assert "map.on('error'" in src and "showBasemapError(" in src
+
+
+def test_pmtiles_header_check_never_reads_the_whole_file():
+    # A host that ignores Range answers 200 with the whole file; read a few bytes, then cancel.
+    src = map_js()
+    assert "arrayBuffer()" not in src
+    assert "getReader()" in src and "reader.cancel()" in src

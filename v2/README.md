@@ -426,9 +426,11 @@ Run on office-mac, 2026-11-04, with an app token, default window.
    ArcGIS; `pipeline/tests/test_no_esri.py` now fails if an ArcGIS or Esri URL
    comes back into the site code. At low zoom (z0-z7) the Protomaps build also
    carries Natural Earth land and water (public domain) and Daylight landcover
-   from ESA WorldCover 2020 (CC BY 4.0), per
-   [the Protomaps layer docs](https://docs.protomaps.com/basemaps/layers); the
-   About page credits both. District shapes sit under the street labels. Before
+   (z0-z7, per [the Protomaps layer docs](https://docs.protomaps.com/basemaps/layers)),
+   which Daylight derives from ESA WorldCover 2020
+   ([Daylight's landcover release](https://daylightmap.org/2023/10/11/landcover.html);
+   license CC BY 4.0, per [ESA WorldCover](https://esa-worldcover.org/en/data-access)).
+   The About page credits both. District shapes sit under the street labels. Before
    using the street map, `map.js` checks `basemap.json`, the `nyc.pmtiles`
    header, the sprite and one glyph file (5-second timeout each); if any fails, or
    a street-map error comes later, the map keeps the outlines and requests on
