@@ -70,3 +70,32 @@ def test_compare_query_split_by_geo_matches_the_or_filter(tmp_path):
     new = f"SELECT geo_kind, complaint_type, sum(n) FROM ({union}) GROUP BY ALL ORDER BY ALL"
     a, b = duckdb.sql(old).fetchall(), duckdb.sql(new).fetchall()
     assert a and a == b
+
+
+def test_a_failed_first_load_never_leaves_the_page_waiting():
+    """#144 QA: Brooklyn from 2020 failed its first load and the page hung on "Loading…".
+    main() must catch the first load and say so."""
+    src = (SITE_JS / "district.js").read_text()
+    main = src[src.index("async function main()"):]
+    first = main.index("await ensureLoaded();")
+    assert main.rindex("try {", 0, first) > main.index("USE boardstat")
+    assert "loadFailedText(loadError)" in main
+
+
+def test_table_is_stored_compressed():
+    """#144 QA: the req table lives in a compressed in-memory database (Brooklyn from 2020
+    did not fit uncompressed). Every query names the table without a database."""
+    src = (SITE_JS / "district.js").read_text()
+    assert src.index("ATTACH ':memory:' AS boardstat (COMPRESS true)") < src.index("USE boardstat") < src.index("async function main()") + src[src.index("async function main()"):].index("await ensureLoaded();")
+
+
+def test_year_before_note_is_announced_once():
+    """#144 QA: the loading note is redrawn with the chart, so it has no live role; a
+    separate live region outside the chart says once when the line arrives."""
+    src = (SITE_JS / "district.js").read_text()
+    note = src[src.index("'muted prior-loading'") - 40:src.index("'muted prior-loading'") + 120]
+    assert "role" not in note
+    for page in ("district.html", "address.html"):
+        html = (SITE_JS.parent / page).read_text()
+        assert re.search(r'id="monthly-live" role="status" aria-live="polite"', html)
+        assert html.index('id="monthly"') < html.index('id="monthly-live"')

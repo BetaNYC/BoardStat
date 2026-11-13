@@ -326,16 +326,38 @@ time, so the pipeline writes nothing new.
 **Two-step load on borough pages (#144 follow-up, `js/loadplan.js`).** A
 borough page first loads the Closed requests from the From date on (plus every
 request not yet Closed, as before) and draws every panel; Requests per month
-shows "This period" with the note "Loading the same months a year earlier…".
-Then it loads the 12 months before the From date in the background, one district
-file at a time, appends them to the table, and draws only Requests per month
-again. Each file remembers how far back it is loaded, so no row is loaded twice;
-Apply, Reset and a From date moved earlier wait for at most the file being read,
-then load only what is still missing. If the background load fails, the page
-says so under the chart, leaves the year-earlier line out, registers the files
-again (a failed range read can leave DuckDB-WASM 1.32.0 serving a bad read-ahead
-buffer; seen as "TProtocolException: Invalid data" on the retry) and tries again
-on the next draw.
+shows "This period" with the note "Loading the same months a year earlier…"
+(its legend shows only "This period" until then, so nothing moves when the gray
+line arrives; a screen-reader live region says once when it has). Then it loads
+the 12 months before the From date in the background, one district file at a
+time, appends them to the table, and draws only Requests per month again. Each
+file remembers how far back it is loaded, so no row is loaded twice; Apply, Reset
+and a From date moved earlier wait for at most the file being read, then load
+only what is still missing, and the background redraw is skipped while such a
+load runs (its own redraw follows).
+
+If the background load fails, the page says so under the chart, leaves the
+year-earlier line out, and registers the files again (a failed range read can
+leave DuckDB-WASM 1.32.0 serving a bad read-ahead buffer; seen as
+"TProtocolException: Invalid data" on the retry). The next Apply or Reset that
+changes the page tries again, as does reloading the page. If the first load
+fails, on any page, the status line says so and Apply tries again.
+
+**A tab left open across the nightly build.** The build replaces the files in
+place, so rows appended after it would come from a different build than the rest.
+Before anything is appended (the background load, or a From date moved earlier),
+the page reads `manifest.json` again; if `generated_at` changed, it adds nothing
+and asks the reader to reload.
+
+**Memory.** The table lives in an in-memory database stored compressed
+(`ATTACH ':memory:' AS boardstat (COMPRESS true)`, then `USE boardstat`;
+[DuckDB ATTACH options](https://duckdb.org/docs/1.4/sql/statements/attach)).
+Loads read up to five district files per statement. Before this, Brooklyn from
+2020 (6.9 million requests) never finished loading: DuckDB-WASM ran out of
+memory ("File 'd-317.parquet' too small to be a Parquet file") and the page
+stayed on "Loading…". It now loads in 17 s on a local server, with 6,862,161
+requests matching. One statement per file was 2 s slower than five files per
+statement, and every file in one statement still ran out of memory.
 
 The second step costs extra bytes. It starts mid-file, and DuckDB-WASM's
 read-ahead grows fourfold on each contiguous read up to 16 MB
@@ -351,28 +373,27 @@ Measured 2026-11-13, default view (Nov 2025 on), cold browser, headless
 Chromium, 2020+ nightly data, bytes counted at a local range-answering server;
 "50 Mbps" paces that server to 50 Mbit/s shared across connections. "Drawn" is
 every panel drawn; "Year earlier" is when the year-earlier series appears.
+"Before" is commit 6e4e6e6 (one step, uncompressed).
 
 | Page | Load | Page data | Rows loaded | DuckDB memory | Drawn (local / 50 Mbps) | Year earlier (50 Mbps) |
 |---|---|---:|---:|---:|---:|---:|
-| Brooklyn CD 6 | one step (unchanged) | 7.8 MB | 119,332 | 38 MB | 2.7 s / 4.2 s | 4.2 s |
-| Staten Island | one step (before) | 18.3 MB | 301,898 | 103 MB | 3.2 s / 7.4 s | 7.4 s |
-| Staten Island | two steps | 17 + 6 = 23.1 MB | 228,896, then 301,898 | 93, then 113 MB | 3.0 s / 6.6 s | 8.1 s |
-| **Brooklyn** | one step (before) | 133.4 MB | 2,364,674 | 768 MB | 7.0 s / 36.6 s | 36.6 s |
-| **Brooklyn** | **two steps** | **89 + 93 = 182.3 MB** | **1,317,062, then 2,364,674** | **about 490, then 553 MB** | **5.1 s / 25.7 s** | **49.2 s** |
-| Brooklyn, one prebuilt file | one step | 132.9 MB | 2,364,674 | 760 MB | 6.6 s / — | — |
+| Brooklyn CD 6 | before | 7.8 MB | 119,332 | 38 MB | 3.2 s / 4.6 s | 4.6 s |
+| Brooklyn CD 6 | one step, compressed | 7.8 MB | 119,332 | 7 MB | 2.6 s / 4.5 s | 4.5 s |
+| Staten Island | before | 18.3 MB | 301,898 | 103 MB | 3.2 s / 7.4 s | 7.4 s |
+| Staten Island | two steps, compressed | 17 + 6 = 23.1 MB | 228,896, then 301,898 | 33, then 35 MB | 3.1 s / 6.8 s | 8.4 s |
+| **Brooklyn** | before | 133.4 MB | 2,364,674 | 768 MB | 7.0 s / 36.6 s | 36.6 s |
+| **Brooklyn** | **two steps, compressed** | **89 + 93 = 181.9 MB** | **1,317,062, then 2,364,674** | **about 80, then 142 MB** | **6.1 s / 26.4 s** | **50.4 s** |
+| Brooklyn, one prebuilt file | before | 132.9 MB | 2,364,674 | 760 MB | 6.6 s / — | — |
 
-The first step alone, run as a query, reads 89.2 MB for Brooklyn; the page-level
+The first step alone, run as a query, reads 89 MB for Brooklyn; the page-level
 counts include the first background file. Totals (1,246,567 for Brooklyn,
-160,915 for Staten Island) and every year-earlier value are the same as with the
-one-step load. Apply with an earlier From date during the background load drew
-in 17 s after the first draw at 50 Mbps (Brooklyn).
+160,915 for Staten Island) and every year-earlier value are the same as before.
 
-So Brooklyn draws about 11 s sooner and the year-earlier line arrives about 13 s
-later, for 49 MB more. If that trade is wrong, the other ways to make Brooklyn
-faster are: open borough pages with a shorter default period, or have the
-pipeline write per-borough summaries for the charts and read detail only for the
-list and map (a layout with the previous year in its own files would also remove
-the re-fetch).
+So Brooklyn draws about 10 s sooner and the year-earlier line arrives about 14 s
+later, for 48 MB more. Other ways to make Brooklyn faster: open borough pages
+with a shorter default period, or have the pipeline write per-borough summaries
+for the charts and read detail only for the list and map (a layout with the
+previous year in its own files would also remove the re-fetch).
 
 ## Traffic measurement (Google Analytics)
 
@@ -591,7 +612,7 @@ Run on office-mac, 2026-11-04, with an app token, default window.
   connections the first load of a district takes a few seconds.
 - The map shows at most the 60,000 most recent matching requests.
 - A borough page (#144) downloads far more than a district page: see
-  "Whole-borough view" below.
+  "Whole-borough view" above.
 - "Same month a year earlier" only exists where the data covers both months
   (none before January 2021).
 - Boundary simplification (about 10 m) is per polygon, so hairline gaps can show

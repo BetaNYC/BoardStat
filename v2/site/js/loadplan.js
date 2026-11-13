@@ -68,24 +68,39 @@ export function priorCoverStart(state, loadedFrom, windowStart) {
   return notBefore(loadedFrom, windowStart);
 }
 
-/** The first load: Closed rows from `from` on, then every row not yet Closed (in that order). */
-export function initialLoadSql(src, cols, from) {
+/**
+ * First load of a group of files: for each file, its Closed rows from `from` on, then its
+ * rows not yet Closed (in that order). The first group creates the table; later groups
+ * are appended. A whole borough from 2020 in one statement ran DuckDB-WASM out of
+ * memory (#144 QA); groups of FILES_PER_STATEMENT files did not, and cost no more time.
+ */
+export function firstLoadSql(srcs, cols, from, create) {
   // The Closed branch runs first: run the other way round, DuckDB-WASM fetched about
   // 20% more bytes (CC 11, 2020+ data, measured 2026-11-06), because the second scan's
   // read-ahead re-fetched ranges the first had already read.
   return `
-    CREATE OR REPLACE TABLE req AS
-    SELECT ${cols} FROM ${src} WHERE is_closed = true AND created_date >= CAST(${lit(from)} AS TIMESTAMP)
+    ${create ? 'CREATE OR REPLACE TABLE req AS' : 'INSERT INTO req'}
+    ${srcs.map((src) => `SELECT ${cols} FROM ${src} WHERE is_closed = true AND created_date >= CAST(${lit(from)} AS TIMESTAMP)
     UNION ALL
-    SELECT ${cols} FROM ${src} WHERE is_closed = false`;
+    SELECT ${cols} FROM ${src} WHERE is_closed = false`).join('\n    UNION ALL\n    ')}`;
 }
 
-/** Append one file's Closed rows created in [from, to). */
-export function extendSql(src, cols, from, to) {
+/** Append Closed rows created in [from, to) of each { src, from, to }. */
+export function extendSql(parts, cols) {
   return `
     INSERT INTO req
-    SELECT ${cols} FROM ${src} WHERE is_closed = true
-      AND created_date >= CAST(${lit(from)} AS TIMESTAMP) AND created_date < CAST(${lit(to)} AS TIMESTAMP)`;
+    ${parts.map(({ src, from, to }) => `SELECT ${cols} FROM ${src} WHERE is_closed = true
+      AND created_date >= CAST(${lit(from)} AS TIMESTAMP) AND created_date < CAST(${lit(to)} AS TIMESTAMP)`).join('\n    UNION ALL\n    ')}`;
+}
+
+/** How many files one load statement reads (measured on Brooklyn, 2026-11-13). */
+export const FILES_PER_STATEMENT = 5;
+
+/** Split a list into runs of at most n. */
+export function chunks(list, n) {
+  const out = [];
+  for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n));
+  return out;
 }
 
 /** Run async functions one at a time, in the order they were queued. A failure does not stop the queue. */
@@ -109,32 +124,66 @@ export function latestOnly() {
   return { next: () => ++n, isLatest: (t) => t === n };
 }
 
+/** Thrown when the data was rebuilt after the page opened: appending would mix two builds. */
+export class DataChangedError extends Error {
+  constructor() {
+    super('The data was rebuilt after this page opened');
+    this.name = 'DataChangedError';
+  }
+}
+
 /**
- * The `req` table's loader. `exec(sql)` runs SQL; `sources[i]` is the SQL that reads file i
- * alone, `allSrc` reads every file. All changes to the table go through one queue.
+ * The `req` table's loader. `exec(sql)` runs SQL; `sources[i]` is the SQL that reads file
+ * i. All changes to the table go through one queue: the page's own loads in statements
+ * of up to `perStatement` files, the background load one file per statement, so the
+ * page's queries can run in between.
+ * `checkFresh()` runs before anything is added to an existing table and throws
+ * DataChangedError if the files are no longer the ones the table came from (the nightly
+ * build replaces them in place).
  */
-export function createLoader({ exec, sources, allSrc, cols }) {
+export function createLoader({ exec, sources, cols, checkFresh = async () => {}, perStatement = FILES_PER_STATEMENT }) {
   const fileFrom = sources.map(() => null);
   const serial = createSerial();
+  let created = false; // the req table exists
   let job = null; // the background load running now: { target, done }
   let lastError = null; // why the last background load failed, until the next one starts
+  let pending = 0; // foreground loads queued or running
 
-  /** Foreground: make sure Closed rows from `target` on are loaded. Resolves true if the table changed. */
+  /** Bring the files `ids` back to `target`, in one statement per kind. Returns true if rows were added. */
+  async function loadFiles(ids, target) {
+    const first = ids.filter((i) => fileFrom[i] === null);
+    const more = ids.filter((i) => fileFrom[i] !== null && fileFrom[i] > target);
+    if (first.length) {
+      if (created) await checkFresh();
+      await exec(firstLoadSql(first.map((i) => sources[i]), cols, target, !created));
+      created = true;
+      for (const i of first) fileFrom[i] = target;
+    }
+    if (more.length) {
+      await checkFresh();
+      await exec(extendSql(more.map((i) => ({ src: sources[i], from: target, to: fileFrom[i] })), cols));
+      for (const i of more) fileFrom[i] = target;
+    }
+    return first.length + more.length > 0;
+  }
+
+  /** Foreground: make sure every file has Closed rows from `target` on. Resolves true if the table changed. */
   function loadFor(target, onLoading = () => {}) {
+    pending++;
     return serial.run(async () => {
-      if (fileFrom.some((d) => d === null)) {
-        onLoading(target);
-        await exec(initialLoadSql(allSrc, cols, target));
-        fileFrom.fill(target);
-        return true;
+      let changed = false;
+      try {
+        const todo = sources.map((_, i) => i).filter((i) => fileFrom[i] === null || fileFrom[i] > target);
+        let done = 0;
+        for (const ids of chunks(todo, perStatement)) {
+          onLoading(target, done, todo.length);
+          if (await loadFiles(ids, target)) changed = true;
+          done += ids.length;
+        }
+      } finally {
+        pending--;
       }
-      const todo = missingRanges(fileFrom, target);
-      if (todo.length) onLoading(target);
-      for (const r of todo) {
-        await exec(extendSql(sources[r.i], cols, r.from, r.to));
-        fileFrom[r.i] = r.from;
-      }
-      return todo.length > 0;
+      return changed;
     });
   }
 
@@ -142,7 +191,8 @@ export function createLoader({ exec, sources, allSrc, cols }) {
    * Background: load Closed rows back to `target`, one file per queued step, so queries
    * for the page can run between files. Returns the running job, or null if there is
    * nothing to load. A job already reaching as far back keeps running; a job for an
-   * earlier date replaces it (the older one stops after its current file).
+   * earlier date replaces it (the older one stops after its current file). A replaced
+   * job reports `superseded`, whether it then succeeded or failed.
    */
   function loadInBackground(target) {
     if (target === null || fileFrom.some((d) => d === null) || !missingRanges(fileFrom, target).length) return null;
@@ -156,18 +206,15 @@ export function createLoader({ exec, sources, allSrc, cols }) {
           if (job !== mine) return { ok: true, superseded: true };
           const next = missingRanges(fileFrom, mine.target)[0];
           if (!next) break;
-          await serial.run(async () => {
-            // Worked out again inside the queue: a foreground load may have filled it meanwhile.
-            const r = missingRanges(fileFrom, mine.target).find((x) => x.i === next.i);
-            if (!r) return;
-            await exec(extendSql(sources[r.i], cols, r.from, r.to));
-            fileFrom[r.i] = r.from;
-          });
+          // Worked out again inside the queue: a foreground load may have filled it meanwhile.
+          await serial.run(() => loadFiles([next.i], mine.target));
         }
         if (job === mine) job = null;
         return { ok: true };
       } catch (error) {
-        if (job === mine) { job = null; lastError = error; }
+        if (job !== mine) return { ok: false, error, superseded: true };
+        job = null;
+        lastError = error;
         return { ok: false, error };
       }
     })();
@@ -183,5 +230,7 @@ export function createLoader({ exec, sources, allSrc, cols }) {
     fileFrom: () => [...fileFrom],
     running: () => job,
     lastError: () => lastError,
+    /** True while a foreground load is queued or running: the table is not yet what the page needs. */
+    loadPending: () => pending > 0,
   };
 }

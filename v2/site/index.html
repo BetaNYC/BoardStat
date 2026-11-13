@@ -9,7 +9,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css?v=54507c9a6e">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=af85672e6d","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=a3e98058db","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=910647b1bd","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=6eb8d4adf5","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=a3e98058db","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=2b35c83029","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -34,7 +34,7 @@
         <label class="choice"><input type="radio" name="geo" value="cc"> A council district</label>
         <label class="choice"><input type="radio" name="geo" value="boro"> A whole borough</label>
         <label class="choice"><input type="radio" name="geo" value="addr"> An address</label>
-        <p class="muted" id="boro-note" hidden>A borough page adds up all of the borough's community districts and its parks and other Joint Interest Areas. It loads several times more data than one district, so it takes longer to open.</p>
+        <p class="muted" id="boro-note" hidden>A borough page adds up all of the borough's community districts and its parks and other Joint Interest Areas. It can load up to about 20 times as much data as one district, so it takes longer to open.</p>
         <p class="muted" id="cc-note" hidden>Council districts use the current lines (Department of City Planning release <span class="bver">26c</span>). Requests made before the 2023 redistricting are re-mapped to today's lines by their location, so totals may differ from the city's own <code>council_district</code> field.</p>
       </fieldset>
 
