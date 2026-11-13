@@ -40,7 +40,8 @@ internal reports, in Noel's private vault).
    MapLibre GL ── self-hosted Protomaps street map, district boundaries, clustered points
    Observable Plot ── monthly line, agency × status, compare chart
    Page features: filters (dates, problem, description with exclude, agency, status
-   incl. "not yet closed", address) in the URL; at-a-glance numbers; top problems
+   incl. "not yet closed", address) in groups that open and close, run by an Apply
+   button and kept in the URL; at-a-glance numbers; top problems
    and descriptions; monthly chart; agency responsiveness table; older requests
    still open; map; top addresses; compare; request list with days open; CSV; print
 ```

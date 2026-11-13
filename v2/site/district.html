@@ -6,9 +6,9 @@
   <title>District · BoardStat 2.0 (prototype)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css?v=cbb35afbba">
+  <link rel="stylesheet" href="css/style.css?v=4194e734d8">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=2d30694181","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=7c26b37530","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=2baa838b88","./js/filterstate.js":"./js/filterstate.js?v=7454a9b715","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=eddf87a5bd","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -31,28 +31,47 @@
 
     <form id="filters" class="panel no-print" aria-labelledby="filters-h">
       <h2 id="filters-h">Filter requests</h2>
-      <div class="filters">
-        <div><label for="f-start">From</label><input type="date" id="f-start" name="start"></div>
-        <div><label for="f-end">To</label><input type="date" id="f-end" name="end"></div>
-        <div>
-          <label for="f-type">Problem (formerly Complaint Type)</label>
-          <input type="text" id="f-type" list="type-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="type-help">
-          <datalist id="type-options"></datalist>
-          <span class="sr-only" id="type-help">Choose one or more problems. Selected problems are listed below with remove buttons.</span>
-          <ul class="chips" id="type-chips" aria-label="Selected problems"></ul>
+      <p class="muted">Choose filters, then press <strong>Apply filters</strong> to update the page. Select a heading to open or close a group.</p>
+      <details class="filter-group" id="fg-dates" data-section="dates" open>
+        <summary><span class="fg-title">Dates</span> <span class="fg-count" data-count-for="dates"></span></summary>
+        <div class="fg-body">
+          <div><label for="f-start">From</label><input type="date" id="f-start" name="start"></div>
+          <div><label for="f-end">To</label><input type="date" id="f-end" name="end"></div>
         </div>
-        <div>
-          <label for="f-desc">Description (formerly Descriptor)</label>
-          <input type="text" id="f-desc" list="desc-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="desc-help">
-          <datalist id="desc-options"></datalist>
-          <span class="sr-only" id="desc-help">Lists the descriptions used for the selected problems, or for every problem if none is selected. Selected descriptions are listed below with remove buttons.</span>
-          <label class="choice" for="f-desc-ex"><input type="checkbox" id="f-desc-ex"> Exclude these descriptions</label>
-          <ul class="chips" id="desc-chips" aria-label="Selected descriptions"></ul>
+      </details>
+      <details class="filter-group" id="fg-problem" data-section="problem" open>
+        <summary><span class="fg-title">Problem and description</span> <span class="fg-count" data-count-for="problem"></span></summary>
+        <div class="fg-body fg-pair">
+          <div>
+            <label for="f-type">Problem (formerly Complaint Type)</label>
+            <input type="text" id="f-type" list="type-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="type-help">
+            <datalist id="type-options"></datalist>
+            <span class="sr-only" id="type-help">Choose one or more problems. Selected problems are listed below with remove buttons. Press Enter in an empty box to apply the filters.</span>
+            <ul class="chips" id="type-chips" aria-label="Selected problems"></ul>
+          </div>
+          <div>
+            <label for="f-desc">Description (formerly Descriptor)</label>
+            <input type="text" id="f-desc" list="desc-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="desc-help">
+            <datalist id="desc-options"></datalist>
+            <span class="sr-only" id="desc-help">Lists the descriptions used for the selected problems, or for every problem if none is selected. Selected descriptions are listed below with remove buttons. Press Enter in an empty box to apply the filters.</span>
+            <ul class="chips" id="desc-chips" aria-label="Selected descriptions"></ul>
+            <label class="choice" for="f-desc-ex"><input type="checkbox" id="f-desc-ex"> Exclude these descriptions</label>
+          </div>
         </div>
-        <div><label for="f-agency">Agency</label><select id="f-agency" name="agency"><option value="">All agencies</option></select></div>
-        <div><label for="f-status">Status</label><select id="f-status" name="status"><option value="">Any status</option><option value="not_closed">Not yet closed (any status but Closed)</option></select></div>
-        <div id="addr-filter" hidden><span class="label">Address</span> <span id="addr-value"></span> <button type="button" class="link" id="addr-clear">Clear address</button></div>
-        <div><button type="button" class="secondary" id="reset">Reset filters</button> <button type="button" id="print">Print summary</button></div>
+      </details>
+      <details class="filter-group" id="fg-agency" data-section="agency">
+        <summary><span class="fg-title">Agency and status</span> <span class="fg-count" data-count-for="agency"></span></summary>
+        <div class="fg-body fg-pair">
+          <div><label for="f-agency">Agency</label><select id="f-agency" name="agency"><option value="">All agencies</option></select></div>
+          <div><label for="f-status">Status</label><select id="f-status" name="status"><option value="">Any status</option><option value="not_closed">Not yet closed (any status but Closed)</option></select></div>
+        </div>
+      </details>
+      <div id="addr-filter" class="addr-filter" hidden><span class="label">Address</span> <span id="addr-value"></span> <button type="button" class="link" id="addr-clear">Clear address</button></div>
+      <div class="filter-actions">
+        <button type="submit" id="apply">Apply filters</button>
+        <button type="button" class="secondary" id="reset">Reset filters</button>
+        <button type="button" class="secondary" id="print">Print summary</button>
+        <p class="pending" id="pending" aria-live="polite"></p>
       </div>
       <p class="status" id="status" role="status" aria-live="polite"></p>
     </form>
@@ -62,18 +81,20 @@
       <div class="kpis" id="kpis"></div>
     </section>
 
-    <div class="grid">
-      <section class="panel" aria-labelledby="top-h">
-        <h2 id="top-h">Top 10 problems</h2>
-        <p class="muted no-print">Select a problem to see what people described.</p>
+    <section class="panel" aria-labelledby="top-h">
+      <h2 id="top-h">Top 10 problems</h2>
+      <p class="muted no-print">Select a problem to see what people described.</p>
+      <div class="top-wrap">
         <div id="top"></div>
         <div id="descriptors" class="no-print" aria-live="polite"></div>
-      </section>
-      <section class="panel" aria-labelledby="month-h">
-        <h2 id="month-h">Requests per month</h2>
-        <div id="monthly"></div>
-      </section>
-    </div>
+      </div>
+    </section>
+
+    <!-- Full width: the chart is drawn as wide as this panel (#142). -->
+    <section class="panel" aria-labelledby="month-h">
+      <h2 id="month-h">Requests per month</h2>
+      <div id="monthly"></div>
+    </section>
 
     <section class="panel" aria-labelledby="agency-h">
       <h2 id="agency-h">Agency responsiveness</h2>
@@ -97,17 +118,17 @@
       <p class="map-note" id="map-note">Circles group nearby requests; select one to zoom in, or select a single point for details.</p>
     </section>
 
-    <div class="grid no-print">
-      <section class="panel" aria-labelledby="addr-h">
-        <h2 id="addr-h">Addresses with the most requests</h2>
-        <div id="addresses"></div>
-      </section>
-      <section class="panel" aria-labelledby="cmp-h">
-        <h2 id="cmp-h">Compare</h2>
-        <p class="muted" id="cmp-note"></p>
-        <div id="compare"></div>
-      </section>
-    </div>
+    <section class="panel no-print" aria-labelledby="addr-h">
+      <h2 id="addr-h">Addresses with the most requests</h2>
+      <div id="addresses"></div>
+    </section>
+
+    <!-- Full width: the chart is drawn as wide as this panel (#142). -->
+    <section class="panel no-print" aria-labelledby="cmp-h">
+      <h2 id="cmp-h">Compare</h2>
+      <p class="muted" id="cmp-note"></p>
+      <div id="compare"></div>
+    </section>
 
     <section class="panel no-print" aria-labelledby="detail-h">
       <h2 id="detail-h">Every request</h2>
@@ -130,6 +151,6 @@
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html">What&rsquo;s changed</a>.</footer>
-  <script type="module" src="js/district.js?v=2d30694181"></script>
+  <script type="module" src="js/district.js?v=2baa838b88"></script>
 </body>
 </html>

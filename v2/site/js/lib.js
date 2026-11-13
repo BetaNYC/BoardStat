@@ -192,9 +192,11 @@ export function table(rows, columns, caption) {
 
 /** A chart plus a "Show as table" disclosure carrying the same numbers. */
 export function chartWithTable(container, chartNode, rows, columns, caption) {
+  // A redraw (new filters, or a resize) keeps the table open if the reader had opened it.
+  const wasOpen = container.querySelector(':scope > details.as-table')?.open;
   container.replaceChildren(
     el('figure', {}, chartNode),
-    el('details', { class: 'as-table' }, el('summary', { text: 'Show as table' }), table(rows, columns, caption)),
+    el('details', { class: 'as-table', open: wasOpen || null }, el('summary', { text: 'Show as table' }), table(rows, columns, caption)),
   );
 }
 
