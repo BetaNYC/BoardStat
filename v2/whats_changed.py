@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# betanyc-shared: whats_changed.py v1.2.3
-# betanyc-shared-sha256: 0e1875d7da9de7635f6d155bd22dd24093ae6ba621de5e73954b514cf43e7a89
+# betanyc-shared: whats_changed.py v1.2.4
+# betanyc-shared-sha256: f33f57f41fd2aac1f6407d67b3e4ba04de6a9069c1a26eca512fcc2353b040c6
 # Canonical copy: betanyc-ai-workspace scripts/whats_changed.py. Do not edit a copy in
 # another repo; change the canonical file, re-stamp it, and copy it again.
 # Drift check: scripts/whats_changed_drift.py. Standard: platform/system/whats-changed-standard.md.
@@ -971,7 +971,10 @@ def _yaml_title(parsed: dict) -> str:
 def render_quarto(parsed: dict, link_map: LinkMap) -> str:
     title = _yaml_title(parsed)
     body = render_fragment(parsed, link_map, with_h1=False)
-    return f'---\ntitle: {title}\n---\n\n```{{=html}}\n{body}\n```\n'
+    # anchor-sections: false (quarto.org, HTML format options): Quarto otherwise adds an "Anchor"
+    # link to every entry heading, many links with one label and different targets. Each entry
+    # already has its own "Link to this change".
+    return f'---\ntitle: {title}\nanchor-sections: false\n---\n\n```{{=html}}\n{body}\n```\n'
 
 
 def liquid_safe(body: str) -> str:
