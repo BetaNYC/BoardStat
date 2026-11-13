@@ -323,22 +323,56 @@ borough file was measured too (a scratch Brooklyn file built from the same
 rows, same sort and row groups) and downloaded the same bytes in the same
 time, so the pipeline writes nothing new.
 
+**Two-step load on borough pages (#144 follow-up, `js/loadplan.js`).** A
+borough page first loads the Closed requests from the From date on (plus every
+request not yet Closed, as before) and draws every panel; Requests per month
+shows "This period" with the note "Loading the same months a year earlier…".
+Then it loads the 12 months before the From date in the background, one district
+file at a time, appends them to the table, and draws only Requests per month
+again. Each file remembers how far back it is loaded, so no row is loaded twice;
+Apply, Reset and a From date moved earlier wait for at most the file being read,
+then load only what is still missing. If the background load fails, the page
+says so under the chart, leaves the year-earlier line out, registers the files
+again (a failed range read can leave DuckDB-WASM 1.32.0 serving a bad read-ahead
+buffer; seen as "TProtocolException: Invalid data" on the retry) and tries again
+on the next draw.
+
+The second step costs extra bytes. It starts mid-file, and DuckDB-WASM's
+read-ahead grows fourfold on each contiguous read up to 16 MB
+(`lib/include/duckdb/web/io/readahead_buffer.h` in duckdb-wasm 1.32.0), so it
+runs on to the end of each file and fetches the first step's bytes again, with
+the unselected columns. Two steps cost about the one-step bytes plus the first
+step's. That is worth it for a borough and not for a district, so district,
+council district and address pages keep the one-step load (`TWO_STEP` in
+`district.js`). Any page now appends only the missing older rows when the From
+date moves earlier, instead of reloading the whole table.
+
 Measured 2026-11-13, default view (Nov 2025 on), cold browser, headless
 Chromium, 2020+ nightly data, bytes counted at a local range-answering server;
-"50 Mbps" paces that server to 50 Mbit/s shared across connections:
+"50 Mbps" paces that server to 50 Mbit/s shared across connections. "Drawn" is
+every panel drawn; "Year earlier" is when the year-earlier series appears.
 
-| Page | Page data | Rows loaded | DuckDB memory | Local | 50 Mbps |
-|---|---:|---:|---:|---:|---:|
-| Brooklyn CD 6 | 7.8 MB | 119,332 | 38 MB | 3.1 s | 4.1 s |
-| Staten Island | 18.3 MB | 301,898 | 103 MB | 2.9 s | 6.8 s |
-| **Brooklyn** | **133.4 MB** | **2,364,674** | **768 MB** | **6.2 s** | **36.2 s** |
-| Brooklyn, one prebuilt file | 132.9 MB | 2,364,674 | 760 MB | 6.6 s | — |
+| Page | Load | Page data | Rows loaded | DuckDB memory | Drawn (local / 50 Mbps) | Year earlier (50 Mbps) |
+|---|---|---:|---:|---:|---:|---:|
+| Brooklyn CD 6 | one step (unchanged) | 7.8 MB | 119,332 | 38 MB | 2.7 s / 4.2 s | 4.2 s |
+| Staten Island | one step (before) | 18.3 MB | 301,898 | 103 MB | 3.2 s / 7.4 s | 7.4 s |
+| Staten Island | two steps | 17 + 6 = 23.1 MB | 228,896, then 301,898 | 93, then 113 MB | 3.0 s / 6.6 s | 8.1 s |
+| **Brooklyn** | one step (before) | 133.4 MB | 2,364,674 | 768 MB | 7.0 s / 36.6 s | 36.6 s |
+| **Brooklyn** | **two steps** | **89 + 93 = 182.3 MB** | **1,317,062, then 2,364,674** | **about 490, then 553 MB** | **5.1 s / 25.7 s** | **49.2 s** |
+| Brooklyn, one prebuilt file | one step | 132.9 MB | 2,364,674 | 760 MB | 6.6 s / — | — |
 
-Half of what loads is the year before the chosen dates (the "same month a year
-earlier" line). Ways to make Brooklyn faster if needed: load that year after
-the page first draws; open borough pages with a shorter default period; or
-have the pipeline write per-borough summaries for the charts and read detail
-only for the list and map.
+The first step alone, run as a query, reads 89.2 MB for Brooklyn; the page-level
+counts include the first background file. Totals (1,246,567 for Brooklyn,
+160,915 for Staten Island) and every year-earlier value are the same as with the
+one-step load. Apply with an earlier From date during the background load drew
+in 17 s after the first draw at 50 Mbps (Brooklyn).
+
+So Brooklyn draws about 11 s sooner and the year-earlier line arrives about 13 s
+later, for 49 MB more. If that trade is wrong, the other ways to make Brooklyn
+faster are: open borough pages with a shorter default period, or have the
+pipeline write per-borough summaries for the charts and read detail only for the
+list and map (a layout with the previous year in its own files would also remove
+the re-fetch).
 
 ## Traffic measurement (Google Analytics)
 

@@ -1,7 +1,7 @@
 // District page: every query runs in DuckDB-WASM over ONE district's Parquet file, or,
 // for a whole borough (geo=boro, #144), over all of its community districts' files at once.
 import {
-  PLOT_URL, loadManifest, renderDataStatus, renderChanges, dataUrl, registerData, query, lit, el, table, chartWithTable,
+  PLOT_URL, loadManifest, renderDataStatus, renderChanges, dataUrl, registerData, reregisterData, query, lit, el, table, chartWithTable,
   setStatus, fmtInt, fmtDays, fmtPct, fmtDate, fmtDateTime, monthLabel,
 } from './lib.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
@@ -10,6 +10,7 @@ import {
 } from './filterstate.js';
 import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl } from './place.js';
+import { periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly } from './loadplan.js';
 
 const $ = (id) => document.getElementById(id);
 const PAGE = 50;
@@ -47,25 +48,37 @@ let selectedType = null;
 let addrInfo = null; // address page: { zip, cd, cc, boro, lng, lat } of the address
 let asOfSql = null; // build time as an NYC-local TIMESTAMP literal; "days open" is measured to it
 let viewStart = null; // the From date a link without dates opens with (manifest.window.default_start)
-let loadedFrom = null; // closed requests created before this date are not in the req table
+let loader = null; // loads the req table (loadplan.js); null when the file is loaded whole
+let loadedFrom = null; // Closed requests created before this date are not (all) in the req table
+let tableLoads = 0; // counts loads made before a draw, so the filter lists are refilled after one
 
 // ------------------------------------------------------------- loading only what the view needs
 //
 // Detail files hold the Closed requests first, in created_date order, then every
 // request not yet Closed at the very end, in 50,000-row groups (boardstat_build.py).
-// The page loads all open requests plus Closed ones from LOAD_BACK_MONTHS before the
-// From date: the "same month a year earlier" series needs that year, and "Still open
-// from before this period" needs every older open request. So the rows a page needs
-// are one run of row groups at the end of the file. DuckDB-WASM reads only the row
-// groups whose min/max statistics match, over HTTP range requests (lib.js turns off
+// The page loads every request not yet Closed ("Still open from before this period"
+// needs all of them) plus the Closed requests from LOAD_BACK_MONTHS before the From
+// date: the "same month a year earlier" series needs that year. So the rows a page
+// needs are one run of row groups at the end of each file. DuckDB-WASM reads only the
+// row groups whose min/max statistics match, over HTTP range requests (lib.js turns off
 // forceFullHTTPReads; https://duckdb.org/docs/stable/data/parquet/overview#partial-reading).
-// Its read-ahead grows each read up to 16 MB, so a contiguous run that ends at the
-// end of the file costs little more than the run itself. The Closed branch of the
-// load runs first: run the other way round, DuckDB-WASM fetched about 20% more bytes
-// (CC 11, 2020+ data, measured 2026-11-06), because the second scan's read-ahead
-// re-fetched ranges the first had already read.
-// Moving the From date earlier than that reloads the table.
-const LOAD_BACK_MONTHS = 12;
+// Its read-ahead grows each read fourfold while reads stay contiguous, up to 16 MB
+// (duckdb-wasm 1.32.0, lib/include/duckdb/web/io/readahead_buffer.h), so a run that
+// ends at the end of the file costs about the raw bytes from its first row group to
+// the end of the file, unselected columns included. The Closed branch of the load
+// runs first (initialLoadSql in loadplan.js says why).
+//
+// A borough page loads in two steps instead (#144, loadplan.js): Closed requests from
+// the From date on, then draw, then the year before in the background, file by file,
+// and draw Requests per month again. That second read starts mid-file, so read-ahead
+// runs on to the end of the file and fetches the first step's bytes again: two steps
+// cost the one-step bytes plus the first step's. Measured 2026-11-13 at 50 Mbit/s,
+// Brooklyn draws in 26 s instead of 37 s for 49 MB more; a community district (CD 306)
+// draws 0.4 s sooner for 4.7 MB more (+60%), so district, council district and
+// address pages keep the one-step load. TWO_STEP below switches it.
+//
+// Moving the From date earlier appends only the missing older Closed rows.
+const TWO_STEP = IS_BORO;
 // The columns the page's panels use. The CSV download reads every column straight
 // from the file instead, so the long text fields never sit in memory.
 const LOAD_COLUMNS = ['unique_key', 'created_date', 'closed_date', 'agency', 'agency_name', 'complaint_type', 'descriptor', 'status',
@@ -74,38 +87,50 @@ const LOAD_COLUMNS = ['unique_key', 'created_date', 'closed_date', 'agency', 'ag
 // Files built before range loading have no is_closed column or default_start; load those whole.
 const rangeLoading = () => Boolean(manifest.window.default_start);
 
-function monthsBefore(iso, n) {
-  const d = new Date(`${iso.slice(0, 7)}-01T12:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() - n);
-  return d.toISOString().slice(0, 10);
-}
-
-/** The earliest created date the current filters need for Closed requests, or null for none. */
-function neededFrom() {
-  // Every request whose status is not Closed is always loaded, so a status filter
-  // other than Closed (including "not yet closed") never needs older Closed rows.
-  if (state.status && state.status !== 'Closed') return null;
-  const from = monthsBefore(state.start, LOAD_BACK_MONTHS);
-  return from > manifest.window.start ? from : manifest.window.start;
-}
-
-/** (Re)build the req table if the view needs Closed requests older than what is loaded. */
+/** Before a draw: make sure the req table holds every row the current filters' period needs. */
 async function ensureLoaded() {
-  if (!rangeLoading()) {
-    if (loadedFrom === null) { await query(`CREATE TABLE req AS SELECT * FROM ${SRC}`); loadedFrom = manifest.window.start; }
+  if (!loader) {
+    if (loadedFrom === null) { await query(`CREATE TABLE req AS SELECT * FROM ${SRC}`); loadedFrom = manifest.window.start; tableLoads++; }
     return;
   }
-  const need = neededFrom();
-  if (loadedFrom !== null && (need === null || need >= loadedFrom)) return;
-  const from = need === null ? monthsBefore(viewStart, LOAD_BACK_MONTHS) : need;
-  const cols = LOAD_COLUMNS.join(', ');
-  setStatus($('status'), `Loading requests from ${fmtDate(from > manifest.window.start ? from : manifest.window.start)} on…`);
-  await query(`
-    CREATE OR REPLACE TABLE req AS
-    SELECT ${cols} FROM ${SRC} WHERE is_closed = true AND created_date >= CAST(${lit(from)} AS TIMESTAMP)
-    UNION ALL
-    SELECT ${cols} FROM ${SRC} WHERE is_closed = false`);
-  loadedFrom = from;
+  // A status other than Closed needs no Closed rows; the first load still takes the
+  // default view's, so that switching back to every status is quick.
+  const firstFrom = (s) => (TWO_STEP ? periodFrom : priorFrom)(s, manifest.window.start);
+  const target = firstFrom(state) ?? (loadedFrom === null ? firstFrom({ start: viewStart }) : null);
+  if (target === null) return;
+  const changed = await loader.loadFor(target, (from) => setStatus($('status'), `Loading requests from ${fmtDate(from)} on…`));
+  loadedFrom = loader.loadedFrom();
+  if (changed) tableLoads++;
+}
+
+/**
+ * After a draw: load the year before the From date in the background, then draw
+ * Requests per month again. A failure leaves the rest of the page as it is.
+ */
+function loadPriorYear() {
+  if (!loader || !TWO_STEP) return;
+  const job = loader.loadInBackground(priorFrom(state, manifest.window.start));
+  if (!job || job.watched) return;
+  job.watched = true;
+  job.done.then(async (r) => {
+    loadedFrom = loader.loadedFrom();
+    if (r.superseded) return;
+    if (!r.ok) { console.error(r.error); priorFailure = r.error; await freshDataFiles(); }
+    return renderMonthly();
+  }).catch((err) => console.error(err));
+}
+
+// Why the last background load failed; cleared when the page draws again, which retries it.
+let priorFailure = null;
+let dataFiles = []; // [name, path] of each detail file this page reads
+/** After a failed read: register the detail files again, so a retry does not reuse a bad buffer (lib.js). */
+function freshDataFiles() {
+  const redo = async () => {
+    for (const [name, path] of dataFiles) {
+      try { await reregisterData(name, path); } catch (err) { console.error(err); }
+    }
+  };
+  return loader ? loader.queue(redo) : redo();
 }
 
 // ------------------------------------------------------------- state <-> URL
@@ -280,8 +305,8 @@ function addType(t) {
 /** Fill the problem, agency and status lists from what is loaded (again after a reload). */
 let optionsFrom;
 async function fillFilterOptions() {
-  if (optionsFrom === loadedFrom) return;
-  optionsFrom = loadedFrom;
+  if (optionsFrom === tableLoads) return;
+  optionsFrom = tableLoads;
   allTypes = (await query(`SELECT complaint_type AS t, count(*) AS n FROM req GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.t);
   $('type-options').replaceChildren(...allTypes.map((t) => el('option', { value: t })));
   // Keep the fixed first options ("All agencies", "Any status", "Not yet closed"); replace the rest.
@@ -485,11 +510,20 @@ function yearChart(rows, title, spanText, width) {
   });
 }
 
+// Only the newest Requests per month draw is shown: the background load of the year
+// before (loadPriorYear) draws it again, and must never overwrite a newer view.
+const monthlyDraw = latestOnly();
+
 async function renderMonthly() {
   // A month is "partial" when the From/To dates or the end of the data cut it short.
   // Partial months are shown as hollow dots off the line, so a short month never
   // looks like a drop. The year-earlier series uses exactly the same days, shifted
   // back 12 months (every filter except From/To applies).
+  const draw = monthlyDraw.next();
+  // Year-earlier counts are complete only from coverFrom on: what is loaded when the
+  // query runs (rows are only ever added, so reading it first is safe).
+  const coverFrom = priorCoverStart(state, loadedFrom, manifest.window.start);
+  const priorFailed = priorFailure;
   const effEnd = state.end < lastDataDay() ? state.end : lastDataDay();
   // When the dates reach the end of the data, the year-earlier series stops at the
   // same minute as the newest request, since the last day is usually only partly in.
@@ -516,16 +550,20 @@ async function renderMonthly() {
       GROUP BY 1
     )
     SELECT m.ym, m.n, prev_year.n_prior FROM m LEFT JOIN prev_year USING (ym) ORDER BY m.ym`);
-  // A year-earlier month is only shown if the data covers all of its matching days.
-  const priorCovered = (ym) => {
+  if (!monthlyDraw.isLatest(draw)) return;
+  // A year-earlier month is only shown if the data covers all of its matching days,
+  // and the page has loaded them (the year before loads after the first draw).
+  const priorStartOf = (ym) => {
     const [y, mo] = ym.split('-').map(Number);
     const span = partialSpan(ym, state.start, effEnd) || [`${ym}-01`, null];
-    const priorStart = `${y - 1}-${String(mo).padStart(2, '0')}-${span[0].slice(8)}`;
-    return priorStart >= manifest.window.start;
+    return `${y - 1}-${String(mo).padStart(2, '0')}-${span[0].slice(8)}`;
   };
+  let priorMissing = 0;
   for (const r of rows) {
     r.span = partialSpan(r.ym, state.start, effEnd);
-    if (!priorCovered(r.ym)) r.n_prior = null;
+    const priorStart = priorStartOf(r.ym);
+    if (priorStart < manifest.window.start) r.n_prior = null;
+    else if (priorStart < coverFrom) { r.n_prior = null; r.priorWait = true; priorMissing++; }
   }
   const spanText = (sp) => (sp ? `partial month: ${fmtDate(sp[0])}${sp[0] === sp[1] ? '' : ` to ${fmtDate(sp[1])}`} only` : '');
   const data = [];
@@ -563,8 +601,14 @@ async function renderMonthly() {
   chartWithTable($('monthly'), chart, rows, [
     { key: 'ym', label: 'Month', fmt: (v, r) => (r.span ? `${monthLabel(v)} (${spanText(r.span)})` : monthLabel(v)) },
     { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
-    { key: 'n_prior', label: 'Same days a year earlier', num: true, fmt: (v) => (v == null ? 'not in data' : fmtInt(v)) },
+    { key: 'n_prior', label: 'Same days a year earlier', num: true,
+      fmt: (v, r) => (v != null ? fmtInt(v) : !r.priorWait ? 'not in data' : priorFailed ? 'not loaded' : 'loading…') },
   ], 'Requests per month');
+  if (priorMissing) {
+    $('monthly').append(priorFailed
+      ? el('p', { class: 'muted prior-failed', text: 'The same months a year earlier could not be loaded, so that line is left out. Everything else on this page is complete. Reload the page to try again.' })
+      : el('p', { class: 'muted prior-loading', role: 'status', text: 'Loading the same months a year earlier…' }));
+  }
   if (byYear) $('monthly').append(el('p', { class: 'muted', text: 'Each line is one calendar year, so you can compare the same month across years. The newest year is the thickest line. The table lists every month.' }));
   if (part.length) {
     const list = rows.filter((r) => r.span).map((r) => `${monthLabel(r.ym)} (${spanText(r.span).replace('partial month: ', '')})`).join(' and ');
@@ -1047,12 +1091,13 @@ async function refresh() {
   renderPending();
   describeFiltersForPrint();
   page = 0;
+  priorFailure = null; // this refresh retries a failed background load (loadPriorYear)
   setStatus($('status'), 'Updating…');
   try {
-    const before = loadedFrom;
+    const before = tableLoads;
     await ensureLoaded();
     if (seq !== refreshSeq) return;
-    if (loadedFrom !== before) { descOptionsKey = null; await fillFilterOptions(); }
+    if (tableLoads !== before) { descOptionsKey = null; await fillFilterOptions(); }
     setStatus($('status'), 'Updating…');
     await updateDescOptions();
     await renderKpis();
@@ -1063,9 +1108,12 @@ async function refresh() {
     if (seq === refreshSeq) setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
     lastRefreshFailed = false;
     lastChartWidth = chartWidthKey();
+    // Only once the page has drawn, so it never waits for the year before.
+    if (seq === refreshSeq) loadPriorYear();
   } catch (err) {
     console.error(err);
     lastRefreshFailed = true;
+    freshDataFiles().catch((e) => console.error(e));
     setStatus($('status'), `Something went wrong: ${err.message}`);
   }
 }
@@ -1122,6 +1170,8 @@ async function main() {
     : 'Loading the query engine and this district\'s data…');
   const names = sourceNames(district);
   SRC = sourceSql(names);
+  dataFiles = names.map((n, i) => [n, `data/${district.files[i]}`]);
+  if (rangeLoading()) loader = createLoader({ exec: query, sources: names.map((n) => sourceSql([n])), allSrc: SRC, cols: LOAD_COLUMNS.join(', ') });
   [Plot] = await Promise.all([
     import(PLOT_URL),
     ...names.map((n, i) => registerData(n, `data/${district.files[i]}`)),

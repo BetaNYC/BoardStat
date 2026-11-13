@@ -17,10 +17,21 @@ def test_duckdb_wasm_reads_byte_ranges():
 
 
 def test_load_reads_closed_rows_before_open_rows():
-    """Closed branch first: the other order made DuckDB-WASM re-fetch ranges (district.js)."""
-    src = (SITE_JS / "district.js").read_text()
+    """Closed branch first: the other order made DuckDB-WASM re-fetch ranges (loadplan.js)."""
+    src = (SITE_JS / "loadplan.js").read_text()
     load = src[src.index("CREATE OR REPLACE TABLE req AS"):]
     assert load.index("is_closed = true") < load.index("is_closed = false")
+
+
+def test_year_before_loads_after_the_first_draw():
+    """#144: the page draws before the background load of the year before the From date,
+    and that load appends Closed rows only (never re-reads the open ones)."""
+    src = (SITE_JS / "district.js").read_text()
+    refresh = src[src.index("async function refresh()"):]
+    assert refresh.index("Promise.all([renderTop()") < refresh.index("loadPriorYear()")
+    extend = (SITE_JS / "loadplan.js").read_text()
+    extend = extend[extend.index("export function extendSql"):extend.index("export function createSerial")]
+    assert "INSERT INTO req" in extend and "is_closed = true" in extend and "is_closed = false" not in extend
 
 
 def test_compare_query_split_by_geo_matches_the_or_filter(tmp_path):

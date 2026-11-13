@@ -63,6 +63,18 @@ export async function registerData(name, relPath) {
   await db.registerFileURL(name, url, duckdb.DuckDBDataProtocol.HTTP, false);
 }
 
+/**
+ * Register `name` again as a new file. After a failed range read, DuckDB-WASM 1.32.0 can
+ * serve later reads of that file from a read-ahead buffer the failed read never filled
+ * ("TProtocolException: Invalid data", seen 2026-11-13 on #144), so a retry must start
+ * from a fresh registration. dropFile: duckdb-wasm packages/duckdb-wasm/src/parallel/async_bindings.ts.
+ */
+export async function reregisterData(name, relPath) {
+  const { db } = await getDB();
+  await db.dropFile(name);
+  await registerData(name, relPath);
+}
+
 /** Run SQL and return plain objects (Arrow rows -> toJSON(), BigInt -> Number). */
 export async function query(sql) {
   const { conn } = await getDB();

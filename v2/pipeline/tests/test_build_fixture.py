@@ -197,6 +197,13 @@ LOAD_SQL = """
     UNION ALL
     SELECT * FROM read_parquet({f}) WHERE is_closed = false
 """
+# The background load of the year before (loadplan.js, extendSql): one file's Closed
+# requests created in [from, to). Kept in step with the JS.
+EXTEND_SQL = """
+    INSERT INTO {t}
+    SELECT * FROM read_parquet({f}) WHERE is_closed = true
+      AND created_date >= CAST({a} AS TIMESTAMP) AND created_date < CAST({b} AS TIMESTAMP)
+"""
 
 
 @pytest.fixture()
@@ -242,6 +249,22 @@ def test_range_load_gives_the_same_answers_as_the_whole_file(big_detail):
     # A status other than Closed needs no extra load: every such request is loaded.
     q = "SELECT count(*) FROM {t} WHERE status = 'In Progress'"
     assert con.execute(q.format(t="part")).fetchall() == con.execute(q.format(t="whole")).fetchall()
+
+
+def test_two_step_load_matches_the_one_step_load(big_detail):
+    """#144: loading from the From date, then appending the year before (in two pieces,
+    as a later From date and the background load would), gives exactly the rows the old
+    single load from 12 months earlier gave: none missing, none twice."""
+    f = bb.sql_str(str(big_detail))
+    con = duckdb.connect()
+    con.execute("CREATE TABLE one AS " + LOAD_SQL.format(f=f, x="'2024-06-01'"))
+    con.execute("CREATE TABLE two AS " + LOAD_SQL.format(f=f, x="'2025-06-15'"))
+    con.execute(EXTEND_SQL.format(t="two", f=f, a="'2025-01-01'", b="'2025-06-15'"))
+    con.execute(EXTEND_SQL.format(t="two", f=f, a="'2024-06-01'", b="'2025-01-01'"))
+    assert con.execute("SELECT count(*) FROM two").fetchone()[0] == con.execute("SELECT count(*) FROM one").fetchone()[0]
+    assert con.execute("SELECT count(*) - count(DISTINCT unique_key) FROM two").fetchone()[0] == 0
+    assert con.execute("SELECT * FROM one EXCEPT SELECT * FROM two").fetchall() == []
+    assert con.execute("SELECT * FROM two EXCEPT SELECT * FROM one").fetchall() == []
 
 
 def test_row_group_statistics_allow_pruning(big_detail):
