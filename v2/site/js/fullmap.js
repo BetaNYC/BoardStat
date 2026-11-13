@@ -8,10 +8,10 @@
 // the map and the filters use, in a compressed in-memory database, from the From date on
 // (plus every request not yet closed). Moving the From date earlier appends only what is
 // missing, so a change of filters reads nothing again.
-import { loadManifest, renderDataStatus, registerData, reregisterData, query, lit, el, setStatus, fmtDate, fmtInt } from './lib.js';
+import { loadManifest, renderDataStatus, registerData, reregisterData, query, el, setStatus, fmtDate, fmtInt } from './lib.js';
 import { filtersFromParams, filtersToParams, describeFilters, keepKnownStatus } from './filterstate.js';
-import { whereSql, DESC_SQL } from './filtersql.js';
-import { createFilterForm, DATE_ORDER_MSG } from './filterform.js';
+import { whereSql } from './filtersql.js';
+import { createFilterForm, tableLists, DATE_ORDER_MSG } from './filterform.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql } from './place.js';
 import { periodFrom, createLoader, freshnessCheck, loadFailedText, filesNamedIn, DataChangedError } from './loadplan.js';
@@ -34,28 +34,15 @@ let total = 0;
 let lastFailed = false;
 let firstLoadDone = false;
 let dataFiles = [];
+let loadCount = 0;
+let listsKey = null; // the loads and dates the form's lists were made for
 let firstApplied = false; // the page's own first draw leaves focus alone
 
 /** The filters a link with no filters opens with (Reset's target). This page never has an address. */
 const defaultFilters = () => ({ ...defaults, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' });
 
-/**
- * Lists are ordered by how many requests each has in the applied dates, then overall, so
- * the district page and the full-page map list them in the same order although each has
- * loaded a different span of rows (#149 QA).
- */
-const periodOrder = () => `count(*) FILTER (WHERE ${whereSql({ start: state.start, end: state.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' })}) DESC, count(*) DESC`;
-
-/** The lists the form offers, from the rows loaded for this map. */
-const formLists = {
-  problems: async () => (await query(`SELECT complaint_type AS t FROM req GROUP BY 1 ORDER BY ${periodOrder()}, 1`)).map((r) => r.t),
-  descriptions: async (types) => (await query(`
-    SELECT ${DESC_SQL} AS d, count(*) AS n FROM req
-    ${types.length ? `WHERE complaint_type IN (${types.map(lit).join(', ')})` : ''}
-    GROUP BY 1 ORDER BY 2 DESC, 1`)).map((r) => r.d),
-  agencies: async () => query(`SELECT agency, any_value(agency_name) AS label FROM req GROUP BY 1 ORDER BY ${periodOrder()}, 1`),
-  statuses: async () => (await query(`SELECT status FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY ${periodOrder()}, 1`)).map((r) => r.status),
-};
+/** The form's lists, from this page's rows, for the applied dates (filterform.js tableLists). */
+const formLists = tableLists(query, () => state);
 
 /** The link of this page and of the way back: same place, same filters, never an address. */
 function writeLinks() {
@@ -100,7 +87,9 @@ async function redraw() {
     let changed;
     try { changed = await ensureLoaded(); } catch (err) { err.boardstatLoad = true; throw err; }
     if (mine !== seq) return;
-    if (changed || !firstLoadDone) await form.fillLists();
+    // Lists again after a load, and whenever the applied dates change (they list the dates).
+    const key = `${loadCount += changed ? 1 : 0}|${state.start}|${state.end}`;
+    if (key !== listsKey) { listsKey = key; await form.fillLists(); }
     if (!firstLoadDone) {
       // Drop a status this place's data does not have, as the district page does
       // (keepKnownStatus), so both pages show the same requests for the same link.

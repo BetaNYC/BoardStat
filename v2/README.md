@@ -75,12 +75,21 @@ The map page loads its rows like the district page (`js/loadplan.js`): a table o
 the columns the map and the filters use, in the compressed in-memory database,
 Closed requests from the From date on plus every request not yet closed, so a change
 of filters reads nothing again and a From date moved earlier appends only what is
-missing. It never loads the year before (the map has no year-earlier series). Its
-lists of problems, descriptions, agencies and statuses come from those rows, as the
-district page's do, ordered by how many requests each has in the applied dates, so
-both pages list them in the same order. A status filter is kept when the page's rows
-have it, and "Closed" is always kept: a short period can have no Closed rows loaded,
-while every other status is on a request not yet closed, which is always loaded.
+missing. It never loads the year before (the map has no year-earlier series).
+
+**What the lists offer, on both pages.** A problem, description, agency or status is
+listed if it has a request created in the applied dates, or a request not yet closed
+(`listScopeSql` in `js/filterform.js`); rows a page holds for other reasons, like the
+year a borough page loads for its year-earlier line, never feed the lists. They are
+ordered by requests in the applied dates, then in that scope, then by name, and the
+form says so next to the Problem and Agency boxes. Both pages hold every row in that
+scope, so they list the same choices in the same order for the same dates, and the
+lists are made again whenever the applied dates change. "Closed" is always a status
+choice. A status filter from a link is kept only if the data has that status
+(`keepKnownStatus`, checked against the data's list, never against the menu); "Closed"
+is always kept, since a short period can have no Closed rows loaded, while every other
+status is on a request not yet closed, which is always loaded. An applied agency with
+no requests in the new dates stays selected, shown as an extra choice.
 
 **Address filter.** It never goes into a link (see the analytics notes below), so
 it is never carried between the district page and the map, in either direction, and

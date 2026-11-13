@@ -96,3 +96,27 @@ test('status=Closed is kept even when no Closed rows are loaded (#149 QA: a shor
   assert.equal(keepKnownStatus({ ...s, status: 'Bogus' }, ['In Progress']).status, '');
   assert.equal(keepKnownStatus({ ...s, status: 'Open' }, ['Open']).status, 'Open');
 });
+
+test('a status the data does not have (status=Bogus) is dropped: checked against the data list, never the menu', async () => {
+  const { statusChoices } = await import('../site/js/filterform.js');
+  const known = ['In Progress', 'Open', 'Closed']; // what lists.statuses() returns
+  const link = { ...base, status: 'Bogus' };
+  assert.equal(keepKnownStatus(link, statusChoices(known)).status, '');
+  assert.equal(keepKnownStatus({ ...link, status: 'Open' }, statusChoices(known)).status, 'Open');
+  assert.equal(keepKnownStatus({ ...link, status: 'not_closed' }, statusChoices(known)).status, 'not_closed');
+});
+
+test('the lists offer rows in the applied dates or not yet closed, most requests in those dates first', async () => {
+  const { listScopeSql, listOrderSql, tableLists } = await import('../site/js/filterform.js');
+  const s = { ...base, start: '2026-06-01', end: '2026-11-13' };
+  const scope = listScopeSql(s);
+  assert.match(scope, /created_date >= CAST\('2026-06-01' AS DATE\)/);
+  assert.match(scope, /OR status IS DISTINCT FROM 'Closed'/);
+  assert.match(listOrderSql(s), /^count\(\*\) FILTER \(WHERE created_date >= CAST\('2026-06-01'/);
+  // Every list query uses the scope and the order; "Closed" is always a status choice.
+  const seen = [];
+  const lists = tableLists(async (sql) => { seen.push(sql); return sql.includes('SELECT status') ? [{ status: 'Open' }] : []; }, () => s);
+  await lists.problems(); await lists.agencies(); await lists.descriptions(['Noise']);
+  assert.deepEqual(await lists.statuses(), ['Open', 'Closed']);
+  for (const sql of seen) { assert.ok(sql.includes(scope), sql); assert.ok(sql.includes(listOrderSql(s)), sql); }
+});

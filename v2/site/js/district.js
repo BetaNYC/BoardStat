@@ -9,7 +9,7 @@ import {
   NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus,
 } from './filterstate.js';
 import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
-import { createFilterForm, DATE_ORDER_MSG } from './filterform.js';
+import { createFilterForm, tableLists, DATE_ORDER_MSG } from './filterform.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl } from './place.js';
 import {
   periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly, DataChangedError, filesNamedIn, freshnessCheck, loadFailedText,
@@ -225,29 +225,15 @@ function applyNow(fn) {
   form.applyNow(fn);
 }
 
-/**
- * Lists are ordered by how many requests each has in the applied dates, then overall, so
- * the district page and the full-page map list them in the same order although each has
- * loaded a different span of rows (#149 QA).
- */
-const periodOrder = () => `count(*) FILTER (WHERE ${whereSql({ start: state.start, end: state.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' })}) DESC, count(*) DESC`;
+/** The form's lists, from this page's rows, for the applied dates (filterform.js tableLists). */
+const formLists = tableLists(query, () => state);
 
-/** The lists the form offers, from the rows in the req table. */
-const formLists = {
-  problems: async () => (await query(`SELECT complaint_type AS t FROM req GROUP BY 1 ORDER BY ${periodOrder()}, 1`)).map((r) => r.t),
-  descriptions: async (types) => (await query(`
-    SELECT ${DESC_SQL} AS d, count(*) AS n FROM req
-    ${types.length ? `WHERE complaint_type IN (${types.map(lit).join(', ')})` : ''}
-    GROUP BY 1 ORDER BY 2 DESC, 1`)).map((r) => r.d),
-  agencies: async () => query(`SELECT agency, any_value(agency_name) AS label FROM req GROUP BY 1 ORDER BY ${periodOrder()}, 1`),
-  statuses: async () => (await query(`SELECT status FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY ${periodOrder()}, 1`)).map((r) => r.status),
-};
-
-/** Fill the problem, agency and status lists from what is loaded (again after a reload). */
+/** Fill the problem, agency and status lists: again after a load, and whenever the applied dates change. */
 let optionsFrom;
 async function fillFilterOptions() {
-  if (optionsFrom === tableLoads) return;
-  optionsFrom = tableLoads;
+  const key = `${tableLoads}|${state.start}|${state.end}`;
+  if (optionsFrom === key) return;
+  optionsFrom = key;
   await form.fillLists();
 }
 
@@ -1006,10 +992,9 @@ async function refresh() {
   priorFailure = null; // this refresh retries a failed background load (loadPriorYear)
   setStatus($('status'), 'Updating…');
   try {
-    const before = tableLoads;
     try { await ensureLoaded(); } catch (err) { err.boardstatLoad = true; throw err; }
     if (seq !== refreshSeq) return;
-    if (tableLoads !== before) await fillFilterOptions();
+    if (firstLoadDone) await fillFilterOptions(); // a no-op unless the rows or the dates changed
     // A page whose first load failed finishes its setup after the first load that works.
     if (!firstLoadDone) await afterFirstLoad();
     setStatus($('status'), 'Updating…');

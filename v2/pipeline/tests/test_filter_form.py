@@ -107,3 +107,12 @@ def test_reset_clears_typed_text():
     js = (JS / "filterform.js").read_text()
     m = re.search(r"function reset\(\) \{.*?\n  \}", js, re.DOTALL)
     assert m and "$('f-type').value = ''" in m.group(0) and "$('f-desc').value = ''" in m.group(0)
+
+
+def test_form_says_how_the_suggestions_are_ordered():
+    """#149 QA round 2: the lists put the most requests in the applied dates first, and say so."""
+    form = form_html("district.html")
+    assert '<label for="f-agency">Agency (most requests in these dates first)</label>' in form
+    for box in ("type", "desc"):
+        assert f'<p class="field-hint" id="{box}-order">Suggestions are listed with the most requests in these dates first.</p>' in form
+        assert f'aria-describedby="{box}-order {box}-help"' in form

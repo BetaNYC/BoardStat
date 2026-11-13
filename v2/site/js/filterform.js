@@ -11,6 +11,7 @@
 // The page supplies the lists to choose from (it knows where its rows are) and what to do
 // on Apply. The pure decisions are exported for v2/tests-js.
 import { el, fmtDate } from './lib.js';
+import { whereSql, DESC_SQL, NOT_CLOSED_SQL, lit } from './filtersql.js';
 import { copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED } from './filterstate.js';
 
 export const DATE_ORDER_MSG = 'The From date is after the To date. Change one of them, then press Apply filters.';
@@ -50,6 +51,52 @@ export function pendingSummary(draft, applied, defaults, fmt = fmtDate) {
 }
 
 /**
+ * Which rows the lists offer choices from (#149 QA): requests created in the applied
+ * dates, plus every request not yet closed. The extra year a borough page loads for its
+ * year-earlier line, and any older rows a page still holds, never feed the lists, so
+ * the district page and the full-page map offer the same choices for the same dates.
+ */
+export function listScopeSql(s) {
+  const dates = whereSql({ start: s.start, end: s.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' });
+  return `((${dates}) OR ${NOT_CLOSED_SQL})`;
+}
+
+/**
+ * Most requests in the applied dates first, then most in the scope, then by name. The
+ * form says so next to the Problem and Agency boxes.
+ */
+export function listOrderSql(s) {
+  const dates = whereSql({ start: s.start, end: s.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' });
+  return `count(*) FILTER (WHERE ${dates}) DESC, count(*) DESC, 1`;
+}
+
+/**
+ * The form's lists from a page's `req` table, for the filters `getState()` returns.
+ * "Closed" is always a status choice (keepKnownStatus always keeps it, round 1).
+ */
+export function tableLists(query, getState) {
+  const scope = () => listScopeSql(getState());
+  const order = () => listOrderSql(getState());
+  return {
+    problems: async () => (await query(`SELECT complaint_type AS t FROM req WHERE ${scope()} GROUP BY 1 ORDER BY ${order()}`)).map((r) => r.t),
+    descriptions: async (types) => (await query(`
+      SELECT ${DESC_SQL} AS d FROM req WHERE ${scope()}
+      ${types.length ? `AND complaint_type IN (${types.map(lit).join(', ')})` : ''}
+      GROUP BY 1 ORDER BY ${order()}`)).map((r) => r.d),
+    agencies: async () => query(`SELECT agency, any_value(agency_name) AS label FROM req WHERE ${scope()} GROUP BY 1 ORDER BY ${order()}`),
+    statuses: async () => {
+      const list = (await query(`SELECT status FROM req WHERE ${scope()} AND status IS NOT NULL GROUP BY 1 ORDER BY ${order()}`)).map((r) => r.status);
+      return list.includes('Closed') ? list : [...list, 'Closed'];
+    },
+  };
+}
+
+/** The menu values a status filter may hold: '' (any), "not yet closed", and the data's statuses. */
+export function statusChoices(known) {
+  return ['', NOT_CLOSED, ...known];
+}
+
+/**
  * Run the form on this page.
  *   defaults()          the filters a link without filters opens with (Reset's target)
  *   lists.problems()    problem names, most common first
@@ -69,6 +116,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   let descs = [];
   let descKey = null;
   let listsReady = false; // the page has rows to list (fillLists has run)
+  let knownStatuses = []; // what lists.statuses() returned: the data's statuses, and "Closed"
 
   function renderChips() {
     $('type-chips').replaceChildren(...draft.types.map((t) => el('li', {},
@@ -86,14 +134,24 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   function syncControls() {
     $('f-start').value = draft.start;
     $('f-end').value = draft.end;
-    // Before the lists are filled (or after a failed first load) a menu may not have the
-    // applied value yet: add it, so the menu shows what is applied, never "All agencies".
+    // A menu may lack the value in the form: before its list is filled (or after a failed
+    // first load), or an agency with no requests in the new dates. Show it as an extra
+    // option rather than "All agencies". A status is only shown that way before the list
+    // is filled; after that, one the data does not have is never offered (#149 QA).
     for (const [id, v] of [['f-agency', draft.agency], ['f-status', draft.status]]) {
-      if (v && ![...$(id).options].some((o) => o.value === v)) $(id).append(el('option', { value: v, text: v }));
+      dropExtras(id, v);
+      if (!v || [...$(id).options].some((o) => o.value === v)) continue;
+      if (id === 'f-status' && listsReady && !knownStatuses.includes(v)) continue;
+      $(id).append(el('option', { value: v, text: v, 'data-extra': '' }));
     }
     $('f-agency').value = draft.agency;
     $('f-status').value = draft.status;
     $('f-desc-ex').checked = draft.descEx;
+  }
+
+  /** Remove extra options (syncControls) other than `keep`. */
+  function dropExtras(id, keep) {
+    for (const o of [...$(id).querySelectorAll('option[data-extra]')]) if (o.value !== keep) o.remove();
   }
 
   function renderPending() {
@@ -216,15 +274,16 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
       // Keep the fixed first options ("All agencies", "Any status", "Not yet closed"); replace the rest.
       $('f-agency').replaceChildren($('f-agency').options[0], ...(await lists.agencies())
         .map((r) => el('option', { value: r.agency, text: `${r.agency}${r.label ? ` (${r.label})` : ''}` })));
-      const fixedStatus = [...$('f-status').options].filter((o) => o.value === '' || o.value === NOT_CLOSED);
-      $('f-status').replaceChildren(...fixedStatus, ...(await lists.statuses()).map((v) => el('option', { value: v, text: v })));
+      const fixedStatus = [...$('f-status').options].filter((o) => !o.hasAttribute('data-extra') && (o.value === '' || o.value === NOT_CLOSED));
+      knownStatuses = await lists.statuses();
+      $('f-status').replaceChildren(...fixedStatus, ...knownStatuses.map((v) => el('option', { value: v, text: v })));
       descKey = null;
       listsReady = true;
       await updateDescriptions();
       syncControls();
     },
-    /** The status values the status list offers, including '' and "not yet closed". */
-    statusChoices: () => [...$('f-status').options].map((o) => o.value),
+    /** The status values the data allows (never what the menu happens to show). */
+    statusChoices: () => statusChoices(knownStatuses),
     openGroups,
     /** Wire up the controls. Changing a control changes only the form (#142); Apply, or
      *  Enter in a text or date box, runs the page's queries. */
@@ -232,8 +291,8 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
       for (const id of ['f-start', 'f-end']) { $(id).min = min; $(id).max = max; }
       $('f-start').addEventListener('change', (e) => { if (e.target.value) { draft.start = e.target.value; changed(); } });
       $('f-end').addEventListener('change', (e) => { if (e.target.value) { draft.end = e.target.value; changed(); } });
-      $('f-agency').addEventListener('change', (e) => { draft.agency = e.target.value; changed(); });
-      $('f-status').addEventListener('change', (e) => { draft.status = e.target.value; changed(); });
+      $('f-agency').addEventListener('change', (e) => { draft.agency = e.target.value; dropExtras('f-agency', draft.agency); changed(); });
+      $('f-status').addEventListener('change', (e) => { draft.status = e.target.value; dropExtras('f-status', draft.status); changed(); });
       // Enter with text in the box adds it as a chip; Enter in an empty box applies the filters.
       $('f-type').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.value.trim()) { e.preventDefault(); addType(e.target.value); } });
       $('f-type').addEventListener('change', (e) => { if (problems.includes(e.target.value)) addType(e.target.value); });

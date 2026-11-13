@@ -262,3 +262,6 @@ dl.glossary dd p { margin: 0.3rem 0; }
 /* Keep each menu item on one line ("Help & feedback" wraps as a unit). */
 header.site .site-nav { flex-wrap: wrap; row-gap: 0.25rem; }
 header.site .site-nav a { white-space: nowrap; }
+
+/* A short hint between a field's label and its box (#149: how the suggestions are ordered). */
+.field-hint { margin: 0 0 0.25rem; font-size: 0.875rem; color: var(--bnyc-dark-gray); }

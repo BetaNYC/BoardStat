@@ -6,9 +6,9 @@
   <title>District · BoardStat 2.0 (prototype)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css?v=08875e18bc">
+  <link rel="stylesheet" href="css/style.css?v=4cec144e8e">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=6fbdedb269","./js/filterform.js":"./js/filterform.js?v=1ac2ba3d67","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=7cbf606fca","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=de61fbb9d4","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=b26ecaf04a","./js/filterform.js":"./js/filterform.js?v=eae460fd42","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=e2fb4a9eab","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=de61fbb9d4","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -45,14 +45,16 @@
         <div class="fg-body fg-pair">
           <div>
             <label for="f-type">Problem (formerly Complaint Type)</label>
-            <input type="text" id="f-type" list="type-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="type-help">
+            <p class="field-hint" id="type-order">Suggestions are listed with the most requests in these dates first.</p>
+            <input type="text" id="f-type" list="type-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="type-order type-help">
             <datalist id="type-options"></datalist>
             <span class="sr-only" id="type-help">Choose one or more problems. Selected problems are listed below with remove buttons. Press Enter in an empty box to apply the filters.</span>
             <ul class="chips" id="type-chips" aria-label="Selected problems"></ul>
           </div>
           <div>
             <label for="f-desc">Description (formerly Descriptor)</label>
-            <input type="text" id="f-desc" list="desc-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="desc-help">
+            <p class="field-hint" id="desc-order">Suggestions are listed with the most requests in these dates first.</p>
+            <input type="text" id="f-desc" list="desc-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="desc-order desc-help">
             <datalist id="desc-options"></datalist>
             <span class="sr-only" id="desc-help">Lists the descriptions used for the selected problems, or for every problem if none is selected. Selected descriptions are listed below with remove buttons. Press Enter in an empty box to apply the filters.</span>
             <ul class="chips" id="desc-chips" aria-label="Selected descriptions"></ul>
@@ -63,7 +65,7 @@
       <details class="filter-group" id="fg-agency" data-section="agency">
         <summary><span class="fg-title">Agency and status</span> <span class="fg-count" data-count-for="agency"></span></summary>
         <div class="fg-body fg-pair">
-          <div><label for="f-agency">Agency</label><select id="f-agency" name="agency"><option value="">All agencies</option></select></div>
+          <div><label for="f-agency">Agency (most requests in these dates first)</label><select id="f-agency" name="agency"><option value="">All agencies</option></select></div>
           <div><label for="f-status">Status</label><select id="f-status" name="status"><option value="">Any status</option><option value="not_closed">Not yet closed (any status but Closed)</option></select></div>
         </div>
       </details>
@@ -157,6 +159,6 @@
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html">What&rsquo;s changed</a>.</footer>
-  <script type="module" src="js/district.js?v=6fbdedb269"></script>
+  <script type="module" src="js/district.js?v=b26ecaf04a"></script>
 </body>
 </html>
