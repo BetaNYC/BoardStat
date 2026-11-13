@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="css/style.css?v=08875e18bc">
   <script src="js/analytics.js?v=6ed76567f7"></script>
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=4e3cfdfd0c","./js/filterform.js":"./js/filterform.js?v=8f732698b0","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=969b88f5f9","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=de61fbb9d4","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=6fbdedb269","./js/filterform.js":"./js/filterform.js?v=1ac2ba3d67","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=7cbf606fca","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=de61fbb9d4","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
 </head>
 <body class="fullmap-page">
@@ -26,10 +26,10 @@
       <div class="fullmap-head">
         <h1 id="title">Loading map…</h1>
         <p class="muted" id="filters-summary"></p>
-        <p class="filters-toggle-row"><button type="button" class="secondary" id="filters-toggle" aria-controls="filters" aria-expanded="true">Hide filters</button></p>
+        <p class="filters-toggle-row"><button type="button" class="secondary" id="filters-toggle" aria-controls="filters" aria-expanded="false">Change filters</button></p>
       </div>
       <p class="fullmap-back"><a id="back-link" href="district.html">← Back to the district page</a>
-        <span class="muted">(with the filters set here, except an address filter)</span></p>
+        <span class="muted">(keeps the filters set here)</span></p>
     </div>
     <div class="banner warn" id="stale" role="status" hidden></div>
     <!-- The same filter form as the district page (#149): the markup is kept the same on
@@ -89,6 +89,6 @@
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html">What&rsquo;s changed</a>.</footer>
-  <script type="module" src="js/fullmap.js?v=969b88f5f9"></script>
+  <script type="module" src="js/fullmap.js?v=7cbf606fca"></script>
 </body>
 </html>

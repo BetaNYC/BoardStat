@@ -86,6 +86,11 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   function syncControls() {
     $('f-start').value = draft.start;
     $('f-end').value = draft.end;
+    // Before the lists are filled (or after a failed first load) a menu may not have the
+    // applied value yet: add it, so the menu shows what is applied, never "All agencies".
+    for (const [id, v] of [['f-agency', draft.agency], ['f-status', draft.status]]) {
+      if (v && ![...$(id).options].some((o) => o.value === v)) $(id).append(el('option', { value: v, text: v }));
+    }
     $('f-agency').value = draft.agency;
     $('f-status').value = draft.status;
     $('f-desc-ex').checked = draft.descEx;

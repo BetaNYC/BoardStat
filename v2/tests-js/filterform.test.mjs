@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyCheck, findChoice, pendingSummary, DATE_ORDER_MSG, PENDING_MSG } from '../site/js/filterform.js';
-import { filtersFromParams, filtersToParams, copyFilters, patchBoth } from '../site/js/filterstate.js';
+import { filtersFromParams, filtersToParams, copyFilters, patchBoth, keepKnownStatus } from '../site/js/filterstate.js';
 import { whereSql } from '../site/js/filtersql.js';
 
 const defaults = { start: '2025-11-01', end: '2026-11-13' };
@@ -88,4 +88,11 @@ test('a shortcut changes the applied filters and the form together, keeping othe
   assert.equal(applied.status, '');
   assert.equal(d2.agency, 'HPD');
   assert.equal(d2.status, 'Open');
+});
+
+test('status=Closed is kept even when no Closed rows are loaded (#149 QA: a short period on the map)', () => {
+  const s = { ...base, start: '2026-11-12', status: 'Closed' };
+  assert.equal(keepKnownStatus(s, ['In Progress', 'Open']).status, 'Closed');
+  assert.equal(keepKnownStatus({ ...s, status: 'Bogus' }, ['In Progress']).status, '');
+  assert.equal(keepKnownStatus({ ...s, status: 'Open' }, ['Open']).status, 'Open');
 });

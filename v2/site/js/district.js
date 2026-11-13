@@ -225,15 +225,22 @@ function applyNow(fn) {
   form.applyNow(fn);
 }
 
+/**
+ * Lists are ordered by how many requests each has in the applied dates, then overall, so
+ * the district page and the full-page map list them in the same order although each has
+ * loaded a different span of rows (#149 QA).
+ */
+const periodOrder = () => `count(*) FILTER (WHERE ${whereSql({ start: state.start, end: state.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' })}) DESC, count(*) DESC`;
+
 /** The lists the form offers, from the rows in the req table. */
 const formLists = {
-  problems: async () => (await query(`SELECT complaint_type AS t, count(*) AS n FROM req GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.t),
+  problems: async () => (await query(`SELECT complaint_type AS t FROM req GROUP BY 1 ORDER BY ${periodOrder()}, 1`)).map((r) => r.t),
   descriptions: async (types) => (await query(`
     SELECT ${DESC_SQL} AS d, count(*) AS n FROM req
     ${types.length ? `WHERE complaint_type IN (${types.map(lit).join(', ')})` : ''}
     GROUP BY 1 ORDER BY 2 DESC, 1`)).map((r) => r.d),
-  agencies: async () => query(`SELECT agency, any_value(agency_name) AS label, count(*) AS n FROM req GROUP BY 1 ORDER BY 3 DESC, 1`),
-  statuses: async () => (await query(`SELECT status, count(*) AS n FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.status),
+  agencies: async () => query(`SELECT agency, any_value(agency_name) AS label FROM req GROUP BY 1 ORDER BY ${periodOrder()}, 1`),
+  statuses: async () => (await query(`SELECT status FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY ${periodOrder()}, 1`)).map((r) => r.status),
 };
 
 /** Fill the problem, agency and status lists from what is loaded (again after a reload). */

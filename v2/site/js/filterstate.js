@@ -117,7 +117,12 @@ export function filtersToParams(geo, id, s, defaults) {
  * the data; '' (any status) and NOT_CLOSED are always allowed.
  */
 export function keepKnownStatus(s, known) {
-  if (!s.status || s.status === NOT_CLOSED || known.includes(s.status)) return s;
+  // "Closed" is always kept: a page lists the statuses of the rows it has loaded, and it
+  // loads Closed rows only from the From date on, so a short period can have none even
+  // though the data does (#149 QA). Every other status is on a request not yet Closed,
+  // and those are always loaded (detail files keep them together at the end), so the
+  // list is complete for them.
+  if (!s.status || s.status === NOT_CLOSED || s.status === 'Closed' || known.includes(s.status)) return s;
   return { ...s, status: '' };
 }
 

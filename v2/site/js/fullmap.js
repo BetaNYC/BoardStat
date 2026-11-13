@@ -34,20 +34,27 @@ let total = 0;
 let lastFailed = false;
 let firstLoadDone = false;
 let dataFiles = [];
-let firstApplied = false; // the page's own first draw does not close the form on a phone
+let firstApplied = false; // the page's own first draw leaves focus alone
 
 /** The filters a link with no filters opens with (Reset's target). This page never has an address. */
 const defaultFilters = () => ({ ...defaults, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' });
 
+/**
+ * Lists are ordered by how many requests each has in the applied dates, then overall, so
+ * the district page and the full-page map list them in the same order although each has
+ * loaded a different span of rows (#149 QA).
+ */
+const periodOrder = () => `count(*) FILTER (WHERE ${whereSql({ start: state.start, end: state.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' })}) DESC, count(*) DESC`;
+
 /** The lists the form offers, from the rows loaded for this map. */
 const formLists = {
-  problems: async () => (await query(`SELECT complaint_type AS t, count(*) AS n FROM req GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.t),
+  problems: async () => (await query(`SELECT complaint_type AS t FROM req GROUP BY 1 ORDER BY ${periodOrder()}, 1`)).map((r) => r.t),
   descriptions: async (types) => (await query(`
     SELECT ${DESC_SQL} AS d, count(*) AS n FROM req
     ${types.length ? `WHERE complaint_type IN (${types.map(lit).join(', ')})` : ''}
     GROUP BY 1 ORDER BY 2 DESC, 1`)).map((r) => r.d),
-  agencies: async () => query(`SELECT agency, any_value(agency_name) AS label, count(*) AS n FROM req GROUP BY 1 ORDER BY 3 DESC, 1`),
-  statuses: async () => (await query(`SELECT status, count(*) AS n FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.status),
+  agencies: async () => query(`SELECT agency, any_value(agency_name) AS label FROM req GROUP BY 1 ORDER BY ${periodOrder()}, 1`),
+  statuses: async () => (await query(`SELECT status FROM req WHERE status IS NOT NULL GROUP BY 1 ORDER BY ${periodOrder()}, 1`)).map((r) => r.status),
 };
 
 /** The link of this page and of the way back: same place, same filters, never an address. */
@@ -76,8 +83,7 @@ function freshDataFiles(err) {
   });
 }
 
-/** On a phone the form starts closed and closes again after Apply, so the map stays in view. */
-const phone = () => window.matchMedia('(max-width: 640px)').matches;
+/** The form starts closed and closes again after Apply, so the map stays in view. */
 function showForm(open) {
   $('filters').classList.toggle('is-collapsed', !open);
   $('filters-toggle').setAttribute('aria-expanded', String(open));
@@ -110,9 +116,12 @@ async function redraw() {
     $('map-note').textContent = mapNoteText(total, shown.count);
     setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
     lastFailed = false;
-    if (phone() && firstApplied) {
+    if (firstApplied) {
       showForm(false);
       $('main').scrollIntoView({ block: 'start' }); // back up to the summary line and the map
+      // The control that had focus is now hidden: keep keyboard and screen-reader users
+      // on the button that opens the form again (the status line has just said the count).
+      $('filters-toggle').focus({ preventScroll: true });
     }
   } catch (err) {
     console.error(err);
@@ -161,7 +170,7 @@ async function main() {
   form.set(state);
   form.bind(manifest.window.start, manifest.window.end);
   form.openGroups({ compact: true });
-  showForm(!phone());
+  showForm(false);
   $('filters-toggle').addEventListener('click', () => showForm($('filters').classList.contains('is-collapsed')));
   writeLinks();
 

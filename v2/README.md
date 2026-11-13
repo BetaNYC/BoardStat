@@ -66,10 +66,9 @@ changed reruns nothing). Each page gives it the lists to offer and what to redra
 Apply on the map redraws the map and rewrites the link (`history.replaceState`), and
 the back link always carries the map's current filters; "Open full-page map" carries
 the district page's. That holds for community districts, council districts and
-boroughs. On a phone (640 px or narrower) the form starts closed behind **Change
-filters**, under the one-line summary, and closes again after Apply; on every
-screen its groups start closed unless something in them is set, so the map stays in
-view. The map page's Print summary button is hidden. The address page gets the
+boroughs. On every screen the form starts closed behind **Change filters**, under
+the one-line summary, and closes again after Apply (focus moves to that button), and
+its groups start closed unless something in them is set, so the map stays in view. The map page's Print summary button is hidden. The address page gets the
 shared module for free, with no change in what it does.
 
 The map page loads its rows like the district page (`js/loadplan.js`): a table of
@@ -78,7 +77,10 @@ Closed requests from the From date on plus every request not yet closed, so a ch
 of filters reads nothing again and a From date moved earlier appends only what is
 missing. It never loads the year before (the map has no year-earlier series). Its
 lists of problems, descriptions, agencies and statuses come from those rows, as the
-district page's do.
+district page's do, ordered by how many requests each has in the applied dates, so
+both pages list them in the same order. A status filter is kept when the page's rows
+have it, and "Closed" is always kept: a short period can have no Closed rows loaded,
+while every other status is on a request not yet closed, which is always loaded.
 
 **Address filter.** It never goes into a link (see the analytics notes below), so
 it is never carried between the district page and the map, in either direction, and

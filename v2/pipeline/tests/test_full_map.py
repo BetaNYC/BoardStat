@@ -94,8 +94,12 @@ def test_map_page_redraws_on_apply_and_its_links_carry_its_filters():
 
 def test_map_page_is_phone_friendly_and_says_what_is_not_carried():
     html = read("map.html")
-    assert 'id="filters-toggle" aria-controls="filters"' in html
-    assert "except an address filter" in html
+    assert 'id="filters-toggle" aria-controls="filters" aria-expanded="false">Change filters<' in html
+    assert "(keeps the filters set here)" in html
+    # The form starts closed and closes after Apply on every screen (#149 QA).
+    src = (JS / "fullmap.js").read_text(encoding="utf-8")
+    assert "showForm(false);" in src and "matchMedia" not in src
+    assert "$('filters-toggle').focus(" in src
     assert "change them there" not in html
     for page in ("help.html", "glossary.html"):
         assert "change them there" not in read(page)
