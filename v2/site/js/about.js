@@ -20,7 +20,7 @@ function renderSources(manifest) {
       el('li', {}, `Problem names are grouped regardless of capitalization (for example PLUMBING and Plumbing). ${manifest.complaint_types.unreviewed} of ${manifest.complaint_types.groups} groupings have not yet been reviewed by a person.`),
       el('li', {}, `Time to close (days to close) is the close date minus the created date, in days. It counts only requests marked Closed. Requests with no close date, closed before they were opened (${fmtInt(c.closed_before_created)} citywide) or with a close date in the future (${fmtInt(c.closed_in_future)}) are left out, and so are the few requests that carry a close date but whose status is not Closed.`),
       el('li', {}, `"Not yet closed" means any status other than Closed (for example Open, In Progress, Assigned). Days open are counted from when a request was created to when this data was built (${fmtDateTime(manifest.generated_at)}), not to today.`),
-      el('li', {}, '311 counts reflect who reports problems and how, not only how many problems exist. A higher count can mean more engaged neighbors, not a worse block.'),
+      el('li', {}, '311 counts are reports, not problems. Closed doesn\'t mean fixed. A count shows who reports and how, not only how many problems exist: a higher count can mean more engaged neighbors, not a worse block.'),
     ),
   );
 }

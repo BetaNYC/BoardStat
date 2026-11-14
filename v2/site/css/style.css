@@ -141,7 +141,7 @@ button#apply.is-pending { box-shadow: 0 0 0 3px var(--bnyc-blue-secondary); }
 .kpi .value { font-family: var(--font-head); font-size: 1.75rem; font-weight: 700; color: var(--bnyc-blue); display: block; }
 .kpi .label { font-size: 0.9375rem; }
 
-/* HTML bar list (top problems): every bar is a real button. */
+/* HTML bar list (top 10 request types): every bar is a real button. */
 .barlist { list-style: none; margin: 0; padding: 0; }
 .barlist li { margin: 0.2rem 0; }
 .barlist button {

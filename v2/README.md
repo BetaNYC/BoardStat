@@ -5,7 +5,7 @@ branch next to the original BoardStat (the files at the repository root, which
 still serve boardstat.beta.nyc from `gh-pages` and are untouched here).
 
 BoardStat 2.0 shows NYC 311 service requests for any community district or
-council district: the most common problems, how long they take to close, where
+council district: the most common request types, how long they take to close, where
 they happen, and how the district compares with its borough and the city. It is
 built almost entirely from open-source tools and runs as static files: there is
 no server and no database to operate.
@@ -41,8 +41,9 @@ internal reports, in Noel's private vault).
    Observable Plot ── monthly line, agency × status, compare chart
    Page features: filters (dates, problem, description with exclude, agency, status
    incl. "not yet closed", address) in groups that open and close, run by an Apply
-   button and kept in the URL; at-a-glance numbers; top problems
-   and descriptions; monthly chart; agency responsiveness table; older requests
+   button and kept in the URL; at-a-glance numbers with the caveat "311
+   counts are reports, not problems. Closed doesn't mean fixed."; top 10
+   request types and descriptions; monthly chart; agency responsiveness table; older requests
    still open; map with a key; full-page map; top addresses; compare; request list
    with days open; CSV; print
 ```
@@ -652,7 +653,7 @@ Run on office-mac, 2026-11-04, with an app token, default window.
       by agency, with buttons that set the filters to show them. It carries a
       note that older months' statuses can lag (decision 6).
 16. **"Closed" means `status = 'Closed'` everywhere.** Median and average time to
-    close (headline, top problems, agency table) count only requests marked
+    close (headline, top 10 request types, agency table) count only requests marked
     Closed with a usable `days_to_close`. Some requests carry a close date while
     their status is still Open, Assigned or In Progress (254 of 58,636 in
     Brooklyn CD 6, 0.4%; not measured citywide); they count as not yet closed and are left out of

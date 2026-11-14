@@ -6,9 +6,9 @@
   <title>Glossary · BoardStat 2.0 (prototype)</title>
   <meta name="description" content="The terms BoardStat uses, how each number is calculated, and where to find the datasets behind it.">
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css?v=9c7410fbb0">
+  <link rel="stylesheet" href="css/style.css?v=51edf95137">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=df696cc0c2","./js/filterform.js":"./js/filterform.js?v=d9e37282ef","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=07d8618c8c","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=5bdefd9c4f","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=b609c9704a","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=f0aa91bbe9","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=0bf6e1295a","./js/filterform.js":"./js/filterform.js?v=d9e37282ef","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=07d8618c8c","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=5bdefd9c4f","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=b609c9704a","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -182,7 +182,7 @@
         </dd>
 
         <dt id="caveat">What 311 counts can and cannot tell you</dt>
-        <dd><p>311 counts show who reports problems and how, not only how many problems exist. A higher count can mean more engaged neighbors, not a worse block.</p></dd>
+        <dd><p>311 counts are reports, not problems. Closed doesn't mean fixed. A count shows who reports and how, not only how many problems exist: a higher count can mean more engaged neighbors, not a worse block.</p></dd>
       </dl>
     </section>
 
@@ -195,8 +195,8 @@
         <dt id="at-a-glance">At a glance</dt>
         <dd><p>Four numbers for the filtered requests: <a href="#requests">Requests</a>, <a href="#not-closed">Not yet closed</a>, <a href="#median">Median</a> and <a href="#average">Average time to close</a>. Times under 10 days show one decimal; longer times are rounded to whole days.</p></dd>
 
-        <dt id="top-10">Top 10 problems</dt>
-        <dd><p>The 10 problems with the most requests. Ties are sorted A to Z. Select a problem to see its 15 most common descriptions.</p></dd>
+        <dt id="top-10">Top 10 request types</dt>
+        <dd><p>The 10 kinds of request (the city's <a href="#problem">Problem</a> field) with the most requests. They are the most common things people report, not the biggest problems in a place. Ties are sorted A to Z. Select one to see its 15 most common descriptions.</p></dd>
 
         <dt id="per-month">Requests per month</dt>
         <dd>
@@ -228,7 +228,7 @@
         <dd><p>Every request at one <a href="#address">address</a>, over the whole data window. Open it by selecting an address in the <a href="#address-lookup">address lookup</a>. It has the same filters and panels as a district page, plus <strong>Problems over time</strong>: one bar per month, split into the five most common problems at that address, with the rest grouped. <strong>Compare with its districts</strong> puts the address's 10 biggest problems, as a <a href="#share">share</a> of its requests, next to the same share in its community district and council district, with buttons to open either district. As in Compare, only the dates apply there, and the districts use whole months. It matches the address exactly as the city spelled it, so requests that gave only a cross street are not included. A link at the top opens the address on the <a href="https://boundaries.beta.nyc/">BetaNYC Boundaries Map</a> (<a href="https://github.com/BetaNYC/nyc-boundaries">code on GitHub</a>), which lists the political and administrative districts at that spot. It uses the middle of the locations 311 recorded for the address.</p></dd>
 
         <dt id="compare">Compare</dt>
-        <dd><p>This district's 10 biggest problems, as a <a href="#share">share</a> of its located requests, next to the same share in its <a href="#borough-compare">borough</a> and the whole city. It uses whole months from your From and To dates. Only the dates apply: problem, description, agency, status and address filters do not.</p></dd>
+        <dd><p>This district's 10 most common request types, as a <a href="#share">share</a> of its located requests, next to the same share in its <a href="#borough-compare">borough</a> and the whole city. It uses whole months from your From and To dates. Only the dates apply: problem, description, agency, status and address filters do not.</p></dd>
 
         <dt id="every-request">Every request (and the CSV download)</dt>
         <dd><p>The matching requests, newest first, 50 at a time. <strong>Download CSV</strong> gives every matching request as a spreadsheet file, with the city's original fields plus BoardStat's district numbers (<code>cd</code>, <code>cc</code>), <code>days_to_close</code>, and <code>close_flag</code>, which says why a time to close was left out.</p></dd>
