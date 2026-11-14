@@ -140,3 +140,23 @@ def test_pages_set_up_the_panel_through_the_shared_module():
         assert "form.afterRedraw();" in src
     # The open/close rules live in one place.
     assert "is-collapsed" not in district and "is-collapsed" not in fullmap
+
+
+def test_panel_is_set_up_before_the_first_load():
+    """#149 review: on a phone the panel was fully open, with a dead "Hide filters" button,
+    until the first load finished. main() sets the panel up before it loads any rows."""
+    district = (JS / "district.js").read_text()
+    main = district[district.index("async function main()"):]
+    assert main.index("form.setupPanel(") < main.index("await ensureLoaded();")
+    assert "form.setupPanel(" not in district[district.index("function setupFilters()"):district.index("function describeFiltersForPrint()")]
+
+
+def test_pages_with_nothing_to_show_have_no_filter_panel():
+    """#149 review: "District not found" showed a toggle that did nothing."""
+    district = (JS / "district.js").read_text()
+    hide = re.search(r"function hideFilters\(\) \{.*?\n\}", district, re.DOTALL).group(0)
+    assert "$('filters-bar').hidden = true;" in hide and "$('filters').hidden = true;" in hide
+    main = district[district.index("async function main()"):]
+    for marker in ("'Data not available'", "'Borough not found' : 'District not found'", "'No address chosen'"):
+        block = main[main.index(marker):]
+        assert block.index("hideFilters();") < block.index("return;"), marker

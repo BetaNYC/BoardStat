@@ -255,8 +255,6 @@ function setupFilters() {
   form.bind(manifest.window.start, manifest.window.end);
   form.set(state);
   form.openGroups();
-  // Open on a wide screen, closed on a phone (filterform.js setupPanel, #149).
-  form.setupPanel({ scrollTo: $('filters-bar') });
   $('print').addEventListener('click', () => { window.boardstatTrack?.('print_page', { geo, district_id: geoId }); window.print(); });
   window.addEventListener('beforeprint', describeFiltersForPrint);
   $('prev').addEventListener('click', () => { if (page > 0) { page--; renderDetail(); } });
@@ -1032,23 +1030,32 @@ function nycLocal(iso) {
   return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
 }
 
+/** A page with nothing to show (no data, no such place, no address): no filter panel, no dead toggle. */
+function hideFilters() {
+  $('filters-bar').hidden = true;
+  $('filters').hidden = true;
+}
+
 async function main() {
   try {
     manifest = await loadManifest();
   } catch (err) {
     $('title').textContent = 'Data not available';
     $('as-of').textContent = String(err.message || err);
+    hideFilters();
     return;
   }
   district = resolvePlace(manifest, geo, geoId);
   if (!district || (ADDRESS_MODE && IS_BORO)) {
     $('title').textContent = IS_BORO ? 'Borough not found' : 'District not found';
     $('as-of').replaceChildren(`No data for this ${IS_BORO ? 'borough' : 'district'}. `, el('a', { href: './', text: 'Choose another place.' }));
+    hideFilters();
     return;
   }
   if (ADDRESS_MODE && !params.get('addr')) {
     $('title').textContent = 'No address chosen';
     $('as-of').replaceChildren(el('a', { href: './#addr', text: 'Search for an address.' }));
+    hideFilters();
     return;
   }
   const label = ADDRESS_MODE ? params.get('addr') : district.label;
@@ -1106,6 +1113,9 @@ async function main() {
     lockAddress: ADDRESS_MODE,
   });
   form.set(state);
+  // Open on a wide screen, closed on a phone (filterform.js setupPanel, #149). Before the
+  // first load, so the panel is in its place and the toggle works while the rows load.
+  form.setupPanel({ scrollTo: $('filters-bar') });
   if (!ADDRESS_MODE) updateFullMapLink(filtersToParams(geo, geoId, state, defaultDates()));
   // A failed first load must never leave the page waiting: say so, and let Apply retry.
   let loaded = true;
