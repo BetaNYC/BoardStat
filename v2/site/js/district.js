@@ -1,6 +1,7 @@
-// District page: every query runs in DuckDB-WASM over ONE district's Parquet file.
+// District page: every query runs in DuckDB-WASM over ONE district's Parquet file, or,
+// for a whole borough (geo=boro, #144), over all of its community districts' files at once.
 import {
-  PLOT_URL, loadManifest, renderDataStatus, renderChanges, dataUrl, registerData, query, lit, el, table, chartWithTable,
+  PLOT_URL, loadManifest, renderDataStatus, renderChanges, dataUrl, registerData, reregisterData, query, lit, el, table, chartWithTable,
   setStatus, fmtInt, fmtDays, fmtPct, fmtDate, fmtDateTime, monthLabel,
 } from './lib.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
@@ -8,6 +9,8 @@ import {
   copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus,
 } from './filterstate.js';
 import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
+import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl } from './place.js';
+import { periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly, DataChangedError, filesNamedIn } from './loadplan.js';
 
 const $ = (id) => document.getElementById(id);
 const PAGE = 50;
@@ -24,13 +27,16 @@ const PROBLEM_COLORS = [BLUE, '#7fa8e0', DARK, '#c27c0e', '#3f8f5b', '#c8c8c8'];
 const CLOSED_DAYS = `CASE WHEN status = 'Closed' THEN days_to_close END`;
 
 const params = new URLSearchParams(window.location.search);
-const geo = params.get('geo') === 'cc' ? 'cc' : 'cd';
-const geoId = params.get('id');
+// geo is cd, cc or boro (a whole borough, #144); for boro the id is the borough's slug.
+const { geo, id: geoId } = parsePlace(params);
+const IS_BORO = geo === 'boro';
 // address.html reuses this page for one address: the address filter is fixed,
 // and the district-wide panels (top addresses, compare) are left out.
 const ADDRESS_MODE = document.body.dataset.mode === 'address';
 
 let manifest, district, Plot;
+// The SQL that reads this page's rows: 'd.parquet', or read_parquet([...]) for a borough (place.js).
+let SRC = `'d.parquet'`;
 // `state` is the applied filters: what every panel shows and the link carries.
 // `draft` is what the filter form shows; only the Apply button copies it to `state` (#142).
 let state = {};
@@ -42,25 +48,39 @@ let selectedType = null;
 let addrInfo = null; // address page: { zip, cd, cc, boro, lng, lat } of the address
 let asOfSql = null; // build time as an NYC-local TIMESTAMP literal; "days open" is measured to it
 let viewStart = null; // the From date a link without dates opens with (manifest.window.default_start)
-let loadedFrom = null; // closed requests created before this date are not in the req table
+let loader = null; // loads the req table (loadplan.js); null when the file is loaded whole
+let loadedFrom = null; // Closed requests created before this date are not (all) in the req table
+let tableLoads = 0; // counts loads made before a draw, so the filter lists are refilled after one
 
 // ------------------------------------------------------------- loading only what the view needs
 //
 // Detail files hold the Closed requests first, in created_date order, then every
 // request not yet Closed at the very end, in 50,000-row groups (boardstat_build.py).
-// The page loads all open requests plus Closed ones from LOAD_BACK_MONTHS before the
-// From date: the "same month a year earlier" series needs that year, and "Still open
-// from before this period" needs every older open request. So the rows a page needs
-// are one run of row groups at the end of the file. DuckDB-WASM reads only the row
-// groups whose min/max statistics match, over HTTP range requests (lib.js turns off
+// The page loads every request not yet Closed ("Still open from before this period"
+// needs all of them) plus the Closed requests from LOAD_BACK_MONTHS before the From
+// date: the "same month a year earlier" series needs that year. So the rows a page
+// needs are one run of row groups at the end of each file. DuckDB-WASM reads only the
+// row groups whose min/max statistics match, over HTTP range requests (lib.js turns off
 // forceFullHTTPReads; https://duckdb.org/docs/stable/data/parquet/overview#partial-reading).
-// Its read-ahead grows each read up to 16 MB, so a contiguous run that ends at the
-// end of the file costs little more than the run itself. The Closed branch of the
-// load runs first: run the other way round, DuckDB-WASM fetched about 20% more bytes
-// (CC 11, 2020+ data, measured 2026-11-06), because the second scan's read-ahead
-// re-fetched ranges the first had already read.
-// Moving the From date earlier than that reloads the table.
-const LOAD_BACK_MONTHS = 12;
+// Its read-ahead grows each read fourfold while reads stay contiguous, up to 16 MB
+// (duckdb-wasm 1.32.0, lib/include/duckdb/web/io/readahead_buffer.h), so a run that
+// ends at the end of the file costs about the raw bytes from its first row group to
+// the end of the file, unselected columns included. The Closed branch of the load
+// runs first (firstLoadSql in loadplan.js says why). Loads read up to five district
+// files per statement, into an in-memory database stored compressed (see main()): a
+// whole borough from 2020 in one uncompressed statement ran DuckDB-WASM out of memory.
+//
+// A borough page loads in two steps instead (#144, loadplan.js): Closed requests from
+// the From date on, then draw, then the year before in the background, file by file,
+// and draw Requests per month again. That second read starts mid-file, so read-ahead
+// runs on to the end of the file and fetches the first step's bytes again: two steps
+// cost the one-step bytes plus the first step's. Measured 2026-11-13 at 50 Mbit/s,
+// Brooklyn draws in 26 s instead of 37 s for 49 MB more; a community district (CD 306)
+// draws 0.4 s sooner for 4.7 MB more (+60%), so district, council district and
+// address pages keep the one-step load. TWO_STEP below switches it.
+//
+// Moving the From date earlier appends only the missing older Closed rows.
+const TWO_STEP = IS_BORO;
 // The columns the page's panels use. The CSV download reads every column straight
 // from the file instead, so the long text fields never sit in memory.
 const LOAD_COLUMNS = ['unique_key', 'created_date', 'closed_date', 'agency', 'agency_name', 'complaint_type', 'descriptor', 'status',
@@ -69,38 +89,92 @@ const LOAD_COLUMNS = ['unique_key', 'created_date', 'closed_date', 'agency', 'ag
 // Files built before range loading have no is_closed column or default_start; load those whole.
 const rangeLoading = () => Boolean(manifest.window.default_start);
 
-function monthsBefore(iso, n) {
-  const d = new Date(`${iso.slice(0, 7)}-01T12:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() - n);
-  return d.toISOString().slice(0, 10);
-}
-
-/** The earliest created date the current filters need for Closed requests, or null for none. */
-function neededFrom() {
-  // Every request whose status is not Closed is always loaded, so a status filter
-  // other than Closed (including "not yet closed") never needs older Closed rows.
-  if (state.status && state.status !== 'Closed') return null;
-  const from = monthsBefore(state.start, LOAD_BACK_MONTHS);
-  return from > manifest.window.start ? from : manifest.window.start;
-}
-
-/** (Re)build the req table if the view needs Closed requests older than what is loaded. */
+/** Before a draw: make sure the req table holds every row the current filters' period needs. */
 async function ensureLoaded() {
-  if (!rangeLoading()) {
-    if (loadedFrom === null) { await query(`CREATE TABLE req AS SELECT * FROM 'd.parquet'`); loadedFrom = manifest.window.start; }
+  if (!loader) {
+    if (loadedFrom === null) { await query(`CREATE TABLE req AS SELECT * FROM ${SRC}`); loadedFrom = manifest.window.start; tableLoads++; }
     return;
   }
-  const need = neededFrom();
-  if (loadedFrom !== null && (need === null || need >= loadedFrom)) return;
-  const from = need === null ? monthsBefore(viewStart, LOAD_BACK_MONTHS) : need;
-  const cols = LOAD_COLUMNS.join(', ');
-  setStatus($('status'), `Loading requests from ${fmtDate(from > manifest.window.start ? from : manifest.window.start)} on…`);
-  await query(`
-    CREATE OR REPLACE TABLE req AS
-    SELECT ${cols} FROM 'd.parquet' WHERE is_closed = true AND created_date >= CAST(${lit(from)} AS TIMESTAMP)
-    UNION ALL
-    SELECT ${cols} FROM 'd.parquet' WHERE is_closed = false`);
-  loadedFrom = from;
+  // A status other than Closed needs no Closed rows; the first load still takes the
+  // default view's, so that switching back to every status is quick.
+  const firstFrom = (s) => (TWO_STEP ? periodFrom : priorFrom)(s, manifest.window.start);
+  const target = firstFrom(state) ?? (loadedFrom === null ? firstFrom({ start: viewStart }) : null);
+  if (target === null) return;
+  const changed = await loader.loadFor(target, (from, done, n) => setStatus($('status'),
+    `Loading requests from ${fmtDate(from)} on…${n > 1 && done ? ` (${done} of ${n} districts loaded)` : ''}`));
+  loadedFrom = loader.loadedFrom();
+  if (changed) tableLoads++;
+}
+
+/**
+ * After a draw: load the year before the From date in the background, then draw
+ * Requests per month again. A failure leaves the rest of the page as it is.
+ */
+function loadPriorYear() {
+  if (!loader || !TWO_STEP) return;
+  const job = loader.loadInBackground(priorFrom(state, manifest.window.start));
+  if (!job || job.watched) return;
+  job.watched = true;
+  job.done.then(async (r) => {
+    loadedFrom = loader.loadedFrom();
+    if (r.superseded) return; // the job that replaced it draws (and reports) instead
+    if (!r.ok) {
+      console.error(r.error);
+      priorFailure = r.error;
+      if (!(r.error instanceof DataChangedError)) await freshDataFiles(r.error);
+    }
+    // A load for newer filters is still running: its refresh draws Requests per month
+    // once the table is complete, so drawing now would count a half-loaded table.
+    if (loader.loadPending()) return;
+    await renderMonthly();
+    announcePrior(r.ok ? 'Requests per month now shows the same months a year earlier.' : priorFailureText(r.error));
+  }).catch((err) => console.error(err));
+}
+
+/** Say once, to screen readers, that the year-earlier line arrived or failed (not on every redraw). */
+function announcePrior(text) {
+  const live = $('monthly-live');
+  if (live) live.textContent = text;
+}
+
+/** The note under Requests per month when the year before could not be added. */
+function priorFailureText(err) {
+  return err instanceof DataChangedError
+    ? 'BoardStat updated its data after this page opened, so the same months a year earlier were not added. Reload the page to see them with the new data.'
+    : 'The same months a year earlier could not be loaded, so that line is left out. Everything else on this page is complete. Reload the page, or change a filter and press Apply filters, to try again.';
+}
+
+/**
+ * Before anything is added to the table: the nightly build replaces the files in place,
+ * so rows added after it would come from a different build than the rest (#144 QA).
+ */
+async function checkFresh() {
+  let m;
+  try {
+    const r = await fetch('data/manifest.json', { cache: 'no-cache' });
+    if (!r.ok) return; // cannot tell; the read itself will fail if the files are gone
+    m = await r.json();
+  } catch { return; }
+  if (m.generated_at !== manifest.generated_at) throw new DataChangedError();
+}
+
+// Why the last background load failed; cleared when the page draws again, which retries it.
+let priorFailure = null;
+let dataFiles = []; // [name, path] of each detail file this page reads
+/**
+ * After a failed read: register again only the files the error names, so a retry does
+ * not reuse a bad buffer (lib.js). Files that were read without trouble are left alone:
+ * re-registering one of those made its next read fail ("Failed to open file", #144 QA).
+ */
+function freshDataFiles(err) {
+  const failed = filesNamedIn(String(err?.message || err || ''), dataFiles);
+  if (!failed.length) return Promise.resolve();
+  const redo = async () => {
+    for (const [name, path] of failed) {
+      try { await reregisterData(name, path); } catch (e) { console.error(e); }
+    }
+  };
+  return loader ? loader.queue(redo) : redo();
 }
 
 // ------------------------------------------------------------- state <-> URL
@@ -129,9 +203,16 @@ function updateFullMapLink(p) {
   const a = $('fullmap-link');
   if (!a) return;
   a.href = `map.html?${p.toString()}`;
+  // The link to the whole borough keeps the dates and filters too (#144).
+  const bl = $('boro-link');
+  const b = geo === 'cd' ? boroughOfCd(geoId) : null;
+  if (bl && b) bl.href = `district.html?${filtersToParams('boro', b.slug, state, defaultDates()).toString()}`;
   // The address filter never goes into a link, so the full-page map cannot show it.
   const note = $('fullmap-addr-note');
-  if (note) note.hidden = !state.addr;
+  if (note) {
+    note.hidden = !state.addr;
+    if (IS_BORO) note.textContent = note.textContent.replace('the whole district', 'the whole borough');
+  }
 }
 
 function where(opts = {}) {
@@ -271,8 +352,8 @@ function addType(t) {
 /** Fill the problem, agency and status lists from what is loaded (again after a reload). */
 let optionsFrom;
 async function fillFilterOptions() {
-  if (optionsFrom === loadedFrom) return;
-  optionsFrom = loadedFrom;
+  if (optionsFrom === tableLoads) return;
+  optionsFrom = tableLoads;
   allTypes = (await query(`SELECT complaint_type AS t, count(*) AS n FROM req GROUP BY 1 ORDER BY 2 DESC`)).map((r) => r.t);
   $('type-options').replaceChildren(...allTypes.map((t) => el('option', { value: t })));
   // Keep the fixed first options ("All agencies", "Any status", "Not yet closed"); replace the rest.
@@ -284,13 +365,26 @@ async function fillFilterOptions() {
   syncForm();
 }
 
+/**
+ * What the page needs once, right after its first load works: the filter lists, a
+ * status the data does not have dropped from the link, and the address page's links.
+ * main() runs it; if the first load failed, the first refresh that loads runs it.
+ */
+let firstLoadDone = false;
+async function afterFirstLoad() {
+  firstLoadDone = true;
+  await fillFilterOptions();
+  state = keepKnownStatus(state, [...$('f-status').options].map((o) => o.value));
+  draft = copyFilters(state);
+  syncForm();
+  if (ADDRESS_MODE) await renderAddressLinks();
+}
+
 async function setupFilters() {
   const { start, end } = manifest.window;
   for (const id of ['f-start', 'f-end']) { $(id).min = start; $(id).max = end; }
   $('f-start').value = state.start;
   $('f-end').value = state.end;
-  await fillFilterOptions();
-  state = keepKnownStatus(state, [...$('f-status').options].map((o) => o.value));
   draft = copyFilters(state);
   syncForm();
   setupGroups();
@@ -476,11 +570,22 @@ function yearChart(rows, title, spanText, width) {
   });
 }
 
+// Only the newest Requests per month draw is shown: the background load of the year
+// before (loadPriorYear) draws it again, and must never overwrite a newer view.
+const monthlyDraw = latestOnly();
+
 async function renderMonthly() {
   // A month is "partial" when the From/To dates or the end of the data cut it short.
   // Partial months are shown as hollow dots off the line, so a short month never
   // looks like a drop. The year-earlier series uses exactly the same days, shifted
   // back 12 months (every filter except From/To applies).
+  // While a load for new filters runs the table is half filled; that load's refresh draws.
+  if (loader?.loadPending()) return;
+  const draw = monthlyDraw.next();
+  // Year-earlier counts are complete only from coverFrom on: what is loaded when the
+  // query runs (rows are only ever added, so reading it first is safe).
+  const coverFrom = priorCoverStart(state, loadedFrom, manifest.window.start);
+  const priorFailed = priorFailure;
   const effEnd = state.end < lastDataDay() ? state.end : lastDataDay();
   // When the dates reach the end of the data, the year-earlier series stops at the
   // same minute as the newest request, since the last day is usually only partly in.
@@ -507,16 +612,20 @@ async function renderMonthly() {
       GROUP BY 1
     )
     SELECT m.ym, m.n, prev_year.n_prior FROM m LEFT JOIN prev_year USING (ym) ORDER BY m.ym`);
-  // A year-earlier month is only shown if the data covers all of its matching days.
-  const priorCovered = (ym) => {
+  if (!monthlyDraw.isLatest(draw)) return;
+  // A year-earlier month is only shown if the data covers all of its matching days,
+  // and the page has loaded them (the year before loads after the first draw).
+  const priorStartOf = (ym) => {
     const [y, mo] = ym.split('-').map(Number);
     const span = partialSpan(ym, state.start, effEnd) || [`${ym}-01`, null];
-    const priorStart = `${y - 1}-${String(mo).padStart(2, '0')}-${span[0].slice(8)}`;
-    return priorStart >= manifest.window.start;
+    return `${y - 1}-${String(mo).padStart(2, '0')}-${span[0].slice(8)}`;
   };
+  let priorMissing = 0;
   for (const r of rows) {
     r.span = partialSpan(r.ym, state.start, effEnd);
-    if (!priorCovered(r.ym)) r.n_prior = null;
+    const priorStart = priorStartOf(r.ym);
+    if (priorStart < manifest.window.start) r.n_prior = null;
+    else if (priorStart < coverFrom) { r.n_prior = null; r.priorWait = true; priorMissing++; }
   }
   const spanText = (sp) => (sp ? `partial month: ${fmtDate(sp[0])}${sp[0] === sp[1] ? '' : ` to ${fmtDate(sp[1])}`} only` : '');
   const data = [];
@@ -525,9 +634,13 @@ async function renderMonthly() {
     data.push({ date, ym: r.ym, series: 'This period', n: r.n, partial: !!r.span, span: r.span });
     if (r.n_prior != null) data.push({ date, ym: r.ym, series: 'Same month a year earlier', n: r.n_prior, partial: !!r.span, span: r.span });
   }
-  const full = data.filter((d) => !d.partial);
-  const part = data.filter((d) => d.partial);
-  const hasPrior = data.some((d) => d.series !== 'This period');
+  // Until every year-earlier month is loaded, the chart shows This period only, with the
+  // legend already in place (one key), so the line and its key appear together and
+  // nothing below moves. The table shows each month's value as it is.
+  const shown = priorMissing ? data.filter((d) => d.series === 'This period') : data;
+  const full = shown.filter((d) => !d.partial);
+  const part = shown.filter((d) => d.partial);
+  const hasPrior = shown.some((d) => d.series !== 'This period');
   const title = (d) => `${monthLabel(d.ym)}: ${fmtInt(d.n)} (${d.series}${d.partial ? `; ${spanText(d.span)}` : ''})`;
   // More than 13 months: one line per calendar year, Jan to Dec along the bottom,
   // so years sit on top of each other instead of one long line plus a shifted copy.
@@ -541,8 +654,8 @@ async function renderMonthly() {
     height: 260,
     marginLeft: 56,
     x: { type: 'utc', label: null, ticks: 6, tickFormat: '%b %Y' },
-    y: { label: 'Requests', grid: true, ...countY(Math.max(0, ...data.map((d) => d.n))) },
-    color: { domain: ['This period', 'Same month a year earlier'], range: [BLUE, GRAY], legend: hasPrior },
+    y: { label: 'Requests', grid: true, ...countY(Math.max(0, ...shown.map((d) => d.n))) },
+    color: { domain: priorMissing ? ['This period'] : ['This period', 'Same month a year earlier'], range: [BLUE, GRAY], legend: hasPrior || priorMissing > 0 },
     marks: [
       Plot.ruleY([0]),
       Plot.lineY(full, { x: 'date', y: 'n', stroke: 'series', strokeWidth: 2 }),
@@ -554,12 +667,19 @@ async function renderMonthly() {
   chartWithTable($('monthly'), chart, rows, [
     { key: 'ym', label: 'Month', fmt: (v, r) => (r.span ? `${monthLabel(v)} (${spanText(r.span)})` : monthLabel(v)) },
     { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
-    { key: 'n_prior', label: 'Same days a year earlier', num: true, fmt: (v) => (v == null ? 'not in data' : fmtInt(v)) },
+    { key: 'n_prior', label: 'Same days a year earlier', num: true,
+      fmt: (v, r) => (v != null ? fmtInt(v) : !r.priorWait ? 'not in data' : priorFailed ? 'not loaded' : 'loading…') },
   ], 'Requests per month');
+  if (priorMissing) {
+    // No live role here: the note is redrawn with the chart. announcePrior says it once.
+    $('monthly').append(priorFailed
+      ? el('p', { class: 'muted prior-failed', text: priorFailureText(priorFailed) })
+      : el('p', { class: 'muted prior-loading', text: 'Loading the same months a year earlier…' }));
+  }
   if (byYear) $('monthly').append(el('p', { class: 'muted', text: 'Each line is one calendar year, so you can compare the same month across years. The newest year is the thickest line. The table lists every month.' }));
   if (part.length) {
     const list = rows.filter((r) => r.span).map((r) => `${monthLabel(r.ym)} (${spanText(r.span).replace('partial month: ', '')})`).join(' and ');
-    $('monthly').append(el('p', { class: 'muted', text: `Hollow dots are partial months, so they are lower than a full month would be: ${list}. The newest request in the data is from ${lc ? fmtDateTime(lc.replace(' ', 'T')) : fmtDate(lastDataDay())}, because the city publishes 311 data with a delay. Year-earlier values cover the same days, up to the same time, one year earlier.` }));
+    $('monthly').append(el('p', { class: 'muted', text: `Hollow dots are partial months, so they are lower than a full month would be: ${list}. The newest request in the data is from ${lc ? fmtDateTime(lc.replace(' ', 'T')) : fmtDate(lastDataDay())}, because the city publishes 311 data with a delay.${priorMissing ? '' : ' Year-earlier values cover the same days, up to the same time, one year earlier.'}` }));
   }
 }
 
@@ -801,42 +921,46 @@ async function renderCompare() {
   const boro = district.borough;
   const ymStart = state.start.slice(0, 7);
   const ymEnd = state.end.slice(0, 7);
+  // A borough page compares the borough with the city only (no "borough vs itself", #144).
+  const series = IS_BORO
+    ? [{ key: 'd', kind: 'borough', id: boro, name: `${boro} (this borough)`, color: BLUE, symbol: 'circle' }]
+    : [{ key: 'd', kind: geo, id: geoId, name: 'This district', color: BLUE, symbol: 'circle' },
+      { key: 'b', kind: 'borough', id: boro || '', name: boro || 'Borough', color: DARK, symbol: 'square' }];
+  series.push({ key: 'c', kind: 'city', id: null, name: 'New York City', color: GRAY, symbol: 'triangle' });
   $('cmp-note').textContent = `Share of each problem among all located requests, ${monthLabel(ymStart)} to ${monthLabel(ymEnd)} (whole months). ` +
-    `Compared with ${boro || 'the borough'}${geo === 'cc' ? ' (the borough where most of this district\'s requests are)' : ''} and the whole city. Problem, agency, status and address filters do not apply here.`;
+    (IS_BORO ? 'Compared with the whole city.'
+      : `Compared with ${boro || 'the borough'}${geo === 'cc' ? ' (the borough where most of this district\'s requests are)' : ''} and the whole city.`) +
+    ' Problem, agency, status and address filters do not apply here.';
+  const first = series[0].kind;
   const rows = await query(`
     WITH a AS (
       SELECT geo_kind, complaint_type AS t, sum(n) AS n
-      FROM ${aggRows(ymStart, ymEnd, [[geo, geoId], ['borough', boro || ''], ['city', null]])}
+      FROM ${aggRows(ymStart, ymEnd, series.map((x) => [x.kind, x.id]))}
       GROUP BY ALL
     ), s AS (SELECT geo_kind, t, n / sum(n) OVER (PARTITION BY geo_kind) AS share FROM a),
-    top_types AS (SELECT t FROM s WHERE geo_kind = ${lit(geo)} ORDER BY share DESC LIMIT 10)
+    top_types AS (SELECT t FROM s WHERE geo_kind = ${lit(first)} ORDER BY share DESC LIMIT 10)
     SELECT top_types.t,
-      max(share) FILTER (WHERE geo_kind = ${lit(geo)}) AS d,
-      max(share) FILTER (WHERE geo_kind = 'borough') AS b,
-      max(share) FILTER (WHERE geo_kind = 'city') AS c
+      ${series.map((x) => `max(share) FILTER (WHERE geo_kind = ${lit(x.kind)}) AS ${x.key}`).join(',\n      ')}
     FROM top_types LEFT JOIN s USING (t) GROUP BY top_types.t ORDER BY d DESC`);
-  const long = rows.flatMap((r) => [
-    { t: r.t, where: 'This district', share: r.d ?? 0 },
-    { t: r.t, where: boro || 'Borough', share: r.b ?? 0 },
-    { t: r.t, where: 'New York City', share: r.c ?? 0 },
-  ]);
+  const long = rows.flatMap((r) => series.map((x) => ({ t: r.t, where: x.name, share: r[x.key] ?? 0 })));
+  const names = series.map((x) => x.name);
   const chart = Plot.plot({
-    ariaLabel: 'Share of top problems: district, borough, city',
-    ariaDescription: 'Dot chart comparing each top problem\'s share of requests in this district, its borough, and the city.',
+    ariaLabel: IS_BORO ? 'Share of top problems: borough, city' : 'Share of top problems: district, borough, city',
+    ariaDescription: IS_BORO
+      ? 'Dot chart comparing each top problem\'s share of requests in this borough and the city.'
+      : 'Dot chart comparing each top problem\'s share of requests in this district, its borough, and the city.',
     width: chartWidth('compare', 420),
     marginLeft: 180,
     height: 50 + 30 * rows.length,
     x: { label: 'Share of requests', tickFormat: '.0%', grid: true },
     y: { label: null, domain: rows.map((r) => r.t) },
-    color: { domain: ['This district', boro || 'Borough', 'New York City'], range: [BLUE, DARK, GRAY], legend: true },
-    symbol: { domain: ['This district', boro || 'Borough', 'New York City'], range: ['circle', 'square', 'triangle'] },
+    color: { domain: names, range: series.map((x) => x.color), legend: true },
+    symbol: { domain: names, range: series.map((x) => x.symbol) },
     marks: [Plot.dot(long, { x: 'share', y: 't', fill: 'where', symbol: 'where', r: 5, tip: true })],
   });
   chartWithTable($('compare'), chart, rows, [
     { key: 't', label: 'Problem' },
-    { key: 'd', label: 'This district', num: true, fmt: fmtPct },
-    { key: 'b', label: boro || 'Borough', num: true, fmt: fmtPct },
-    { key: 'c', label: 'New York City', num: true, fmt: fmtPct },
+    ...series.map((x) => ({ key: x.key, label: x.name, num: true, fmt: fmtPct })),
   ], 'Share of requests by problem');
 }
 
@@ -876,7 +1000,7 @@ async function downloadCsv() {
   setStatus($('status'), 'Preparing CSV…');
   const sel = CSV_COLUMNS.map((c) => (c.endsWith('_date') ? `strftime(${c}, '%Y-%m-%dT%H:%M:%S') AS ${c}` : c)).join(', ');
   // Straight from the file, so every column is there without keeping it in memory.
-  const rows = await query(`SELECT ${sel} FROM 'd.parquet' WHERE ${where()} ORDER BY created_date, unique_key`);
+  const rows = await query(`SELECT ${sel} FROM ${SRC} WHERE ${where()} ORDER BY created_date, unique_key`);
   const lines = [CSV_COLUMNS.join(',')].concat(rows.map((r) => CSV_COLUMNS.map((c) => csvCell(r[c])).join(',')));
   const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
   const a = el('a', { href: URL.createObjectURL(blob), download: `boardstat-${geo}-${geoId}-${state.start}-to-${state.end}.csv` });
@@ -889,7 +1013,7 @@ async function downloadCsv() {
 
 async function setupMap() {
   mapCtx = await setupRequestMap('map', { geo, geoId });
-  renderMapLegend($('map-legend'));
+  renderMapLegend($('map-legend'), { borough: IS_BORO });
 }
 
 async function renderMap() {
@@ -902,14 +1026,53 @@ async function renderMap() {
 // ------------------------------------------------------------- about
 
 function renderAbout() {
-  const unloc = geo === 'cd' && !ADDRESS_MODE ? district.unlocated_city_assigned : null;
+  const unloc = !ADDRESS_MODE ? district.unlocated : null;
+  const text = IS_BORO
+    ? boroughCountsText(district, unloc)
+    : 'Every request with a location was placed in this district by BoardStat, using where it happened and today\'s boundary lines.' +
+      (unloc ? ` Not counted: ${fmtInt(unloc)} requests since ${longDate(manifest.window.start)} (all dates, not only the ones chosen above) that have no usable location but that the city's own records assign to this community district.` : '');
   $('about').replaceChildren(
-    el('p', {}, ADDRESS_MODE ? 'This page shows only requests whose address matches exactly, as the city spelled it. ' : '', 'Every request with a location was placed in this district by BoardStat, using where it happened and today\'s boundary lines.' +
-      (unloc ? ` ${fmtInt(unloc)} requests that have no usable location are assigned to this community district by the city's own records; they are not counted on this page.` : '')),
+    el('p', {}, ADDRESS_MODE ? 'This page shows only requests whose address matches exactly, as the city spelled it. ' : '', text),
     el('ul', { class: 'more-links' },
       el('li', {}, el('a', { class: 'button', href: 'about.html', text: 'About BoardStat: sources and history' })),
       el('li', {}, el('a', { class: 'button secondary', href: 'glossary.html', text: 'Glossary: terms and how numbers are counted' }))),
   );
+}
+
+/**
+ * Links between a district and its borough (#144). A community district page links to its
+ * borough; a borough page lists its districts. Council districts cross borough lines, so a
+ * council district page gets no borough link.
+ */
+function renderBoroughLink() {
+  const box = $('place-links');
+  if (!box || ADDRESS_MODE) return;
+  if (IS_BORO) {
+    const link = (d) => el('a', { href: `district.html?geo=cd&id=${encodeURIComponent(d.id)}` }, d.jia ? `Joint Interest Area ${d.id}` : d.label.replace(`${district.borough} `, ''));
+    const out = ['Districts in this borough: '];
+    district.parts.forEach((d, i) => { if (i) out.push(', '); out.push(link(d)); });
+    box.replaceChildren(...out, '.');
+    box.hidden = false;
+  } else if (geo === 'cd') {
+    const b = boroughOfCd(geoId);
+    if (!b) return;
+    box.replaceChildren(el('a', { id: 'boro-link', href: boroughUrl(b.slug) }, `See all of ${b.name}`), el('span', { class: 'muted', text: ' (every community district in the borough, plus its parks and other areas, with the same charts, map and list)' }));
+    box.hidden = false;
+  }
+}
+
+/** A date as "January 1, 2020". */
+const longDate = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+/** What a borough page counts (#144), in words: the same sentence the glossary explains. */
+function boroughCountsText(place, unloc) {
+  const cds = place.parts.filter((d) => !d.jia);
+  const jias = place.parts.filter((d) => d.jia);
+  return `This page counts every request with a location that BoardStat placed inside ${place.borough}: ` +
+    `its ${cds.length} community districts` +
+    (jias.length ? ` and ${jias.length === 1 ? 'its Joint Interest Area' : `its ${jias.length} Joint Interest Areas`} (parks and other areas outside every community district: ${jias.map((d) => d.id).join(', ')})` : '') +
+    '. These are the same requests the district pages count, added together, and the same requests the Compare panel uses for the borough.' +
+    (unloc ? ` Not counted: ${fmtInt(unloc)} requests since ${longDate(manifest.window.start)} (all dates, not only the ones chosen above) that have no usable location but that the city's own records assign to one of ${place.borough}'s community districts, and requests with no location and no district at all.` : ' Requests with no usable location are not counted.');
 }
 
 /** Address page: the ZIP code and the two districts the address is in, with links. */
@@ -979,6 +1142,7 @@ function watchChartWidth() {
     clearTimeout(timer);
     timer = setTimeout(async () => {
       if (lastChartWidth === null || chartWidthKey() === lastChartWidth) return;
+      if (loader?.loadPending()) return; // the refresh after that load draws at the new width
       lastChartWidth = chartWidthKey();
       try {
         await Promise.all([renderMonthly(), renderAgency(), ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare()] : [renderCompare()])]);
@@ -998,12 +1162,15 @@ async function refresh() {
   renderPending();
   describeFiltersForPrint();
   page = 0;
+  priorFailure = null; // this refresh retries a failed background load (loadPriorYear)
   setStatus($('status'), 'Updating…');
   try {
-    const before = loadedFrom;
-    await ensureLoaded();
+    const before = tableLoads;
+    try { await ensureLoaded(); } catch (err) { err.boardstatLoad = true; throw err; }
     if (seq !== refreshSeq) return;
-    if (loadedFrom !== before) { descOptionsKey = null; await fillFilterOptions(); }
+    if (tableLoads !== before) { descOptionsKey = null; await fillFilterOptions(); }
+    // A page whose first load failed finishes its setup after the first load that works.
+    if (!firstLoadDone) await afterFirstLoad();
     setStatus($('status'), 'Updating…');
     await updateDescOptions();
     await renderKpis();
@@ -1014,10 +1181,15 @@ async function refresh() {
     if (seq === refreshSeq) setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
     lastRefreshFailed = false;
     lastChartWidth = chartWidthKey();
+    // Only once the page has drawn, so it never waits for the year before.
+    if (seq === refreshSeq) loadPriorYear();
   } catch (err) {
     console.error(err);
     lastRefreshFailed = true;
-    setStatus($('status'), `Something went wrong: ${err.message}`);
+    if (!(err instanceof DataChangedError)) freshDataFiles(err).catch((e) => console.error(e));
+    // The error itself stays in the console; the page says what to do.
+    setStatus($('status'), err.boardstatLoad || err instanceof DataChangedError ? loadFailedText(err)
+      : 'Something went wrong while updating the page. Press Apply filters to try again, or reload the page.');
   }
 }
 
@@ -1039,10 +1211,10 @@ async function main() {
     $('as-of').textContent = String(err.message || err);
     return;
   }
-  district = manifest.districts[geo]?.find((d) => String(d.id) === String(geoId));
-  if (!district || !district.file) {
-    $('title').textContent = 'District not found';
-    $('as-of').replaceChildren('No data for this district. ', el('a', { href: './', text: 'Choose another district.' }));
+  district = resolvePlace(manifest, geo, geoId);
+  if (!district || (ADDRESS_MODE && IS_BORO)) {
+    $('title').textContent = IS_BORO ? 'Borough not found' : 'District not found';
+    $('as-of').replaceChildren(`No data for this ${IS_BORO ? 'borough' : 'district'}. `, el('a', { href: './', text: 'Choose another place.' }));
     return;
   }
   if (ADDRESS_MODE && !params.get('addr')) {
@@ -1054,33 +1226,75 @@ async function main() {
   document.title = `${label} · BoardStat 2.0 (prototype)`;
   $('title').textContent = label;
   renderDataStatus(manifest, $('as-of'), $('stale'));
-  renderChanges($('changes'), { geo, id: geoId, label: ADDRESS_MODE ? `in ${district.label}` : 'in this district' });
+  renderChanges($('changes'), {
+    geo: IS_BORO ? 'cd' : geo, ids: district.parts.map((d) => d.id),
+    label: ADDRESS_MODE ? `in ${district.label}` : IS_BORO ? 'in this borough' : 'in this district',
+  });
   asOfSql = `CAST(${lit(nycLocal(manifest.generated_at))} AS TIMESTAMP)`;
-  const b = geo === 'cd' ? manifest.sources.community_districts : manifest.sources.council_districts;
-  $('boundary-note').textContent = `Boundary: ${geo === 'cd' ? 'Community District' : 'City Council District'} lines, Department of City Planning release ${b.version || 'unknown'}.` +
-    (district.jia ? ' This is a Joint Interest Area (a park or other area outside every community district), not a community district.' : '');
+  const b = geo === 'cc' ? manifest.sources.council_districts : manifest.sources.community_districts;
+  $('boundary-note').textContent = IS_BORO
+    ? `The whole borough: all ${district.parts.length} of its Community District and Joint Interest Area shapes, Department of City Planning release ${b.version || 'unknown'}.`
+    : `Boundary: ${geo === 'cd' ? 'Community District' : 'City Council District'} lines, Department of City Planning release ${b.version || 'unknown'}.` +
+      (district.jia ? ' This is a Joint Interest Area (a park or other area outside every community district), not a community district.' : '');
+  renderBoroughLink();
   if (geo === 'cc') { $('cc-banner').hidden = false; document.querySelectorAll('.bver').forEach((n) => { n.textContent = b.version || ''; }); }
   renderAbout();
 
-  setStatus($('status'), 'Loading the query engine and this district\'s data…');
-  [Plot] = await Promise.all([
-    import(PLOT_URL),
-    registerData('d.parquet', `data/${district.file}`),
-    registerData('agg.parquet', 'data/agg/month_type.parquet'),
-  ]);
+  setStatus($('status'), IS_BORO
+    ? `Loading the query engine and the borough's data (all ${district.parts.length} districts; this takes longer than one district)…`
+    : 'Loading the query engine and this district\'s data…');
+  const names = sourceNames(district);
+  SRC = sourceSql(names);
+  dataFiles = names.map((n, i) => [n, `data/${district.files[i]}`]);
+  if (rangeLoading()) loader = createLoader({ exec: query, sources: names.map((n) => sourceSql([n])), cols: LOAD_COLUMNS.join(', '), checkFresh });
+  try {
+    [Plot] = await Promise.all([
+      import(PLOT_URL),
+      ...names.map((n, i) => registerData(n, `data/${district.files[i]}`)),
+      registerData('agg.parquet', 'data/agg/month_type.parquet'),
+    ]);
+    // The page's table lives in an in-memory database stored compressed ("COMPRESS: whether
+    // the database is compressed. Only applicable for in-memory databases",
+    // https://duckdb.org/docs/1.4/sql/statements/attach). Brooklyn's default view takes
+    // about 140 MB instead of 770 MB, and a whole borough from 2020 fits at all.
+    await query(`ATTACH ':memory:' AS boardstat (COMPRESS true)`);
+    await query('USE boardstat');
+  } catch (err) {
+    console.error(err);
+    setStatus($('status'), 'BoardStat could not start: the query engine or the charts did not load. This can happen if the connection drops. Reload the page to try again.');
+    return;
+  }
   viewStart = manifest.window.default_start || manifest.window.start;
   window.boardstatTrack?.(ADDRESS_MODE ? 'address_viewed' : 'district_selected', { geo, district_id: geoId, page_type: ADDRESS_MODE ? 'address' : 'district' });
   state = readState();
   if (!ADDRESS_MODE) updateFullMapLink(filtersToParams(geo, geoId, state, defaultDates()));
-  await ensureLoaded();
-  if (ADDRESS_MODE) await renderAddressLinks();
+  // A failed first load must never leave the page waiting: say so, and let Apply retry.
+  let loaded = true;
+  let loadError = null;
+  try {
+    await ensureLoaded();
+  } catch (err) {
+    console.error(err);
+    loaded = false;
+    loadError = err;
+    lastRefreshFailed = true;
+    await freshDataFiles(err);
+  }
+  if (loaded) await afterFirstLoad();
   await setupFilters();
   try { await setupMap(); } catch (err) {
     console.error(err);
     $('map').replaceChildren(el('p', { text: `The map could not load (${err.message}). Every number on this page is also in the tables.` }));
   }
   watchChartWidth();
-  await refresh();
+  if (loaded) await refresh();
+  else setStatus($('status'), loadFailedText(loadError));
+}
+
+/** The status line when the requests could not be loaded. */
+function loadFailedText(err) {
+  if (err instanceof DataChangedError) return 'BoardStat updated its data after this page opened. Reload the page to see the new data.';
+  return 'The requests could not be loaded. This can happen if the connection drops or the browser runs low on memory. Press Apply filters to try again, or reload the page.';
 }
 
 main();

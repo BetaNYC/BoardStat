@@ -17,10 +17,21 @@ def test_duckdb_wasm_reads_byte_ranges():
 
 
 def test_load_reads_closed_rows_before_open_rows():
-    """Closed branch first: the other order made DuckDB-WASM re-fetch ranges (district.js)."""
-    src = (SITE_JS / "district.js").read_text()
+    """Closed branch first: the other order made DuckDB-WASM re-fetch ranges (loadplan.js)."""
+    src = (SITE_JS / "loadplan.js").read_text()
     load = src[src.index("CREATE OR REPLACE TABLE req AS"):]
     assert load.index("is_closed = true") < load.index("is_closed = false")
+
+
+def test_year_before_loads_after_the_first_draw():
+    """#144: the page draws before the background load of the year before the From date,
+    and that load appends Closed rows only (never re-reads the open ones)."""
+    src = (SITE_JS / "district.js").read_text()
+    refresh = src[src.index("async function refresh()"):]
+    assert refresh.index("Promise.all([renderTop()") < refresh.index("loadPriorYear()")
+    extend = (SITE_JS / "loadplan.js").read_text()
+    extend = extend[extend.index("export function extendSql"):extend.index("export function createSerial")]
+    assert "INSERT INTO req" in extend and "is_closed = true" in extend and "is_closed = false" not in extend
 
 
 def test_compare_query_split_by_geo_matches_the_or_filter(tmp_path):
@@ -59,3 +70,59 @@ def test_compare_query_split_by_geo_matches_the_or_filter(tmp_path):
     new = f"SELECT geo_kind, complaint_type, sum(n) FROM ({union}) GROUP BY ALL ORDER BY ALL"
     a, b = duckdb.sql(old).fetchall(), duckdb.sql(new).fetchall()
     assert a and a == b
+
+
+def test_a_failed_first_load_never_leaves_the_page_waiting():
+    """#144 QA: Brooklyn from 2020 failed its first load and the page hung on "Loading…".
+    main() must catch the first load and say so."""
+    src = (SITE_JS / "district.js").read_text()
+    main = src[src.index("async function main()"):]
+    first = main.index("await ensureLoaded();")
+    assert main.rindex("try {", 0, first) > main.index("USE boardstat")
+    assert "loadFailedText(loadError)" in main
+
+
+def test_table_is_stored_compressed():
+    """#144 QA: the req table lives in a compressed in-memory database (Brooklyn from 2020
+    did not fit uncompressed). Every query names the table without a database."""
+    src = (SITE_JS / "district.js").read_text()
+    assert src.index("ATTACH ':memory:' AS boardstat (COMPRESS true)") < src.index("USE boardstat") < src.index("async function main()") + src[src.index("async function main()"):].index("await ensureLoaded();")
+
+
+def test_year_before_note_is_announced_once():
+    """#144 QA: the loading note is redrawn with the chart, so it has no live role; a
+    separate live region outside the chart says once when the line arrives."""
+    src = (SITE_JS / "district.js").read_text()
+    note = src[src.index("'muted prior-loading'") - 40:src.index("'muted prior-loading'") + 120]
+    assert "role" not in note
+    for page in ("district.html", "address.html"):
+        html = (SITE_JS.parent / page).read_text()
+        assert re.search(r'id="monthly-live" role="status" aria-live="polite"', html)
+        assert html.index('id="monthly"') < html.index('id="monthly-live"')
+
+
+def test_errors_reach_the_page_only_as_plain_text():
+    """#144 QA round 2: no raw error text (TProtocolException ...) on the status line."""
+    src = (SITE_JS / "district.js").read_text()
+    assert "Something went wrong: ${err.message}" not in src
+    assert "setStatus($('status'), `${err" not in src
+
+
+def test_a_failed_first_load_finishes_setup_on_the_retry():
+    """#144 QA round 2: after a failed first load, the first refresh that loads runs what
+    main() skipped (address links, keepKnownStatus)."""
+    src = (SITE_JS / "district.js").read_text()
+    refresh = src[src.index("async function refresh()"):src.index("/** An instant as NYC local")]
+    assert "if (!firstLoadDone) await afterFirstLoad();" in refresh
+    after = src[src.index("async function afterFirstLoad()"):src.index("async function setupFilters()")]
+    assert "keepKnownStatus" in after and "renderAddressLinks" in after
+
+
+def test_engine_start_failure_is_caught():
+    """#144 QA round 2: a failed Plot import, file registration, ATTACH or USE says so."""
+    src = (SITE_JS / "district.js").read_text()
+    main = src[src.index("async function main()"):]
+    plot = main.index("import(PLOT_URL)")
+    t = main.rindex("try {", 0, plot)
+    assert main.index("USE boardstat") < main.index("} catch (err)", t)
+    assert "Reload the page" in main[main.index("} catch (err)", t):main.index("} catch (err)", t) + 400]

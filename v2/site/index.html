@@ -9,7 +9,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css?v=54507c9a6e">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=29a8380e23","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=8cedf6c7e3","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=15e5f110aa","./js/map.js":"./js/map.js?v=594c10b1ab","./js/requestmap.js":"./js/requestmap.js?v=f7e51d115c"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=d61c46eefa","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=a3e98058db","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=bfc381b7f5","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -22,7 +22,7 @@
 
   <main id="main">
     <h1>BoardStat 2.0 (prototype)</h1>
-    <p class="lede">See what New Yorkers report to 311 in your community district, your council district, or at one address: the most common problems, how long the city takes to close them, and where they happen.</p>
+    <p class="lede">See what New Yorkers report to 311 in your community district, your council district, a whole borough, or at one address: the most common problems, how long the city takes to close them, and where they happen.</p>
     <p class="muted" id="as-of">Loading data status…</p>
     <p class="muted" id="changes" hidden></p>
     <div class="banner warn" id="stale" role="status" hidden></div>
@@ -32,7 +32,9 @@
         <legend>Step 1: What do you want to look at?</legend>
         <label class="choice"><input type="radio" name="geo" value="cd" checked> A community district</label>
         <label class="choice"><input type="radio" name="geo" value="cc"> A council district</label>
+        <label class="choice"><input type="radio" name="geo" value="boro"> A whole borough</label>
         <label class="choice"><input type="radio" name="geo" value="addr"> An address</label>
+        <p class="muted" id="boro-note" hidden>A borough page adds up all of the borough's community districts and its parks and other Joint Interest Areas. It can load up to about 20 times as much data as one district, so it takes longer to open.</p>
         <p class="muted" id="cc-note" hidden>Council districts use the current lines (Department of City Planning release <span class="bver">26c</span>). Requests made before the 2023 redistricting are re-mapped to today's lines by their location, so totals may differ from the city's own <code>council_district</code> field.</p>
       </fieldset>
 
@@ -40,8 +42,8 @@
         <legend id="district-legend">Step 2: Pick your community district</legend>
         <label for="district-select">District</label>
         <select id="district-select" required></select>
-        <p><button type="submit">Show this district</button></p>
-        <p class="muted">Or select a district on the map below.</p>
+        <p><button type="submit" id="show-btn">Show this district</button></p>
+        <p class="muted" id="map-hint">Or select a district on the map below.</p>
       </fieldset>
 
       <fieldset id="step-addr" hidden>
@@ -56,7 +58,7 @@
 
     <section class="panel" id="map-panel" aria-labelledby="map-h">
       <h2 id="map-h">Or click the map</h2>
-      <div id="map" class="map" role="region" aria-label="Map of district boundaries. Clicking a district opens it. The list above offers the same choices."></div>
+      <div id="map" class="map" role="region" aria-label="Map of district boundaries. Clicking a district opens it, or its borough when you are choosing a borough. The list above offers the same choices."></div>
       <p class="map-note">The map shows district boundaries only.</p>
     </section>
 
@@ -72,6 +74,6 @@
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html">What&rsquo;s changed</a>.</footer>
 
-  <script type="module" src="js/index.js?v=5fa92e5770"></script>
+  <script type="module" src="js/index.js?v=3fd6abff7b"></script>
 </body>
 </html>

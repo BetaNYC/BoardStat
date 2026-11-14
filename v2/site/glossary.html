@@ -8,7 +8,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css?v=54507c9a6e">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=29a8380e23","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=8cedf6c7e3","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=15e5f110aa","./js/map.js":"./js/map.js?v=594c10b1ab","./js/requestmap.js":"./js/requestmap.js?v=f7e51d115c"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=d61c46eefa","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=a3e98058db","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=bfc381b7f5","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -76,7 +76,14 @@
 
         <dt id="borough-compare">Borough (for comparisons)</dt>
         <dd>
-          <p>For a community district, its own borough. For a council district, the borough where most of that district's requests are.</p>
+          <p>For a community district, its own borough. For a council district, the borough where most of that district's requests are. On a borough page, the Compare panel compares the borough with the whole city.</p>
+        </dd>
+
+        <dt id="borough-view">Borough page (whole borough)</dt>
+        <dd>
+          <p>A page for a whole borough, with the same charts, map, request list and filters as a district page. It counts every request that BoardStat <a href="#placed">placed</a> inside one of the borough's community districts or <a href="#jia">Joint Interest Areas</a> (parks and other areas outside every community district). These are the same requests the district pages count, added together, and the same requests the Compare panel uses for the borough.</p>
+          <p>It does not count requests with <a href="#located">no usable location</a>, even when the city's own records name a district in that borough. The page says how many of those there are. Council districts are not used, because some cross borough lines.</p>
+          <p>A borough page loads much more data than one district. Brooklyn, the largest, downloads about 180 MB the first time. On a typical home connection the page appears in about half a minute, and the line for the same months a year earlier follows about 25 seconds later.</p>
         </dd>
       </dl>
     </section>
@@ -212,7 +219,7 @@
         <dd><p>Each dot is a request. Circles group requests that are close together. Bigger, darker circles hold more requests (light: under 100, middle: 100 to 999, dark: 1,000 or more); the map key under the map shows each one. Select a circle to zoom in, or a dot to see that request's problem, description, date, status and address. The map shows at most the 60,000 most recent matching requests.</p></dd>
 
         <dt id="full-map">Full-page map</dt>
-        <dd><p>The same <a href="#map">map of requests</a>, as big as your screen. Open it with <strong>Open full-page map</strong> under a district's map. It shows the same district, dates and filters, and lists them at the top. Its web address carries all of them, so you can share it. To change the filters, use <strong>Back to the district page</strong>, which keeps them. An <a href="#address">address</a> filter is never put in a web address, so the full-page map leaves it out and shows the whole district.</p></dd>
+        <dd><p>The same <a href="#map">map of requests</a>, as big as your screen. Open it with <strong>Open full-page map</strong> under a district's or borough's map. It shows the same place, dates and filters, and lists them at the top. Its web address carries all of them, so you can share it. To change the filters, use the back link at the top, which keeps them. An <a href="#address">address</a> filter is never put in a web address, so the full-page map leaves it out and shows the whole district or borough.</p></dd>
 
         <dt id="top-addresses">Addresses with the most requests</dt>
         <dd><p>The 15 <a href="#address">addresses</a> with the most matching requests, with the problem reported most often at each one. Requests with only cross streets are not in this list.</p></dd>

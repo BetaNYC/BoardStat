@@ -63,6 +63,18 @@ export async function registerData(name, relPath) {
   await db.registerFileURL(name, url, duckdb.DuckDBDataProtocol.HTTP, false);
 }
 
+/**
+ * Register `name` again as a new file. After a failed range read, DuckDB-WASM 1.32.0 can
+ * serve later reads of that file from a read-ahead buffer the failed read never filled
+ * ("TProtocolException: Invalid data", seen 2026-11-13 on #144), so a retry must start
+ * from a fresh registration. dropFile: duckdb-wasm packages/duckdb-wasm/src/parallel/async_bindings.ts.
+ */
+export async function reregisterData(name, relPath) {
+  const { db } = await getDB();
+  await db.dropFile(name);
+  await registerData(name, relPath);
+}
+
 /** Run SQL and return plain objects (Arrow rows -> toJSON(), BigInt -> Number). */
 export async function query(sql) {
   const { conn } = await getDB();
@@ -121,6 +133,7 @@ export function renderDataStatus(manifest, asOfEl, staleEl) {
  * "What changed since the last update" from data/changes.json, which the nightly
  * refresh writes (new requests, updated requests, requests that became Closed).
  * No file, no line: a one-off build has nothing to compare against.
+ * `where` is { geo, id, label } for one district, or { geo, ids, label } for several.
  */
 export async function renderChanges(target, where = null) {
   if (!target) return;
@@ -132,7 +145,13 @@ export async function renderChanges(target, where = null) {
   } catch { return; }
   const part = (x = {}) => `${fmtInt(x.new || 0)} new, ${fmtInt(x.updated || 0)} updated, ${fmtInt(x.closed || 0)} closed`;
   let text = `What changed ${c.since ? `since ${fmtDateTime(c.since)}` : 'in the latest update'}: citywide ${part(c.city)}`;
-  if (where) text += `; ${where.label} ${part(c[where.geo]?.[String(where.id)])}`;
+  // where.ids (a borough, #144) adds up the districts it is made of.
+  const ids = where ? (where.ids || [where.id]).map(String) : [];
+  if (where) {
+    const sum = { new: 0, updated: 0, closed: 0 };
+    for (const id of ids) for (const k of Object.keys(sum)) sum[k] += c[where.geo]?.[id]?.[k] || 0;
+    text += `; ${where.label} ${part(sum)}`;
+  }
   target.textContent = `${text}.`;
   target.hidden = false;
 }

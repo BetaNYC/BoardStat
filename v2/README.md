@@ -296,6 +296,116 @@ text columns from the file). The tradeoff: before, the whole file was already
 in the browser, so moving the From date back cost no download; now it costs
 about one more file's worth. If that proves common, split files by year.
 
+## Whole-borough view (#144)
+
+`district.html?geo=boro&id=<slug>` (and `map.html` with the same parameters)
+shows a whole borough with the same panels, map, list and filters as a district.
+Slugs: `manhattan`, `bronx`, `brooklyn`, `queens`, `staten-island`
+(`js/place.js`). The index page has a "A whole borough" choice; every community
+district page links to its borough with the current filters.
+
+**What it counts.** A borough is every community district file whose number
+starts with the borough's digit, Joint Interest Areas included (Brooklyn:
+301–318, 355, 356). That is the rule the pipeline already uses for the
+`borough` rows of `agg/month_type.parquet` (`cd // 100`), so the page and the
+Compare panel agree: verified exactly for all five boroughs against `agg`, and
+for filtered views against DuckDB in Python (2026-11-13). Requests with no
+usable location are in no district file and so on no borough page; the page
+states how many of those the city's own records assign to the borough.
+Council districts are never used, because they cross borough lines.
+
+**How it reads the data (no pipeline change).** The page registers each
+district file and reads them as one table with
+`read_parquet(['d-301.parquet', ...])`
+([DuckDB: reading multiple files](https://duckdb.org/docs/stable/data/multiple_files/overview)).
+Range loading works per file, as on a district page. A single prebuilt
+borough file was measured too (a scratch Brooklyn file built from the same
+rows, same sort and row groups) and downloaded the same bytes in the same
+time, so the pipeline writes nothing new.
+
+**Two-step load on borough pages (#144 follow-up, `js/loadplan.js`).** A
+borough page first loads the Closed requests from the From date on (plus every
+request not yet Closed, as before) and draws every panel; Requests per month
+shows "This period" with the note "Loading the same months a year earlier…"
+(its legend shows only "This period" until then, so nothing moves when the gray
+line arrives; a screen-reader live region says once when it has). Then it loads
+the 12 months before the From date in the background, one district file at a
+time, appends them to the table, and draws only Requests per month again. Each
+file remembers how far back it is loaded, so no row is loaded twice; Apply, Reset
+and a From date moved earlier wait for at most the file being read, then load
+only what is still missing, and the background redraw is skipped while such a
+load runs (its own redraw follows).
+
+If the background load fails, the page says so under the chart, leaves the
+year-earlier line out, and registers again the files the error names (a failed
+range read can leave DuckDB-WASM 1.32.0 serving a bad read-ahead buffer; seen as
+"TProtocolException: Invalid data" on the retry). Only those: re-registering a
+file that had been read without trouble made its next read fail with "Failed
+to open file". The next Apply or Reset that
+changes the page tries again, as does reloading the page. If the first load
+fails, on any page, the status line says so and Apply tries again; the first
+load that works then finishes the page's setup (filter lists, and the address
+page's ZIP and district links). If the query engine itself does not start, the
+status line says to reload.
+
+**A tab left open across the nightly build.** The build replaces the files in
+place, so rows appended after it would come from a different build than the rest.
+Before anything is appended (the background load, or a From date moved earlier),
+the page reads `manifest.json` again; if `generated_at` changed, it adds nothing
+and asks the reader to reload. Limit: the check only sees the manifest, so it
+misses a rebuild whose data files changed before its manifest did. On beta.nyc
+the nightly job swaps the whole `data/` folder with a few `mv` commands
+(`publish()` in `boardstat_nightly.py`), so that window is a moment; on a
+machine serving the build folder directly (as `serve.py` does from
+`data-nightly`), the build writes the district files minutes before
+`manifest.json`. Nothing guards that window.
+
+**Memory.** The table lives in an in-memory database stored compressed
+(`ATTACH ':memory:' AS boardstat (COMPRESS true)`, then `USE boardstat`;
+[DuckDB ATTACH options](https://duckdb.org/docs/1.4/sql/statements/attach)).
+Loads read up to five district files per statement. Before this, Brooklyn from
+2020 (6.9 million requests) never finished loading: DuckDB-WASM ran out of
+memory ("File 'd-317.parquet' too small to be a Parquet file") and the page
+stayed on "Loading…". It now loads in 17 s on a local server, with 6,862,161
+requests matching. One statement per file was 2 s slower than five files per
+statement, and every file in one statement still ran out of memory.
+
+The second step costs extra bytes. It starts mid-file, and DuckDB-WASM's
+read-ahead grows fourfold on each contiguous read up to 16 MB
+(`lib/include/duckdb/web/io/readahead_buffer.h` in duckdb-wasm 1.32.0), so it
+runs on to the end of each file and fetches the first step's bytes again, with
+the unselected columns. Two steps cost about the one-step bytes plus the first
+step's. That is worth it for a borough and not for a district, so district,
+council district and address pages keep the one-step load (`TWO_STEP` in
+`district.js`). Any page now appends only the missing older rows when the From
+date moves earlier, instead of reloading the whole table.
+
+Measured 2026-11-13, default view (Nov 2025 on), cold browser, headless
+Chromium, 2020+ nightly data, bytes counted at a local range-answering server;
+"50 Mbps" paces that server to 50 Mbit/s shared across connections. "Drawn" is
+every panel drawn; "Year earlier" is when the year-earlier series appears.
+"Before" is commit 6e4e6e6 (one step, uncompressed).
+
+| Page | Load | Page data | Rows loaded | DuckDB memory | Drawn (local / 50 Mbps) | Year earlier (50 Mbps) |
+|---|---|---:|---:|---:|---:|---:|
+| Brooklyn CD 6 | before | 7.8 MB | 119,332 | 38 MB | 3.2 s / 4.6 s | 4.6 s |
+| Brooklyn CD 6 | one step, compressed | 7.8 MB | 119,332 | 7 MB | 2.6 s / 4.5 s | 4.5 s |
+| Staten Island | before | 18.3 MB | 301,898 | 103 MB | 3.2 s / 7.4 s | 7.4 s |
+| Staten Island | two steps, compressed | 17 + 6 = 23.1 MB | 228,896, then 301,898 | 33, then 35 MB | 3.1 s / 6.8 s | 8.4 s |
+| **Brooklyn** | before | 133.4 MB | 2,364,674 | 768 MB | 7.0 s / 36.6 s | 36.6 s |
+| **Brooklyn** | **two steps, compressed** | **89 + 93 = 181.9 MB** | **1,317,062, then 2,364,674** | **about 80, then 142 MB** | **6.1 s / 26.4 s** | **50.4 s** |
+| Brooklyn, one prebuilt file | before | 132.9 MB | 2,364,674 | 760 MB | 6.6 s / — | — |
+
+The first step alone, run as a query, reads 89 MB for Brooklyn; the page-level
+counts include the first background file. Totals (1,246,567 for Brooklyn,
+160,915 for Staten Island) and every year-earlier value are the same as before.
+
+So Brooklyn draws about 10 s sooner and the year-earlier line arrives about 14 s
+later, for 48 MB more. Other ways to make Brooklyn faster: open borough pages
+with a shorter default period, or have the pipeline write per-borough summaries
+for the charts and read detail only for the list and map (a layout with the
+previous year in its own files would also remove the re-fetch).
+
 ## Traffic measurement (Google Analytics)
 
 Every page loads `site/js/analytics.js`, which adds the beta.nyc Google tag
@@ -512,6 +622,8 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 - Detail files for the busiest districts are the largest downloads; on slow
   connections the first load of a district takes a few seconds.
 - The map shows at most the 60,000 most recent matching requests.
+- A borough page (#144) downloads far more than a district page: see
+  "Whole-borough view" above.
 - "Same month a year earlier" only exists where the data covers both months
   (none before January 2021).
 - Boundary simplification (about 10 m) is per polygon, so hairline gaps can show
