@@ -1,8 +1,8 @@
-// MapLibre helpers. Street basemap, in order of preference:
-// 1. NYC OTI's own vector basemap (NYC_Basemap_v3, hosted by the City on ArcGIS).
-// 2. A self-hosted Protomaps extract of NYC (OpenStreetMap data), built by
-//    pipeline/basemap_build.sh into data/basemap/, if the City's service fails.
-// 3. Boundaries on a blank background, if neither is available.
+// MapLibre helpers. The street map is a self-hosted Protomaps extract of NYC
+// (OpenStreetMap data), built by pipeline/basemap_build.sh into data/basemap/.
+// Only open-source software and open data; no street map is fetched from any
+// other service (#141). If it cannot load, the map shows boundaries on a blank
+// background with a visible message saying so.
 // v6 ships as ES modules only; the worker is found from the module URL
 // (https://maplibre.org/maplibre-gl-js/docs/).
 import { MAPLIBRE_URL, PMTILES_URL, BASEMAPS_URL } from './lib.js';
@@ -25,71 +25,131 @@ const BLANK_STYLE = {
   layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#F9FAFF' } }],
 };
 
-// The City's service publishes a version-8 style with relative URLs; MapLibre needs
-// absolute ones. Service metadata: NYC_SVC + '?f=json' (copyrightText "SOURCE: NYC OTI").
-const NYC_SVC = 'https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/NYC_Basemap_v3/VectorTileServer';
-const NYC_ATTRIBUTION = 'Street map: <a href="https://www.nyc.gov/content/oti/pages/">NYC OTI</a>';
+// Shown on the map when the street map cannot load, so a missing street map is
+// never mistaken for a blank part of the city.
+const BASEMAP_FAILED = 'The street map could not load. The rest of the map still works.';
+const BASEMAP_TIMEOUT_MS = 5000;
 
-async function nycStyle() {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 6000);
-  try {
-    const r = await fetch(`${NYC_SVC}/resources/styles/root.json`, { signal: ctl.signal });
-    if (!r.ok) return null;
-    const style = await r.json();
-    if (style.version !== 8 || !style.sources || !Array.isArray(style.layers)) return null;
-    for (const src of Object.values(style.sources)) {
-      delete src.url;
-      src.tiles = [`${NYC_SVC}/tile/{z}/{y}/{x}.pbf`];
-      src.attribution = NYC_ATTRIBUTION;
-    }
-    style.glyphs = `${NYC_SVC}/resources/fonts/{fontstack}/{range}.pbf`;
-    style.sprite = `${NYC_SVC}/resources/sprites/sprite`;
-    return style;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+/** Reject after ms, so a hung request or import can never stall the map. */
+function withTimeout(promise, ms = BASEMAP_TIMEOUT_MS) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), ms); }),
+  ]).finally(() => clearTimeout(timer));
 }
 
-async function basemapStyle(ml) {
-  return (await nycStyle()) || (await protomapsStyle(ml));
+/** GET a URL with a timeout; throw unless the status is one of `ok`. */
+async function mustFetch(url, ok = [200], headers = {}) {
+  const r = await fetch(url, { headers, signal: AbortSignal.timeout(BASEMAP_TIMEOUT_MS) });
+  if (!ok.includes(r.status)) throw new Error(`${url}: HTTP ${r.status}`);
+  return r;
+}
+
+/** Read only the first n bytes of a response, then cancel the rest, so a server
+ *  that ignores Range (200 with the whole 200+ MB file) costs one chunk. */
+async function firstBytes(r, n) {
+  const out = new Uint8Array(n);
+  let got = 0;
+  const reader = r.body.getReader();
+  try {
+    while (got < n) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const take = Math.min(n - got, value.length);
+      out.set(value.subarray(0, take), got);
+      got += take;
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+  return out.subarray(0, got);
+}
+
+/** Check every self-hosted basemap file the style needs before using it:
+ *  basemap.json, the PMTiles header (magic "PMTiles", version 3, per
+ *  https://github.com/protomaps/PMTiles/blob/main/spec/v3/spec.md), the sprite,
+ *  and one glyph range. Throws on any failure. */
+async function checkBasemapFiles(base) {
+  await mustFetch(base + 'basemap.json');
+  const r = await mustFetch(base + 'nyc.pmtiles', [200, 206], { Range: 'bytes=0-7' });
+  const head = await firstBytes(r, 8);
+  if (new TextDecoder().decode(head.slice(0, 7)) !== 'PMTiles' || head[7] !== 3) throw new Error('nyc.pmtiles: not PMTiles v3');
+  await mustFetch(base + 'sprites/' + FLAVOR + '.json');
+  await mustFetch(base + 'fonts/Noto%20Sans%20Regular/0-255.pbf');
 }
 
 let protocolAdded = false;
-/** Protomaps style per https://docs.protomaps.com/basemaps/maplibre, all assets self-hosted. */
-async function protomapsStyle(ml) {
-  const base = new URL('data/basemap/', location.href).href;
-  const head = await fetch(base + 'basemap.json', { method: 'HEAD' }).catch(() => null);
-  if (!head || !head.ok) return BLANK_STYLE;
-  const [{ Protocol }, basemaps] = await Promise.all([import(PMTILES_URL), import(BASEMAPS_URL)]);
-  if (!protocolAdded) { // add once per page (https://docs.protomaps.com/pmtiles/maplibre)
-    ml.addProtocol('pmtiles', new Protocol().tile);
-    protocolAdded = true;
+/** Protomaps style per https://docs.protomaps.com/basemaps/maplibre, all assets self-hosted.
+ *  Returns { style, failed }: on any failure or timeout, a blank style and failed = true. */
+async function basemapStyle(ml) {
+  try {
+    const base = new URL('data/basemap/', location.href).href;
+    const [, [{ Protocol }, basemaps]] = await Promise.all([
+      checkBasemapFiles(base),
+      withTimeout(Promise.all([import(PMTILES_URL), import(BASEMAPS_URL)])),
+    ]);
+    if (!protocolAdded) { // add once per page (https://docs.protomaps.com/pmtiles/maplibre)
+      ml.addProtocol('pmtiles', new Protocol().tile);
+      protocolAdded = true;
+    }
+    return {
+      failed: false,
+      base,
+      style: {
+        version: 8,
+        glyphs: base + 'fonts/{fontstack}/{range}.pbf',
+        sprite: base + 'sprites/' + FLAVOR,
+        sources: {
+          protomaps: { type: 'vector', url: 'pmtiles://' + base + 'nyc.pmtiles', attribution: OSM_ATTRIBUTION },
+        },
+        layers: basemaps.layers('protomaps', basemaps.namedFlavor(FLAVOR), { lang: 'en' }),
+      },
+    };
+  } catch {
+    return { style: BLANK_STYLE, failed: true };
   }
-  return {
-    version: 8,
-    glyphs: base + 'fonts/{fontstack}/{range}.pbf',
-    sprite: base + 'sprites/' + FLAVOR,
-    sources: {
-      protomaps: { type: 'vector', url: 'pmtiles://' + base + 'nyc.pmtiles', attribution: OSM_ATTRIBUTION },
-    },
-    layers: basemaps.layers('protomaps', basemaps.namedFlavor(FLAVOR), { lang: 'en' }),
-  };
+}
+
+/** True if a map 'error' event came from the street map. MapLibre's ErrorEvent
+ *  carries `error` plus extra data (src/util/evented.ts); `sourceId` and the
+ *  failed request's `url` are not in the API docs, so both are checked, and
+ *  checkBasemapFiles() above is the guard that does not depend on them. */
+function isBasemapError(e, base) {
+  if (e?.sourceId === 'protomaps') return true;
+  const url = String(e?.error?.url ?? '');
+  const msg = String(e?.error?.message ?? '');
+  return (url && url.startsWith(base)) || msg.includes(base) || msg.includes('nyc.pmtiles');
+}
+
+/** Put a short, visible message on the map, once. */
+function showBasemapError(container) {
+  const box = typeof container === 'string' ? document.getElementById(container) : container;
+  if (!box || box.querySelector('.map-error')) return;
+  const p = document.createElement('p');
+  p.className = 'map-error';
+  p.setAttribute('role', 'status');
+  p.textContent = BASEMAP_FAILED;
+  box.append(p);
 }
 
 export async function makeMap(container, { bounds = NYC_BOUNDS } = {}) {
   const ml = await loadMapLibre();
+  const { style, failed, base } = await basemapStyle(ml);
   const map = new ml.Map({
     container,
-    style: await basemapStyle(ml),
+    style,
     bounds,
     fitBoundsOptions: { padding: 20 },
-    attributionControl: { compact: true, customAttribution: 'Boundaries: NYC Department of City Planning' },
+    // compact: false keeps the credits expanded at every width; OSMF asks that the
+    // OpenStreetMap credit be visible without a click
+    // (https://maplibre.org/maplibre-gl-js/docs/API/type-aliases/AttributionControlOptions/).
+    attributionControl: { compact: false, customAttribution: 'Boundaries: NYC Department of City Planning' },
   });
+  if (!failed) map.on('error', (e) => { if (isBasemapError(e, base)) showBasemapError(container); });
   map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right');
   await new Promise((resolve) => map.on('load', resolve));
+  if (failed) showBasemapError(container);
   return { ml, map };
 }
 
