@@ -196,7 +196,7 @@ main.fullmap { flex: 1; display: flex; flex-direction: column; width: 100%; max-
 @media screen and (max-width: 640px) { .fullmap-back { text-align: left; } }
 main.fullmap .status { margin: 0.25rem 0; min-height: 0; }
 main.fullmap .status:empty { display: none; }
-.map.map-full { flex: 1; height: auto; min-height: 65vh; }
+.map.map-full { flex: 1; height: auto; min-height: 85vh; min-height: 85dvh; }
 /* The filter panel opens and closes (#149, filterform.js setupPanel): closed, only its
    status line shows, under the summary line and the "Change filters" button. */
 .filters-toggle-row { margin: 0.35rem 0 0; }
