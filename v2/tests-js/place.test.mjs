@@ -115,3 +115,19 @@ test('the borough map highlights all of its district shapes on the community dis
   assert.equal(boundaryFile('cc'), 'cc');
   assert.equal(placeShapes('boro', 'atlantis', features).selected.length, 0);
 });
+
+test('a borough page uses its slim file only when the manifest lists one with every column it needs (#151)', async () => {
+  const { slimFileFor, SLIM_COLUMNS } = await import('../site/js/place.js');
+  const m = { borough_files: { columns: [...SLIM_COLUMNS, 'is_closed'], files: { brooklyn: { file: 'borough/brooklyn.parquet', rows: 10 } } } };
+  assert.equal(slimFileFor(m, 'brooklyn'), 'borough/brooklyn.parquet');
+  assert.equal(slimFileFor(m, 'queens'), null); // not listed
+  assert.equal(slimFileFor({}, 'brooklyn'), null); // an older build: load the district files as before
+  assert.equal(slimFileFor({ borough_files: { columns: ['created_date'], files: m.borough_files.files } }, 'brooklyn'), null);
+  // Range loading reads is_closed, so a file without it is not used either (#151 QA).
+  assert.equal(slimFileFor({ borough_files: { columns: [...SLIM_COLUMNS], files: m.borough_files.files } }, 'brooklyn'), null);
+  // The pipeline's column list and the page's stay in step.
+  const py = (await import('node:fs')).readFileSync(new URL('../pipeline/boardstat_build.py', import.meta.url), 'utf8');
+  const cols = py.match(/BOROUGH_SLIM_COLUMNS = \[([^\]]*)\]/)[1].match(/"([a-z_]+)"/g).map((c) => c.slice(1, -1));
+  for (const c of SLIM_COLUMNS) assert.ok(cols.includes(c), c);
+  assert.ok(cols.includes('is_closed')); // range loading reads it
+});

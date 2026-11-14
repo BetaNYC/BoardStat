@@ -74,21 +74,21 @@ export function priorCoverStart(state, loadedFrom, windowStart) {
  * are appended. A whole borough from 2020 in one statement ran DuckDB-WASM out of
  * memory (#144 QA); groups of FILES_PER_STATEMENT files did not, and cost no more time.
  */
-export function firstLoadSql(srcs, cols, from, create) {
+export function firstLoadSql(srcs, cols, from, create, table = 'req') {
   // The Closed branch runs first: run the other way round, DuckDB-WASM fetched about
   // 20% more bytes (CC 11, 2020+ data, measured 2026-11-06), because the second scan's
   // read-ahead re-fetched ranges the first had already read.
   return `
-    ${create ? 'CREATE OR REPLACE TABLE req AS' : 'INSERT INTO req'}
+    ${create ? `CREATE OR REPLACE TABLE ${table} AS` : `INSERT INTO ${table}`}
     ${srcs.map((src) => `SELECT ${cols} FROM ${src} WHERE is_closed = true AND created_date >= CAST(${lit(from)} AS TIMESTAMP)
     UNION ALL
     SELECT ${cols} FROM ${src} WHERE is_closed = false`).join('\n    UNION ALL\n    ')}`;
 }
 
 /** Append Closed rows created in [from, to) of each { src, from, to }. */
-export function extendSql(parts, cols) {
+export function extendSql(parts, cols, table = 'req') {
   return `
-    INSERT INTO req
+    INSERT INTO ${table}
     ${parts.map(({ src, from, to }) => `SELECT ${cols} FROM ${src} WHERE is_closed = true
       AND created_date >= CAST(${lit(from)} AS TIMESTAMP) AND created_date < CAST(${lit(to)} AS TIMESTAMP)`).join('\n    UNION ALL\n    ')}`;
 }
@@ -168,12 +168,13 @@ export function loadFailedText(err) {
  * The `req` table's loader. `exec(sql)` runs SQL; `sources[i]` is the SQL that reads file
  * i. All changes to the table go through one queue: the page's own loads in statements
  * of up to `perStatement` files, the background load one file per statement, so the
- * page's queries can run in between.
+ * page's queries can run in between. `table` names the table it builds (default req; a
+ * borough page also builds `rows` on demand, #151).
  * `checkFresh()` runs before anything is added to an existing table and throws
  * DataChangedError if the files are no longer the ones the table came from (the nightly
  * build replaces them in place).
  */
-export function createLoader({ exec, sources, cols, checkFresh = async () => {}, perStatement = FILES_PER_STATEMENT }) {
+export function createLoader({ exec, sources, cols, checkFresh = async () => {}, perStatement = FILES_PER_STATEMENT, table = 'req' }) {
   const fileFrom = sources.map(() => null);
   const serial = createSerial();
   let created = false; // the req table exists
@@ -187,13 +188,13 @@ export function createLoader({ exec, sources, cols, checkFresh = async () => {},
     const more = ids.filter((i) => fileFrom[i] !== null && fileFrom[i] > target);
     if (first.length) {
       if (created) await checkFresh();
-      await exec(firstLoadSql(first.map((i) => sources[i]), cols, target, !created));
+      await exec(firstLoadSql(first.map((i) => sources[i]), cols, target, !created, table));
       created = true;
       for (const i of first) fileFrom[i] = target;
     }
     if (more.length) {
       await checkFresh();
-      await exec(extendSql(more.map((i) => ({ src: sources[i], from: target, to: fileFrom[i] })), cols));
+      await exec(extendSql(more.map((i) => ({ src: sources[i], from: target, to: fileFrom[i] })), cols, table));
       for (const i of more) fileFrom[i] = target;
     }
     return first.length + more.length > 0;

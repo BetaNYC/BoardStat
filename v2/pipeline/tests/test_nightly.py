@@ -299,3 +299,37 @@ def test_launchd_plist_runs_at_530_and_830():
     assert data["StartCalendarInterval"] == [{"Hour": 5, "Minute": 30}, {"Hour": 8, "Minute": 30}]
     sh = (plist.parent / "nightly.sh").read_text()
     assert "--skip-if-published-today" in sh
+
+
+def test_a_failed_borough_check_stops_the_night_before_publish_and_tags_noel(rosie, monkeypatch, tmp_path):
+    """#151 nightly guard: the build raises PipelineError when a borough file does not match
+    its district files. run() must stop there: no upload, no swap, and main() alerts staff
+    (#138: Rosie, kind failure, tagging Noel). Nothing here reaches the network."""
+    fake = rosie()
+    msg = "Borough file check: Brooklyn's borough file has 1 rows but its district files have 2. Not publishing."
+    monkeypatch.setattr(nightly.bb, "Soda", lambda token=None: object())
+    monkeypatch.setattr(nightly, "initial_watermark", lambda cache: "2026-11-12T00:00:00")
+    monkeypatch.setattr(nightly, "fetch_changes", lambda soda, since, start, end, out: 0)
+
+    def patch_cache(con, changes_csv, cache_311, start, end):
+        con.execute("CREATE OR REPLACE TABLE chg (updated_at VARCHAR)")
+        con.execute("CREATE OR REPLACE TABLE diff (unique_key VARCHAR, created_date VARCHAR, kind VARCHAR, old_status VARCHAR, new_status VARCHAR)")
+    monkeypatch.setattr(nightly, "patch_cache", patch_cache)
+    monkeypatch.setattr(nightly.Path, "unlink", lambda self, missing_ok=False: None)
+
+    def build_fails(argv):
+        raise bb.PipelineError(msg)
+    monkeypatch.setattr(nightly.bb, "main", build_fails)
+    published = []
+    monkeypatch.setattr(nightly, "publish", lambda out: published.append(out))
+    monkeypatch.setattr(nightly, "verify_live", lambda g: published.append(g))
+    rc = nightly.main(["--publish", "--notify", "ops-website", "--check-counts", "no", "--today", "2026-11-13",
+                       "--cache", str(tmp_path / "cache"), "--out", str(tmp_path / "out")])
+    assert rc == 2
+    assert published == []  # never uploaded, never swapped live
+    assert len(fake.calls) == 1
+    cmd = fake.calls[0]
+    assert cmd[cmd.index("--channel") + 1] == "ops-website" and cmd[cmd.index("--kind") + 1] == "failure"
+    assert _tags(cmd) == ["noel"]
+    text = cmd[cmd.index("--text") + 1]
+    assert msg in text and "The site still shows the last good data" in text

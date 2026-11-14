@@ -6,9 +6,9 @@
   <title>District · BoardStat 2.0 (prototype)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css?v=51edf95137">
+  <link rel="stylesheet" href="css/style.css?v=fd18a49dc8">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=f0aa91bbe9","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=f5bf733bd4","./js/filterform.js":"./js/filterform.js?v=d9e37282ef","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=07d8618c8c","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=de61fbb9d4","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=f0aa91bbe9","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=2a4cbb8089","./js/filterform.js":"./js/filterform.js?v=d9e37282ef","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=509ef447f9","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=5bdefd9c4f","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=b56294c924","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -85,6 +85,9 @@
       <p class="status" id="status" role="status" aria-live="polite"></p>
     </form>
 
+    <p class="muted no-print" id="slim-note" role="status" hidden></p>
+    <p class="muted no-print" id="rows-note" hidden>An address filter needs each request's details, so this page loaded them for the whole borough. That takes longer and uses more memory, especially on a phone.</p>
+
     <section class="panel" aria-labelledby="kpi-h">
       <h2 id="kpi-h">At a glance</h2>
       <p class="muted caveat" id="kpi-caveat">311 counts are reports, not problems. Closed doesn't mean fixed.</p>
@@ -125,16 +128,22 @@
 
     <section class="panel no-print" aria-labelledby="map-h">
       <h2 id="map-h">Map of requests</h2>
+      <p class="rows-open" id="map-open" hidden><button type="button" class="secondary" id="map-show">Show the map</button>
+        <span class="muted">The map needs each request's location, so it loads much more data for a whole borough. On a phone it can be slow, or make the page reload.</span></p>
+      <p class="section-error" id="map-error" role="status" hidden></p>
       <div id="map" class="map" role="region" aria-label="Map of request locations, grouped into circles where many are close together. The tables on this page carry the same information."></div>
       <p class="map-note" id="map-note">Circles group nearby requests; select one to zoom in, or select a single point for details.</p>
       <div class="map-legend" id="map-legend"></div>
       <p class="fullmap-open"><a class="button secondary" id="fullmap-link" href="map.html">Open full-page map</a>
-        <span class="muted">Opens a bigger map with the same place, dates and filters. Its link can be shared.</span></p>
+        <span class="muted">Opens a bigger map with the same place, dates and filters. Its link can be shared.<span id="fullmap-boro-note" hidden> On a phone, a whole borough's map can be slow or make the page reload.</span></span></p>
       <p class="muted" id="fullmap-addr-note" hidden>The full-page map does not keep the address filter, because BoardStat never puts a street address in a link. It shows the whole district with the other filters. If you come back from the map, the address filter will be off.</p>
     </section>
 
     <section class="panel no-print" aria-labelledby="addr-h">
       <h2 id="addr-h">Addresses with the most requests</h2>
+      <p class="rows-open" id="addresses-open" hidden><button type="button" class="secondary" id="addresses-show">Show the addresses</button>
+        <span class="muted">Addresses come from each request's details, so this loads much more data for a whole borough. On a phone it can be slow, or make the page reload.</span></p>
+      <p class="section-error" id="addresses-error" role="status" hidden></p>
       <div id="addresses"></div>
     </section>
 
@@ -148,6 +157,8 @@
     <section class="panel no-print" aria-labelledby="detail-h">
       <h2 id="detail-h">Every request</h2>
       <p><button type="button" id="download">Download CSV</button> <span class="muted">Downloads exactly the requests that match the filters above.</span></p>
+      <p class="muted" id="detail-open-note" hidden>The list comes from each request's details, so it loads much more data for a whole borough. On a phone it can be slow, or make the page reload.</p>
+      <p class="section-error" id="detail-error" role="status" hidden></p>
       <details class="as-table" id="detail-wrap">
         <summary>Show the list of requests</summary>
         <div id="detail"></div>
@@ -166,6 +177,6 @@
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html">What&rsquo;s changed</a>.</footer>
-  <script type="module" src="js/district.js?v=f5bf733bd4"></script>
+  <script type="module" src="js/district.js?v=2a4cbb8089"></script>
 </body>
 </html>

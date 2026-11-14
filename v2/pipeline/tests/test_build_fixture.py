@@ -330,3 +330,94 @@ def test_build_fails_loudly_without_the_license_notice(tmp_path, monkeypatch):
     with pytest.raises(bb.PipelineError, match="data license notice missing"):
         bb.build([], tmp_path / "cd.geojson", tmp_path / "cc.geojson", tmp_path / "map.csv", tmp_path / "out",
                  dt.date(2026, 1, 1), dt.date(2026, 1, 31), sources={}, now=dt.datetime(2026, 2, 1, tzinfo=dt.UTC))
+
+
+def test_borough_slim_files_hold_the_boroughs_district_rows(built):
+    """#151: one slim file per borough with located requests: the same rows as the
+    borough's district files (cd // 100), only the listed columns, in the detail order."""
+    m, out, _ = built
+    bf = m["borough_files"]
+    assert bf["columns"] == bb.BOROUGH_SLIM_COLUMNS
+    assert set(bf["files"]) == {"manhattan", "brooklyn"}  # CD 101 and CD 302 in the fixture
+    for slug, f in bf["files"].items():
+        path = out / f["file"]
+        assert f["file"] == f"borough/{slug}.parquet" and path.exists()
+        cols = [r[0] for r in duckdb.sql(f"DESCRIBE SELECT * FROM '{path}'").fetchall()]
+        assert cols == bb.BOROUGH_SLIM_COLUMNS
+        code = {"manhattan": 1, "brooklyn": 3}[slug]
+        district_files = [str(out / d["file"]) for d in m["districts"]["cd"] if d["file"] and d["id"] // 100 == code]
+        sel = ", ".join(bb.BOROUGH_SLIM_COLUMNS)
+        detail = duckdb.sql(f"SELECT {sel} FROM read_parquet({district_files}) ORDER BY ALL").fetchall()
+        slim = duckdb.sql(f"SELECT {sel} FROM '{path}' ORDER BY ALL").fetchall()
+        assert slim == detail and f["rows"] == len(slim)
+        # Closed first, then open, each by created_date: the order range loading needs.
+        order = duckdb.sql(f"SELECT is_closed, created_date FROM '{path}'").fetchall()
+        assert order == sorted(order, key=lambda r: (not r[0], r[1]))
+    assert m["files"]["borough/brooklyn.parquet"] > 0  # listed with its size, like every published file
+
+
+def test_borough_slim_files_are_new_files_only(built):
+    """#151: existing files and columns stay exactly as they were (nyc-311-mcp reads them)."""
+    m, out, _ = built
+    detail = [r[0] for r in duckdb.sql(f"DESCRIBE SELECT * FROM '{out / 'detail' / 'cd' / '101.parquet'}'").fetchall()]
+    assert detail == ["unique_key", "created_date", "closed_date", "agency", "agency_name", "complaint_type", "complaint_type_raw",
+                      "descriptor", "descriptor_2", "status", "incident_address", "street_name", "intersection_street_1",
+                      "intersection_street_2", "incident_zip", "bbl", "borough", "community_board", "council_district", "latitude",
+                      "longitude", "resolution_description", "cd", "cc", "city_cd", "days_to_close", "close_flag", "address_norm",
+                      "year_month", "is_closed"]
+    agg = [r[0] for r in duckdb.sql(f"DESCRIBE SELECT * FROM '{out / 'agg' / 'month_type.parquet'}'").fetchall()]
+    assert agg == ["geo_kind", "geo_id", "year_month", "complaint_type", "n"]
+    assert not any(p.parts[-2] == "borough" for p in (out / "detail").rglob("*.parquet"))
+
+
+def test_validate_manifest_checks_borough_files(built):
+    m, _, _ = built
+    bad = json.loads(json.dumps(m, default=str))
+    bad["borough_files"]["files"]["brooklyn"]["file"] = "elsewhere.parquet"
+    with pytest.raises(bb.PipelineError, match="borough_files"):
+        bb.validate_manifest(bad)
+    older = {k: v for k, v in m.items() if k != "borough_files"}
+    bb.validate_manifest(older)  # a build from before #151 is still valid
+
+
+def test_borough_check_passes_on_a_good_build(built):
+    """#151 nightly guard: the fixture build ran the check (it would have raised)."""
+    m, out, _ = built
+    r = bb.check_borough_files(out, m["borough_files"]["files"], m["districts"]["cd"])
+    assert r["boroughs"] == 2 and r["rows"] == sum(f["rows"] for f in m["borough_files"]["files"].values())
+
+
+def _rewrite(path, sql):
+    tmp = path.with_suffix(".tmp.parquet")
+    duckdb.sql(f"COPY ({sql.format(f=bb.sql_str(str(path)))}) TO {bb.sql_str(str(tmp))} (FORMAT parquet)")
+    tmp.replace(path)
+
+
+def test_borough_check_catches_a_dropped_row(built):
+    m, out, _ = built
+    path = out / m["borough_files"]["files"]["brooklyn"]["file"]
+    _rewrite(path, "SELECT * FROM {f} LIMIT (SELECT count(*) - 1 FROM {f})")
+    with pytest.raises(bb.PipelineError, match=r"Brooklyn's borough file has 1 rows but its district files have 2\. Not publishing\."):
+        bb.check_borough_files(out, m["borough_files"]["files"], m["districts"]["cd"])
+
+
+def test_borough_check_catches_a_changed_value(built):
+    m, out, _ = built
+    path = out / m["borough_files"]["files"]["brooklyn"]["file"]
+    _rewrite(path, "SELECT * REPLACE ('XYZ' AS agency) FROM {f}")
+    with pytest.raises(bb.PipelineError, match=r"Brooklyn's borough file and its district files both have 2 rows, but their contents differ"):
+        bb.check_borough_files(out, m["borough_files"]["files"], m["districts"]["cd"])
+
+
+def test_borough_check_catches_a_wrong_manifest_count(built):
+    m, out, _ = built
+    files = json.loads(json.dumps(m["borough_files"]["files"]))
+    files["manhattan"]["rows"] += 1
+    with pytest.raises(bb.PipelineError, match=r"the manifest says Manhattan's borough file has 3 rows but it has 2"):
+        bb.check_borough_files(out, files, m["districts"]["cd"])
+
+
+def test_build_runs_the_borough_check_before_the_manifest():
+    src = open(bb.__file__, encoding="utf-8").read()
+    build = src[src.index("def build("):src.index("def agreement_report(")]
+    assert build.index("check_borough_files(out_dir, borough_files, districts[\"cd\"])") < build.index('(out_dir / "manifest.json").write_text')
