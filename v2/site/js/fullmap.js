@@ -111,7 +111,8 @@ async function main() {
     manifest = await loadManifest();
   } catch (err) {
     $('title').textContent = 'Data not available';
-    $('status').textContent = String(err.message || err);
+    console.error(err);
+    $('status').textContent = 'BoardStat\'s data could not be loaded. Reload the page to try again.';
     return;
   }
   district = resolvePlace(manifest, geo, geoId);

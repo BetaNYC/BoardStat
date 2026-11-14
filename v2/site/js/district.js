@@ -132,27 +132,110 @@ const rowsOpen = (panel) => !SLIM || (opened[panel] && !rowsError);
 let rowsError = null; // the last load of `rows` for the open panels failed (the charts are fine)
 let districtSources = []; // the district files, as loader sources (for a fallback from the slim file)
 
-/** The status line when the open panels' rows could not load: it names them, never the error. */
-function rowsFailedText() {
-  const names = [opened.map && 'The map', opened.addresses && 'The addresses with the most requests', opened.detail && 'The list of requests'].filter(Boolean);
-  return `${names.join(' and ') || 'This section'} could not load. Press Apply filters to try again, or reload the page.`;
+// The slim file's failures in a row (#151 QA): the first is retried on the next Apply;
+// after the second, a wide screen falls back to the district files. A phone never does on
+// its own: that path is what made phones reload. A good load resets the count.
+let slimFailures = 0;
+let fellBack = false; // the page now reads the district files because the slim file failed
+const narrowScreen = () => window.matchMedia('(max-width: 640px)').matches;
+
+const SLIM_RETRY_MSG = 'This borough\'s quick-loading file did not load. Press Apply filters to try again, or reload the page.';
+const SLIM_FALLBACK_PENDING_MSG = 'This borough\'s quick-loading file did not load. Press Apply filters to load the page from each district\'s file instead. That is much more data, and on a phone it can be slow or make the page reload.';
+const SLIM_FALLBACK_DONE_MSG = 'This page is reading each district\'s file, because the borough\'s quick-loading file did not load. That is much more data, and on a phone it can be slow or make the page reload. Reload the page to try the quick-loading file again.';
+
+/** The panels whose numbers would be stale after a failed load of the slim file. */
+const CHART_IDS = ['kpis', 'top', 'descriptors', 'monthly', 'agency-resp', 'backlog', 'agency'];
+
+/**
+ * The slim file failed to load in the foreground. Returns the status line. The charts are
+ * cleared (they would show the old filters' numbers); the next Apply retries.
+ */
+function slimFailed() {
+  slimFailures++;
+  for (const id of CHART_IDS) if ($(id)) $(id).replaceChildren();
+  // Said once, on the status line (a live region); the note under the filters is kept for
+  // what stays true while the page is in use: that it reads the district files (A).
+  showSlimNote('');
+  if (narrowScreen() || slimFailures < 2) return SLIM_RETRY_MSG;
+  fallBackToDistrictFiles();
+  return SLIM_FALLBACK_PENDING_MSG;
+}
+
+function showSlimNote(text) {
+  const note = $('slim-note');
+  if (!note) return;
+  note.textContent = text || '';
+  note.hidden = !text;
 }
 
 /**
- * The slim file failed to load (#151 QA): from now on this page reads the district files for
- * everything, as it does without a slim file, and says so. The next Apply loads them.
+ * After a second failure in a row, on a wide screen: from now on this page reads the
+ * district files for everything, as it does without a slim file. The next Apply loads them.
  */
 function fallBackToDistrictFiles() {
   if (!SLIM) return;
   SLIM = false;
+  fellBack = true;
   rowsLoader = null;
   rowsError = null;
   loadedFrom = null;
   loader = createLoader({ exec: query, sources: districtSources, cols: LOAD_COLUMNS.join(', '), checkFresh: freshnessCheck(manifest.generated_at) });
-  for (const id of ['map-open', 'addresses-open', 'detail-open-note']) if ($(id)) $(id).hidden = true;
-  $('map').hidden = false;
-  $('map-note').hidden = false;
-  if ($('slim-note')) $('slim-note').hidden = false;
+  // The district files now go into req; a rows table loaded for the map is not needed.
+  query('DROP TABLE IF EXISTS rows').catch((e) => console.error(e));
+  syncRowPanels();
+}
+
+/** The message each row-level section shows when its rows could not load. */
+const ROW_PANEL_ERRORS = {
+  map: 'The map could not load. Press Apply filters to try again, or reload the page.',
+  addresses: 'The addresses could not load. Press Apply filters to try again, or reload the page.',
+  detail: 'The list of requests could not load. Press Apply filters to try again, or reload the page.',
+};
+
+/**
+ * Show each row-level section as it is: closed behind its button, open, or failed (its old
+ * content cleared, the message inside it, its button back so it can be tried again).
+ */
+function syncRowPanels() {
+  for (const panel of ['map', 'addresses', 'detail']) {
+    const failed = SLIM && opened[panel] && Boolean(rowsError);
+    const err = $(`${panel}-error`);
+    if (err) { err.textContent = failed ? ROW_PANEL_ERRORS[panel] : ''; err.hidden = !failed; }
+    if (panel === 'detail') {
+      if ($('detail-open-note')) $('detail-open-note').hidden = !SLIM;
+      if (failed) { $('detail').replaceChildren(); $('page-label').textContent = ''; $('detail-wrap').open = false; listenForListOpen(); }
+      continue;
+    }
+    const button = $(`${panel}-open`);
+    if (button) button.hidden = !SLIM || (opened[panel] && !failed);
+    if (panel === 'map') {
+      const show = !SLIM || (opened.map && !failed);
+      $('map').hidden = !show;
+      $('map-note').hidden = !show;
+    }
+    if (panel === 'addresses' && failed) $('addresses').replaceChildren();
+  }
+}
+
+/** "Show the list of requests" loads the rows once; listened for again only after a failure. */
+function listenForListOpen() {
+  const wrap = $('detail-wrap');
+  if (!wrap || wrap.dataset.listening) return;
+  wrap.dataset.listening = '1';
+  wrap.addEventListener('toggle', function onToggle() {
+    if (!wrap.open) return;
+    wrap.removeEventListener('toggle', onToggle);
+    delete wrap.dataset.listening;
+    openRowPanel('detail');
+  });
+}
+
+/** Open (or try again) a row-level section. */
+function openRowPanel(panel) {
+  if (opened[panel] && !rowsError) return;
+  opened[panel] = true;
+  syncRowPanels();
+  refresh();
 }
 
 /** On a borough page: load the district files' rows the open panels or an address filter need. */
@@ -169,16 +252,11 @@ async function ensureRows() {
 /** On a borough page: the buttons that open the map, top addresses and the list. */
 function setupRowPanels() {
   if (!SLIM) return;
-  const open = (panel) => { if (opened[panel]) return; opened[panel] = true; if ($(`${panel}-open`)) $(`${panel}-open`).hidden = true; refresh(); };
-  $('map-open').hidden = false;
-  $('map').hidden = true;
-  $('map-note').hidden = true;
-  $('map-show').addEventListener('click', () => { $('map').hidden = false; $('map-note').hidden = false; open('map'); });
-  $('addresses-open').hidden = false;
-  $('addresses-show').addEventListener('click', () => open('addresses'));
-  $('detail-open-note').hidden = false;
+  $('map-show').addEventListener('click', () => openRowPanel('map'));
+  $('addresses-show').addEventListener('click', () => openRowPanel('addresses'));
   // The list already sits behind "Show the list of requests"; opening it loads the rows.
-  $('detail-wrap').addEventListener('toggle', () => { if ($('detail-wrap').open) open('detail'); });
+  listenForListOpen();
+  syncRowPanels();
 }
 
 /** A plain note when an address filter made a borough page load every request's details. */
@@ -933,7 +1011,7 @@ async function setupMapOnce() {
   try { await setupMap(); } catch (err) {
     mapSetupFailed = true;
     console.error(err);
-    $('map').replaceChildren(el('p', { text: `The map could not load (${err.message}). Every number on this page is also in the tables.` }));
+    $('map').replaceChildren(el('p', { text: 'The map could not load. Every number on this page is also in the tables. Reload the page to try again.' }));
   }
 }
 
@@ -1087,8 +1165,8 @@ async function refresh() {
   setStatus($('status'), 'Updating…');
   try {
     try { await ensureLoaded(); } catch (err) { err.boardstatLoad = true; err.boardstatSlim = SLIM; throw err; }
-    // The open map, list or addresses: if their rows fail, the charts still draw, and the
-    // status line names what did not load. An address filter needs them for every panel.
+    // The open map, list or addresses: if their rows fail, the charts still draw, and each
+    // of those sections says so inside itself. An address filter needs them for every panel.
     rowsError = null;
     try { await ensureRows(); } catch (err) {
       if (state.addr) { err.boardstatLoad = true; throw err; }
@@ -1097,6 +1175,10 @@ async function refresh() {
       freshDataFiles(err).catch((e) => console.error(e));
     }
     if (seq !== refreshSeq) return;
+    // The slim file loaded: a failure before it no longer counts. A fallback that has now
+    // loaded says what it is reading.
+    if (SLIM) { slimFailures = 0; showSlimNote(''); } else if (fellBack) showSlimNote(SLIM_FALLBACK_DONE_MSG);
+    syncRowPanels();
     showRowsNote();
     if (firstLoadDone) await fillFilterOptions(); // a no-op unless the rows or the dates changed
     // A page whose first load failed finishes its setup after the first load that works.
@@ -1107,7 +1189,8 @@ async function refresh() {
     await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgencyResponse(), renderAgency(), renderBacklog(), renderDetail(), renderMap(),
       ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare()] : [renderAddresses(), renderCompare()])]);
     // A link can carry dates in the wrong order: say so instead of just "0 requests match."
-    if (seq === refreshSeq) setStatus($('status'), rowsError ? rowsFailedText() : state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
+    // A section whose rows failed says so inside itself (syncRowPanels); the count stays here.
+    if (seq === refreshSeq) setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
     lastRefreshFailed = Boolean(rowsError);
     lastChartWidth = chartWidthKey();
     // After the form's own Apply or Reset on a phone: close the panel, focus its toggle.
@@ -1118,9 +1201,9 @@ async function refresh() {
     console.error(err);
     lastRefreshFailed = true;
     if (!(err instanceof DataChangedError)) freshDataFiles(err).catch((e) => console.error(e));
-    if (err.boardstatSlim && !(err instanceof DataChangedError)) fallBackToDistrictFiles();
     // The error itself stays in the console; the page says what to do.
-    setStatus($('status'), err.boardstatLoad || err instanceof DataChangedError ? loadFailedText(err)
+    if (err.boardstatSlim && !(err instanceof DataChangedError)) setStatus($('status'), slimFailed());
+    else setStatus($('status'), err.boardstatLoad || err instanceof DataChangedError ? loadFailedText(err)
       : 'Something went wrong while updating the page. Press Apply filters to try again, or reload the page.');
   }
 }
@@ -1146,7 +1229,8 @@ async function main() {
     manifest = await loadManifest();
   } catch (err) {
     $('title').textContent = 'Data not available';
-    $('as-of').textContent = String(err.message || err);
+    console.error(err);
+    $('as-of').textContent = 'BoardStat\'s data could not be loaded. Reload the page to try again.';
     hideFilters();
     return;
   }
@@ -1237,6 +1321,7 @@ async function main() {
   // A failed first load must never leave the page waiting: say so, and let Apply retry.
   let loaded = true;
   let loadError = null;
+  let slimLoadMessage = null;
   try {
     await ensureLoaded();
   } catch (err) {
@@ -1245,7 +1330,8 @@ async function main() {
     loadError = err;
     lastRefreshFailed = true;
     await freshDataFiles(err);
-    if (!(err instanceof DataChangedError)) fallBackToDistrictFiles(); // a borough's slim file: Apply then uses the district files
+    // A borough's slim file: the first failure is retried by Apply (slimFailed).
+    if (SLIM && !(err instanceof DataChangedError)) slimLoadMessage = slimFailed();
   }
   if (loaded) await afterFirstLoad();
   setupFilters();
@@ -1254,7 +1340,7 @@ async function main() {
   setupRowPanels();
   watchChartWidth();
   if (loaded) await refresh();
-  else setStatus($('status'), loadFailedText(loadError));
+  else setStatus($('status'), slimLoadMessage || loadFailedText(loadError));
 }
 
 

@@ -44,21 +44,34 @@ def test_slim_mode_only_with_the_manifests_file_and_rows_through_the_loader():
     assert "const T = () => (SLIM && state.addr ? 'rows' : 'req');" in src
 
 
-def test_a_failed_slim_file_is_retried_and_falls_back_to_the_district_files():
-    """#151 QA: the slim file is re-registered after a failed read, and the page then reads
-    the district files, with a plain note."""
+def test_a_failed_slim_file_is_retried_then_falls_back_only_on_a_wide_screen():
+    """#151 QA round 2: the slim file is re-registered and retried by Apply; only a second
+    failure in a row falls back to the district files, and never at 640 px or less."""
     src = (JS / "district.js").read_text()
     assert "dataFiles.push(['b.parquet', `data/${slimFile}`]);" in src
+    failed = re.search(r"function slimFailed\(\) \{.*?\n\}", src, re.DOTALL).group(0)
+    assert "slimFailures++;" in failed
+    assert "if (narrowScreen() || slimFailures < 2) return SLIM_RETRY_MSG;" in failed
+    assert failed.index("narrowScreen()") < failed.index("fallBackToDistrictFiles();")
+    assert "if (SLIM) { slimFailures = 0; showSlimNote(''); } else if (fellBack) showSlimNote(SLIM_FALLBACK_DONE_MSG);" in src
     fb = re.search(r"function fallBackToDistrictFiles\(\) \{.*?\n\}", src, re.DOTALL).group(0)
-    assert "SLIM = false;" in fb and "$('slim-note').hidden = false;" in fb
-    assert "if (err.boardstatSlim && !(err instanceof DataChangedError)) fallBackToDistrictFiles();" in src
-    assert 'id="slim-note" hidden' in (SITE / "district.html").read_text()
+    assert "SLIM = false;" in fb and "DROP TABLE IF EXISTS rows" in fb
+    # The term is "quick-loading file", never "summary file".
+    for page in ("district.html", "help.html", "glossary.html"):
+        assert "summary file" not in (SITE / page).read_text(), page
+    assert "summary file" not in src
 
 
-def test_a_failed_section_names_the_section_never_the_error():
+def test_a_failed_section_clears_itself_and_says_so_inside():
     src = (JS / "district.js").read_text()
-    fn = re.search(r"function rowsFailedText\(\) \{.*?\n\}", src, re.DOTALL).group(0)
-    assert "could not load. Press Apply filters to try again, or reload the page." in fn and "message" not in fn
+    for panel, text in (("map", "The map could not load."), ("addresses", "The addresses could not load."),
+                        ("detail", "The list of requests could not load.")):
+        assert f"{panel}: '{text} Press Apply filters to try again, or reload the page.'" in src
+        assert f'id="{panel}-error" role="status" hidden' in (SITE / "district.html").read_text()
+    sync = re.search(r"function syncRowPanels\(\) \{.*?\n\}", src, re.DOTALL).group(0)
+    assert "$('addresses').replaceChildren()" in sync and "$('detail').replaceChildren()" in sync and "$('map').hidden = !show;" in sync
+    assert "rowsFailedText" not in src and "err.message" not in src
+    assert "err.message" not in (JS / "fullmap.js").read_text()
     assert "lastRefreshFailed = Boolean(rowsError);" in src
 
 
