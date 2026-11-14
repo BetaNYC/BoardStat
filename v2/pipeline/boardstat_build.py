@@ -119,6 +119,17 @@ FIELDS_CC = ["coundist", "the_geom"]
 PAGE_SIZE = 200_000
 
 BOROUGHS = {1: "Manhattan", 2: "Bronx", 3: "Brooklyn", 4: "Queens", 5: "Staten Island"}
+# Per-borough "slim" files (#151): one row per located request in the borough, with only
+# the columns the borough page's charts and tables use. The page draws from these instead
+# of every district file, so a phone can hold a whole borough; the map, the request list
+# and an address filter still read the district files, when the reader asks for them.
+BOROUGH_SLIM_COLUMNS = ["created_date", "complaint_type", "descriptor", "agency", "agency_name",
+                        "status", "days_to_close", "year_month", "is_closed"]
+
+
+def borough_slug(name: str) -> str:
+    """The slug site/js/place.js uses in borough links: 'Staten Island' -> 'staten-island'."""
+    return name.lower().replace(" ", "-")
 BOROUGH_CODE_BY_NAME = {v.upper(): k for k, v in BOROUGHS.items()}
 # Highest real community district number per borough. Any boro_cd above this is a
 # Joint Interest Area (a park, airport, or other area outside every CD).
@@ -771,6 +782,28 @@ def build(
             districts[kind].append(entry)
     log("detail_written", cd_files=sum(1 for d in districts["cd"] if d["file"]), cc_files=sum(1 for d in districts["cc"] if d["file"]))
 
+    # Per-borough slim files (#151). The same rows as the borough's district files
+    # (cd // 100 = the borough's code, Joint Interest Areas included: the rule the
+    # borough page and the 'borough' agg rows use), in the same order and row groups, so
+    # the page range-loads them the same way (site/js/loadplan.js). New files only;
+    # nothing above changes.
+    t_slim = time.time()
+    (out_dir / "borough").mkdir(parents=True, exist_ok=True)
+    for old in list((out_dir / "borough").glob("*.parquet")):
+        old.unlink()
+    borough_files: dict[str, dict[str, Any]] = {}
+    for code, name in BOROUGHS.items():
+        slug = borough_slug(name)
+        n = con.execute("SELECT count(*) FROM req WHERE cd // 100 = ?", [code]).fetchone()[0]
+        if not n:
+            continue
+        path = out_dir / "borough" / f"{slug}.parquet"
+        con.execute(f"COPY (SELECT {', '.join(BOROUGH_SLIM_COLUMNS)} FROM req WHERE cd // 100 = {int(code)} ORDER BY {detail_order}) "
+                    f"TO {sql_str(str(path))} {parquet_opts}")
+        borough_files[slug] = {"name": name, "file": f"borough/{slug}.parquet", "rows": n}
+    log("borough_slim_written", files=len(borough_files), elapsed_s=round(time.time() - t_slim, 1),
+        bytes=sum((out_dir / f["file"]).stat().st_size for f in borough_files.values()))
+
     # Aggregates for the Compare panel. Located rows only, so district, borough
     # and city shares are computed over the same population.
     boro_case = "CASE cd // 100 " + " ".join(f"WHEN {k} THEN {sql_str(v)}" for k, v in BOROUGHS.items()) + " END"
@@ -834,6 +867,8 @@ def build(
         "complaint_types": {"groups": len(merged), "unreviewed": unreviewed},
         "districts": districts,
         "boroughs": list(BOROUGHS.values()),
+        # #151: per-borough slim files, by the slug site/js/place.js uses.
+        "borough_files": {"columns": BOROUGH_SLIM_COLUMNS, "files": borough_files},
         "notes": [
             "Every located request is assigned to a Community District and a Council District by our own point-in-polygon join against the current DCP boundaries listed in sources.",
             "Requests without usable coordinates are counted but not placed in any district file.",
@@ -955,6 +990,13 @@ def validate_manifest(m: dict[str, Any]) -> None:
     for k in ("council", "community_district"):
         if k not in m["agreement"]:
             raise PipelineError(f"manifest.agreement missing {k!r}")
+    bf = m.get("borough_files")
+    if bf is not None:
+        if not isinstance(bf, dict) or not isinstance(bf.get("files"), dict) or not isinstance(bf.get("columns"), list):
+            raise PipelineError("manifest.borough_files needs 'columns' (a list) and 'files' (an object)")
+        for slug, f in bf["files"].items():
+            if not isinstance(f, dict) or not str(f.get("file", "")).startswith("borough/") or not isinstance(f.get("rows"), int):
+                raise PipelineError(f"manifest.borough_files.files[{slug!r}] needs file 'borough/...' and integer rows")
     w = m["window"]
     try:
         start, end, view = (dt.date.fromisoformat(w[k]) for k in ("start", "end", "default_start"))
