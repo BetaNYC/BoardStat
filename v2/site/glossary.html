@@ -6,9 +6,9 @@
   <title>Glossary · BoardStat 2.0 (prototype)</title>
   <meta name="description" content="The terms BoardStat uses, how each number is calculated, and where to find the datasets behind it.">
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css?v=4194e734d8">
+  <link rel="stylesheet" href="css/style.css?v=54507c9a6e">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=c752f37efe","./js/filterstate.js":"./js/filterstate.js?v=7454a9b715","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=eddf87a5bd","./js/map.js":"./js/map.js?v=7ea3ad200a"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=29a8380e23","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=ecc80fb992","./js/fullmap.js":"./js/fullmap.js?v=8cedf6c7e3","./js/index.js":"./js/index.js?v=5fa92e5770","./js/lib.js":"./js/lib.js?v=15e5f110aa","./js/map.js":"./js/map.js?v=594c10b1ab","./js/requestmap.js":"./js/requestmap.js?v=f7e51d115c"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -209,7 +209,10 @@
         </dd>
 
         <dt id="map">Map of requests</dt>
-        <dd><p>Each dot is a request. Circles group requests that are close together. Bigger, darker circles hold more requests (light: under 100, middle: 100 to 999, dark: 1,000 or more). Select a circle to zoom in. The map shows at most the 60,000 most recent matching requests.</p></dd>
+        <dd><p>Each dot is a request. Circles group requests that are close together. Bigger, darker circles hold more requests (light: under 100, middle: 100 to 999, dark: 1,000 or more); the map key under the map shows each one. Select a circle to zoom in, or a dot to see that request's problem, description, date, status and address. The map shows at most the 60,000 most recent matching requests.</p></dd>
+
+        <dt id="full-map">Full-page map</dt>
+        <dd><p>The same <a href="#map">map of requests</a>, as big as your screen. Open it with <strong>Open full-page map</strong> under a district's map. It shows the same district, dates and filters, and lists them at the top. Its web address carries all of them, so you can share it. To change the filters, use <strong>Back to the district page</strong>, which keeps them. An <a href="#address">address</a> filter is never put in a web address, so the full-page map leaves it out and shows the whole district.</p></dd>
 
         <dt id="top-addresses">Addresses with the most requests</dt>
         <dd><p>The 15 <a href="#address">addresses</a> with the most matching requests, with the problem reported most often at each one. Requests with only cross streets are not in this list.</p></dd>

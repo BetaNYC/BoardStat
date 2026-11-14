@@ -75,10 +75,8 @@ export async function query(sql) {
   });
 }
 
-/** SQL string literal: standard SQL doubling of single quotes. */
-export function lit(s) {
-  return `'${String(s).replace(/'/g, "''")}'`;
-}
+// SQL string literal; defined in filtersql.js so Node tests can use it too.
+export { lit } from './filtersql.js';
 
 // ---------------------------------------------------------------- manifest
 
