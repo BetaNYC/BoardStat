@@ -126,8 +126,34 @@ const opened = { map: false, addresses: false, detail: false };
 const ROWS = () => (SLIM ? 'rows' : 'req');
 /** The table the charts and tables read: the slim one, unless an address filter needs every column. */
 const T = () => (SLIM && state.addr ? 'rows' : 'req');
-/** Whether a row-level panel draws now: always, except on a borough page before the reader opens it. */
-const rowsOpen = (panel) => !SLIM || opened[panel];
+/** Whether a row-level panel draws now: always, except on a borough page before the reader opens it
+ *  (or while its rows failed to load). */
+const rowsOpen = (panel) => !SLIM || (opened[panel] && !rowsError);
+let rowsError = null; // the last load of `rows` for the open panels failed (the charts are fine)
+let districtSources = []; // the district files, as loader sources (for a fallback from the slim file)
+
+/** The status line when the open panels' rows could not load: it names them, never the error. */
+function rowsFailedText() {
+  const names = [opened.map && 'The map', opened.addresses && 'The addresses with the most requests', opened.detail && 'The list of requests'].filter(Boolean);
+  return `${names.join(' and ') || 'This section'} could not load. Press Apply filters to try again, or reload the page.`;
+}
+
+/**
+ * The slim file failed to load (#151 QA): from now on this page reads the district files for
+ * everything, as it does without a slim file, and says so. The next Apply loads them.
+ */
+function fallBackToDistrictFiles() {
+  if (!SLIM) return;
+  SLIM = false;
+  rowsLoader = null;
+  rowsError = null;
+  loadedFrom = null;
+  loader = createLoader({ exec: query, sources: districtSources, cols: LOAD_COLUMNS.join(', '), checkFresh: freshnessCheck(manifest.generated_at) });
+  for (const id of ['map-open', 'addresses-open', 'detail-open-note']) if ($(id)) $(id).hidden = true;
+  $('map').hidden = false;
+  $('map-note').hidden = false;
+  if ($('slim-note')) $('slim-note').hidden = false;
+}
 
 /** On a borough page: load the district files' rows the open panels or an address filter need. */
 async function ensureRows() {
@@ -137,7 +163,7 @@ async function ensureRows() {
   const target = from(state, manifest.window.start) ?? (rowsLoader.loadedFrom() === null ? from({ start: viewStart }, manifest.window.start) : null);
   if (target === null) return;
   await rowsLoader.loadFor(target, (f, done, n) => setStatus($('status'),
-    `Loading every request's details from ${fmtDate(f)} on, for the map, the list and addresses…${n > 1 && done ? ` (${done} of ${n} districts loaded)` : ''}`));
+    `Loading each request's details from ${fmtDate(f)} on…${n > 1 && done ? ` (${done} of ${n} districts loaded)` : ''}`));
 }
 
 /** On a borough page: the buttons that open the map, top addresses and the list. */
@@ -150,6 +176,7 @@ function setupRowPanels() {
   $('map-show').addEventListener('click', () => { $('map').hidden = false; $('map-note').hidden = false; open('map'); });
   $('addresses-open').hidden = false;
   $('addresses-show').addEventListener('click', () => open('addresses'));
+  $('detail-open-note').hidden = false;
   // The list already sits behind "Show the list of requests"; opening it loads the rows.
   $('detail-wrap').addEventListener('toggle', () => { if ($('detail-wrap').open) open('detail'); });
 }
@@ -179,7 +206,7 @@ function loadPriorYear() {
     }
     // A load for newer filters is still running: its refresh draws Requests per month
     // once the table is complete, so drawing now would count a half-loaded table.
-    if (loader.loadPending()) return;
+    if (loader.loadPending() || rowsLoader?.loadPending()) return;
     await renderMonthly();
     announcePrior(r.ok ? 'Requests per month now shows the same months a year earlier.' : priorFailureText(r.error));
   }).catch((err) => console.error(err));
@@ -461,7 +488,7 @@ async function renderMonthly() {
   // looks like a drop. The year-earlier series uses exactly the same days, shifted
   // back 12 months (every filter except From/To applies).
   // While a load for new filters runs the table is half filled; that load's refresh draws.
-  if (loader?.loadPending()) return;
+  if (loader?.loadPending() || rowsLoader?.loadPending()) return;
   const draw = monthlyDraw.next();
   // Year-earlier counts are complete only from coverFrom on: what is loaded when the
   // query runs (rows are only ever added, so reading it first is safe).
@@ -1038,7 +1065,7 @@ function watchChartWidth() {
     clearTimeout(timer);
     timer = setTimeout(async () => {
       if (lastChartWidth === null || chartWidthKey() === lastChartWidth) return;
-      if (loader?.loadPending()) return; // the refresh after that load draws at the new width
+      if (loader?.loadPending() || rowsLoader?.loadPending()) return; // the refresh after that load draws at the new width
       lastChartWidth = chartWidthKey();
       try {
         await Promise.all([renderMonthly(), renderAgency(), ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare()] : [renderCompare()])]);
@@ -1059,7 +1086,16 @@ async function refresh() {
   priorFailure = null; // this refresh retries a failed background load (loadPriorYear)
   setStatus($('status'), 'Updating…');
   try {
-    try { await ensureLoaded(); await ensureRows(); } catch (err) { err.boardstatLoad = true; throw err; }
+    try { await ensureLoaded(); } catch (err) { err.boardstatLoad = true; err.boardstatSlim = SLIM; throw err; }
+    // The open map, list or addresses: if their rows fail, the charts still draw, and the
+    // status line names what did not load. An address filter needs them for every panel.
+    rowsError = null;
+    try { await ensureRows(); } catch (err) {
+      if (state.addr) { err.boardstatLoad = true; throw err; }
+      console.error(err);
+      rowsError = err;
+      freshDataFiles(err).catch((e) => console.error(e));
+    }
     if (seq !== refreshSeq) return;
     showRowsNote();
     if (firstLoadDone) await fillFilterOptions(); // a no-op unless the rows or the dates changed
@@ -1071,8 +1107,8 @@ async function refresh() {
     await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgencyResponse(), renderAgency(), renderBacklog(), renderDetail(), renderMap(),
       ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare()] : [renderAddresses(), renderCompare()])]);
     // A link can carry dates in the wrong order: say so instead of just "0 requests match."
-    if (seq === refreshSeq) setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
-    lastRefreshFailed = false;
+    if (seq === refreshSeq) setStatus($('status'), rowsError ? rowsFailedText() : state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
+    lastRefreshFailed = Boolean(rowsError);
     lastChartWidth = chartWidthKey();
     // After the form's own Apply or Reset on a phone: close the panel, focus its toggle.
     if (seq === refreshSeq) form.afterRedraw();
@@ -1082,6 +1118,7 @@ async function refresh() {
     console.error(err);
     lastRefreshFailed = true;
     if (!(err instanceof DataChangedError)) freshDataFiles(err).catch((e) => console.error(e));
+    if (err.boardstatSlim && !(err instanceof DataChangedError)) fallBackToDistrictFiles();
     // The error itself stays in the console; the page says what to do.
     setStatus($('status'), err.boardstatLoad || err instanceof DataChangedError ? loadFailedText(err)
       : 'Something went wrong while updating the page. Press Apply filters to try again, or reload the page.');
@@ -1150,11 +1187,13 @@ async function main() {
   const names = sourceNames(district);
   SRC = sourceSql(names);
   dataFiles = names.map((n, i) => [n, `data/${district.files[i]}`]);
+  districtSources = names.map((n) => sourceSql([n]));
   // A borough page with its slim file (#151) draws its charts from that one file and reads
   // the district files only for the map, the list, top addresses and an address filter.
   const slimFile = IS_BORO && rangeLoading() ? slimFileFor(manifest, district.id) : null;
   SLIM = Boolean(slimFile);
   if (SLIM) {
+    dataFiles.push(['b.parquet', `data/${slimFile}`]); // so a failed read can be retried (freshDataFiles)
     loader = createLoader({ exec: query, sources: [lit('b.parquet')], cols: SLIM_COLUMNS.join(', '), checkFresh: freshnessCheck(manifest.generated_at) });
     rowsLoader = createLoader({ exec: query, sources: names.map((n) => sourceSql([n])), cols: LOAD_COLUMNS.join(', '), checkFresh: freshnessCheck(manifest.generated_at), table: 'rows' });
   } else if (rangeLoading()) {
@@ -1206,9 +1245,11 @@ async function main() {
     loadError = err;
     lastRefreshFailed = true;
     await freshDataFiles(err);
+    if (!(err instanceof DataChangedError)) fallBackToDistrictFiles(); // a borough's slim file: Apply then uses the district files
   }
   if (loaded) await afterFirstLoad();
   setupFilters();
+  if (IS_BORO && $('fullmap-boro-note')) $('fullmap-boro-note').hidden = false;
   if (!SLIM) await setupMapOnce(); // a borough page with its slim file sets it up when the map is opened
   setupRowPanels();
   watchChartWidth();

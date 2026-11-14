@@ -123,6 +123,8 @@ test('a borough page uses its slim file only when the manifest lists one with ev
   assert.equal(slimFileFor(m, 'queens'), null); // not listed
   assert.equal(slimFileFor({}, 'brooklyn'), null); // an older build: load the district files as before
   assert.equal(slimFileFor({ borough_files: { columns: ['created_date'], files: m.borough_files.files } }, 'brooklyn'), null);
+  // Range loading reads is_closed, so a file without it is not used either (#151 QA).
+  assert.equal(slimFileFor({ borough_files: { columns: [...SLIM_COLUMNS], files: m.borough_files.files } }, 'brooklyn'), null);
   // The pipeline's column list and the page's stay in step.
   const py = (await import('node:fs')).readFileSync(new URL('../pipeline/boardstat_build.py', import.meta.url), 'utf8');
   const cols = py.match(/BOROUGH_SLIM_COLUMNS = \[([^\]]*)\]/)[1].match(/"([a-z_]+)"/g).map((c) => c.slice(1, -1));

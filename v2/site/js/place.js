@@ -108,6 +108,7 @@ export const SLIM_COLUMNS = ['created_date', 'complaint_type', 'descriptor', 'ag
 export function slimFileFor(manifest, slug) {
   const bf = manifest?.borough_files;
   const f = bf?.files?.[slug];
-  if (!f?.file || !Array.isArray(bf.columns) || !SLIM_COLUMNS.every((c) => bf.columns.includes(c))) return null;
+  // is_closed too: the page's range loading reads it (loadplan.js), though no chart does.
+  if (!f?.file || !Array.isArray(bf.columns) || ![...SLIM_COLUMNS, 'is_closed'].every((c) => bf.columns.includes(c))) return null;
   return f.file;
 }
