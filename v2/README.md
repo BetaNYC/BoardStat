@@ -55,12 +55,60 @@ can be shared, and "Back to the district page" carries them back. The two pages
 share code so they cannot drift: `js/filterstate.js` reads and writes the link
 (`filtersFromParams`, `filtersToParams`), `js/filtersql.js` builds the SQL filter
 (`whereSql`), and `js/requestmap.js` draws the map (lines, grouped circles, popups,
-the map key) and its "Showing ..." line, with the same 60,000 most-recent cap. The
-full-page map reads the district's Parquet file directly instead of loading the
-district page's table, and has no filter form of its own: it lists the filters in
-use and sends people back to the district page to change them. The address filter
-never goes into a link (see the analytics notes below), so the full-page map shows
-the whole district; the district page says so when an address filter is on.
+the map key) and its "Showing ..." line, with the same 60,000 most-recent cap.
+
+**Same filters on the full-page map (#149).** `map.html` has the district page's
+filter form: the same `<form id="filters">` markup (a test keeps `district.html`,
+`address.html` and `map.html` identical) run by one module, `js/filterform.js`
+(groups, problem and description chips, Apply, Reset, the "not applied yet" note,
+the date-order and problem-name checks, and #142's rule that an Apply with nothing
+changed reruns nothing). Each page gives it the lists to offer and what to redraw.
+Apply on the map redraws the map and rewrites the link (`history.replaceState`), and
+the back link always carries the map's current filters; "Open full-page map" carries
+the district page's. That holds for community districts, council districts and
+boroughs. The map page's Print summary button is hidden. The address page gets the
+shared module for free, with no change in what it does.
+
+**The filter panel opens and closes, on every page** (`setupPanel` in
+`js/filterform.js`). A "Hide filters" / "Change filters" button (`#filters-toggle`,
+`aria-expanded`) and a one-line summary of the applied filters (`#filters-summary`)
+sit just outside the form, so the form's markup stays the same on every page.
+Closed, the panel shows only its status line, under the summary.
+
+| Page | Starts | After the form's Apply or Reset |
+|---|---|---|
+| District, borough, council district, address, wider than 640 px | open (summary hidden) | stays open |
+| Same pages, 640 px or narrower | closed | closes, focus on the toggle |
+| Full-page map, any width | closed (summary always shown) | closes, focus on the toggle |
+
+Shortcut buttons elsewhere on a page (an agency, "Show these requests") apply at once
+whether the panel is open or closed, update the summary, and never open, close or
+move to the panel. On the map its groups start closed unless something in them is set.
+
+The map page loads its rows like the district page (`js/loadplan.js`): a table of
+the columns the map and the filters use, in the compressed in-memory database,
+Closed requests from the From date on plus every request not yet closed, so a change
+of filters reads nothing again and a From date moved earlier appends only what is
+missing. It never loads the year before (the map has no year-earlier series).
+
+**What the lists offer, on both pages.** A problem, description, agency or status is
+listed if it has a request created in the applied dates, or a request not yet closed
+(`listScopeSql` in `js/filterform.js`); rows a page holds for other reasons, like the
+year a borough page loads for its year-earlier line, never feed the lists. They are
+ordered by requests in the applied dates, then in that scope, then by name, and the
+form says so next to the Problem and Agency boxes. Both pages hold every row in that
+scope, so they list the same choices in the same order for the same dates, and the
+lists are made again whenever the applied dates change. "Closed" is always a status
+choice. A status filter from a link is kept only if the data has that status
+(`keepKnownStatus`, checked against the data's list, never against the menu); "Closed"
+is always kept, since a short period can have no Closed rows loaded, while every other
+status is on a request not yet closed, which is always loaded. An applied agency with
+no requests in the new dates stays selected, shown as an extra choice.
+
+**Address filter.** It never goes into a link (see the analytics notes below), so
+it is never carried between the district page and the map, in either direction, and
+the map page cannot set one (it has no address list). Both pages say so. Nothing is
+kept in session storage.
 
 ## How to run
 
