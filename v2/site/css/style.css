@@ -165,7 +165,9 @@ details.as-table summary { cursor: pointer; color: var(--bnyc-blue); font-weight
 figure { margin: 0; }
 figure svg { max-width: 100%; height: auto; }
 
-.map { position: relative; height: 420px; border: 1px solid var(--bnyc-border-gray); border-radius: 6px; }
+/* Map height follows the screen: 70% of its height, at least 420px and at most 720px.
+   Below 70% so a finger can still reach the page around the map to scroll past it. */
+.map { position: relative; height: 420px; height: clamp(420px, 70vh, 720px); height: clamp(420px, 70dvh, 720px); border: 1px solid var(--bnyc-border-gray); border-radius: 6px; }
 .map-error { position: absolute; top: 0.5rem; left: 0.5rem; right: 3rem; z-index: 2; margin: 0; padding: 0.4rem 0.6rem; font-size: 0.875rem; background: #fff; border: 1px solid var(--bnyc-border-gray); border-radius: 4px; }
 .map-note { font-size: 0.875rem; margin-top: 0.25rem; }
 .maplibregl-popup-content { font-family: var(--font-body); color: var(--bnyc-dark-gray); font-size: 0.875rem; }
@@ -194,7 +196,7 @@ main.fullmap { flex: 1; display: flex; flex-direction: column; width: 100%; max-
 @media screen and (max-width: 640px) { .fullmap-back { text-align: left; } }
 main.fullmap .status { margin: 0.25rem 0; min-height: 0; }
 main.fullmap .status:empty { display: none; }
-.map.map-full { flex: 1; height: auto; min-height: 65vh; }
+.map.map-full { flex: 1; height: auto; min-height: 85vh; min-height: 85dvh; }
 /* The filter panel opens and closes (#149, filterform.js setupPanel): closed, only its
    status line shows, under the summary line and the "Change filters" button. */
 .filters-toggle-row { margin: 0.35rem 0 0; }
