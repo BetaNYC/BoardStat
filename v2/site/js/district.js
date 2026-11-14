@@ -4,6 +4,7 @@ import {
   setStatus, fmtInt, fmtDays, fmtPct, fmtDate, fmtDateTime, monthLabel,
 } from './lib.js';
 import { makeMap, addBoundaries, featureBounds } from './map.js';
+import { copyFilters, changedFields, patchBoth, sectionCount, SECTIONS } from './filterstate.js';
 
 const $ = (id) => document.getElementById(id);
 const PAGE = 50;
@@ -32,7 +33,10 @@ const geoId = params.get('id');
 const ADDRESS_MODE = document.body.dataset.mode === 'address';
 
 let manifest, district, Plot;
+// `state` is the applied filters: what every panel shows and the link carries.
+// `draft` is what the filter form shows; only the Apply button copies it to `state` (#142).
 let state = {};
+let draft = {};
 let page = 0;
 let total = 0;
 let mapCtx = null;
@@ -150,51 +154,130 @@ function where({ skipType = false, skipDates = false, skipDesc = false, skipStat
 
 let allTypes = [];
 function renderChips() {
-  $('type-chips').replaceChildren(...state.types.map((t) => el('li', {},
-    el('button', { type: 'button', 'aria-label': `Remove problem filter ${t}`, onclick: () => { state.types = state.types.filter((x) => x !== t); refresh(); } }, `${t} ×`))));
-  $('desc-chips').classList.toggle('exclude', state.descEx);
-  $('desc-chips').setAttribute('aria-label', state.descEx ? 'Excluded descriptions' : 'Selected descriptions');
-  $('desc-chips').replaceChildren(...state.descs.map((d) => el('li', {},
-    el('button', { type: 'button', 'aria-label': `Remove description filter ${d}`, onclick: () => { state.descs = state.descs.filter((x) => x !== d); refresh(); } },
-      `${state.descEx ? 'Not: ' : ''}${d} ×`))));
-  $('addr-filter').hidden = ADDRESS_MODE || !state.addr;
-  $('addr-value').textContent = state.addr;
+  $('type-chips').replaceChildren(...draft.types.map((t) => el('li', {},
+    el('button', { type: 'button', 'aria-label': `Remove problem filter ${t}`, onclick: () => { draft.types = draft.types.filter((x) => x !== t); formChanged(); } }, `${t} ×`))));
+  $('desc-chips').classList.toggle('exclude', draft.descEx);
+  $('desc-chips').setAttribute('aria-label', draft.descEx ? 'Excluded descriptions' : 'Selected descriptions');
+  $('desc-chips').replaceChildren(...draft.descs.map((d) => el('li', {},
+    el('button', { type: 'button', 'aria-label': `Remove description filter ${d}`, onclick: () => { draft.descs = draft.descs.filter((x) => x !== d); formChanged(); } },
+      `${draft.descEx ? 'Not: ' : ''}${d} ×`))));
+  $('addr-filter').hidden = ADDRESS_MODE || !draft.addr;
+  $('addr-value').textContent = draft.addr;
 }
 
-/** Put the form controls back in line with `state` (after a reset or a shortcut button). */
+/** Put the form controls back in line with `draft` (after a reset or a shortcut button). */
 function syncForm() {
-  $('f-start').value = state.start;
-  $('f-end').value = state.end;
-  $('f-agency').value = state.agency;
-  $('f-status').value = state.status;
-  $('f-desc-ex').checked = state.descEx;
+  $('f-start').value = draft.start;
+  $('f-end').value = draft.end;
+  $('f-agency').value = draft.agency;
+  $('f-status').value = draft.status;
+  $('f-desc-ex').checked = draft.descEx;
+}
+
+/** The filters a link with no filters opens with (the Reset button's target). */
+function defaultFilters() {
+  return { start: viewStart, end: manifest.window.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: ADDRESS_MODE ? state.addr : '' };
+}
+
+/** Show whether the form holds changes the page does not show yet, and what each group has set. */
+function renderPending() {
+  const changed = changedFields(draft, state);
+  const pending = changed.length > 0;
+  $('apply').classList.toggle('is-pending', pending);
+  const msg = pending ? 'Filters changed. Press Apply filters to update the page.' : '';
+  if ($('pending').textContent !== msg) $('pending').textContent = msg;
+  const defaults = defaultFilters();
+  for (const section of Object.keys(SECTIONS)) {
+    const node = document.querySelector(`[data-count-for="${section}"]`);
+    if (!node) continue;
+    const n = sectionCount(draft, defaults, section);
+    const edited = changed.some((k) => SECTIONS[section].includes(k) || (section === 'problem' && k === 'descEx'));
+    const parts = [];
+    if (section === 'dates') parts.push(`${fmtDate(draft.start)} to ${fmtDate(draft.end)}`);
+    else if (n) parts.push(`${n} chosen`);
+    if (edited) parts.push('not applied yet');
+    node.textContent = parts.length ? `(${parts.join(', ')})` : '';
+  }
+}
+
+/** A form control changed the draft: redraw the form, never the panels. */
+function formChanged() {
+  renderChips();
+  renderPending();
+  updateDescOptions().catch((err) => console.error(err));
+}
+
+const DATE_ORDER_MSG = 'The From date is after the To date. Change one of them, then press Apply filters.';
+
+/** Copy the form's filters to the page and run the queries. */
+function applyFilters() {
+  // Text typed but not yet added as a chip is added first, if it matches a choice.
+  // Text that matches nothing stops the Apply and says so, instead of vanishing.
+  const typed = $('f-type').value.trim() || $('f-desc').value.trim();
+  if ($('f-type').value.trim() && !addType($('f-type').value)) return;
+  if ($('f-desc').value.trim() && !addDesc($('f-desc').value)) return;
+  // Date order first, so dates swapped in a link are flagged even with nothing changed.
+  if (draft.start > draft.end) {
+    setStatus($('status'), DATE_ORDER_MSG);
+    $('f-start').focus();
+    return;
+  }
+  // Nothing to change: no need to run every query again (unless the last run failed,
+  // so Apply can retry).
+  if (!typed && !lastRefreshFailed && changedFields(draft, state).length === 0) {
+    setStatus($('status'), `${fmtInt(total)} requests match.`);
+    return;
+  }
+  state = copyFilters(draft);
+  refresh();
+}
+
+/**
+ * Shortcut buttons in the panels (an agency, a description, an address, "Show them")
+ * apply at once. The same change goes into the form, and any other edits still waiting
+ * in the form stay there, unapplied.
+ */
+function applyNow(fn) {
+  ({ applied: state, draft } = patchBoth(state, draft, fn));
+  refresh();
 }
 
 let allDescs = [];
 let descOptionsKey = null;
 /** The Description list offers only descriptors of the selected problems (all if none). */
 async function updateDescOptions() {
-  const key = state.types.join('|');
+  const key = draft.types.join('|');
   if (key === descOptionsKey) return;
   descOptionsKey = key;
   const rows = await query(`
     SELECT ${DESC_SQL} AS d, count(*) AS n FROM req
-    ${state.types.length ? `WHERE complaint_type IN (${state.types.map(lit).join(', ')})` : ''}
+    ${draft.types.length ? `WHERE complaint_type IN (${draft.types.map(lit).join(', ')})` : ''}
     GROUP BY 1 ORDER BY 2 DESC, 1`);
   allDescs = rows.map((r) => r.d);
   $('desc-options').replaceChildren(...allDescs.map((d) => el('option', { value: d })));
 }
 
+/** Text that matches no choice stays in the box, with a short status saying so. Returns false then. */
+function noMatch(box, kind, text) {
+  setStatus($('status'), `No ${kind} named “${text.trim()}”. Choose one of the suggestions as you type, or clear the box.`);
+  $(box).focus();
+  return false;
+}
+
 function addDesc(d) {
   const match = allDescs.find((x) => x.toLowerCase() === String(d).trim().toLowerCase());
-  if (match && !state.descs.includes(match)) { state.descs = [...state.descs, match]; refresh(); }
+  if (!match) return noMatch('f-desc', 'description', String(d));
+  if (!draft.descs.includes(match)) { draft.descs = [...draft.descs, match]; formChanged(); }
   $('f-desc').value = '';
+  return true;
 }
 
 function addType(t) {
   const match = allTypes.find((x) => x.toLowerCase() === t.trim().toLowerCase());
-  if (match && !state.types.includes(match)) { state.types = [...state.types, match]; refresh(); }
+  if (!match) return noMatch('f-type', 'problem', t);
+  if (!draft.types.includes(match)) { draft.types = [...draft.types, match]; formChanged(); }
   $('f-type').value = '';
+  return true;
 }
 
 /** Fill the problem, agency and status lists from what is loaded (again after a reload). */
@@ -220,20 +303,30 @@ async function setupFilters() {
   $('f-end').value = state.end;
   await fillFilterOptions();
   if (state.status && ![...$('f-status').options].some((o) => o.value === state.status)) state.status = '';
+  draft = copyFilters(state);
   syncForm();
+  setupGroups();
 
-  $('f-start').addEventListener('change', (e) => { if (e.target.value) { state.start = e.target.value; refresh(); } });
-  $('f-end').addEventListener('change', (e) => { if (e.target.value) { state.end = e.target.value; refresh(); } });
-  $('f-agency').addEventListener('change', (e) => { state.agency = e.target.value; refresh(); });
-  $('f-status').addEventListener('change', (e) => { state.status = e.target.value; refresh(); });
-  $('f-type').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addType(e.target.value); } });
+  // Changing a control changes only the form (#142). Apply filters, or Enter in a text
+  // or date box, runs the queries.
+  $('f-start').addEventListener('change', (e) => { if (e.target.value) { draft.start = e.target.value; formChanged(); } });
+  $('f-end').addEventListener('change', (e) => { if (e.target.value) { draft.end = e.target.value; formChanged(); } });
+  $('f-agency').addEventListener('change', (e) => { draft.agency = e.target.value; formChanged(); });
+  $('f-status').addEventListener('change', (e) => { draft.status = e.target.value; formChanged(); });
+  // Enter with text in the box adds it as a chip; Enter in an empty box applies the filters.
+  $('f-type').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.value.trim()) { e.preventDefault(); addType(e.target.value); } });
   $('f-type').addEventListener('change', (e) => { if (allTypes.includes(e.target.value)) addType(e.target.value); });
-  $('f-desc').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addDesc(e.target.value); } });
+  $('f-desc').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.value.trim()) { e.preventDefault(); addDesc(e.target.value); } });
   $('f-desc').addEventListener('change', (e) => { if (allDescs.includes(e.target.value)) addDesc(e.target.value); });
-  $('f-desc-ex').addEventListener('change', (e) => { state.descEx = e.target.checked; refresh(); });
-  $('addr-clear').addEventListener('click', () => { state.addr = ''; refresh(); });
+  $('f-desc-ex').addEventListener('change', (e) => { draft.descEx = e.target.checked; formChanged(); });
+  $('addr-clear').addEventListener('click', () => { draft.addr = ''; formChanged(); });
+  $('filters').addEventListener('submit', (e) => { e.preventDefault(); applyFilters(); });
+  // Reset is a deliberate "start over", so it applies at once.
   $('reset').addEventListener('click', () => {
-    state = { start: viewStart, end, types: [], descs: [], descEx: false, agency: '', status: '', addr: ADDRESS_MODE ? state.addr : '' };
+    state = defaultFilters();
+    draft = copyFilters(state);
+    $('f-type').value = '';
+    $('f-desc').value = '';
     refresh();
   });
   $('print').addEventListener('click', () => { window.boardstatTrack?.('print_page', { geo, district_id: geoId }); window.print(); });
@@ -241,6 +334,21 @@ async function setupFilters() {
   $('prev').addEventListener('click', () => { if (page > 0) { page--; renderDetail(); } });
   $('next').addEventListener('click', () => { if ((page + 1) * PAGE < total) { page++; renderDetail(); } });
   $('download').addEventListener('click', downloadCsv);
+}
+
+/**
+ * Filter groups open and close with native <details>/<summary>, which keyboards and
+ * screen readers already handle. On a phone only groups with something set start open.
+ * On a wider screen Dates and Problem start open, and Agency and status opens if set.
+ */
+function setupGroups() {
+  const phone = window.matchMedia('(max-width: 640px)').matches;
+  const defaults = defaultFilters();
+  for (const d of document.querySelectorAll('#filters details.filter-group')) {
+    const set = sectionCount(state, defaults, d.dataset.section) > 0;
+    d.open = set || (!phone && d.dataset.section !== 'agency');
+  }
+  renderPending();
 }
 
 function describeFiltersForPrint() {
@@ -304,12 +412,13 @@ async function renderDescriptors() {
         key: 'd', label: 'Description (descriptor)',
         render: (r) => (state.descs.includes(r.d)
           ? el('span', {}, r.d, el('span', { class: 'muted', text: state.descEx ? ' (excluded)' : ' (in the filter)' }))
-          : el('button', { type: 'button', class: 'link', 'aria-label': `${verb} description ${r.d} ${state.descEx ? 'from' : 'to'} the filter`, onclick: () => { state.descs = [...state.descs, r.d]; refresh(); } }, r.d)),
+          : el('button', { type: 'button', class: 'link', 'aria-label': `${verb} description ${r.d} ${state.descEx ? 'from' : 'to'} the filter`,
+            onclick: () => applyNow((s) => ({ descs: s.descs.includes(r.d) ? s.descs : [...s.descs, r.d] })) }, r.d)),
       },
       { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
     ], `Select a description to ${state.descEx ? 'exclude it' : 'add it to the filter'}. The description filter does not narrow this table.`),
     ...(state.types.includes(selectedType) ? []
-      : [el('p', {}, el('button', { type: 'button', class: 'secondary', onclick: () => { state.types = [...state.types, selectedType]; refresh(); } }, `Filter the page to ${selectedType}`))]),
+      : [el('p', {}, el('button', { type: 'button', class: 'secondary', onclick: () => { const t = selectedType; applyNow((s) => ({ types: s.types.includes(t) ? s.types : [...s.types, t] })); } }, `Filter the page to ${selectedType}`))]),
   );
 }
 
@@ -330,6 +439,15 @@ function partialSpan(ym, from, to) {
   return a === first && b === last ? null : [a, b];
 }
 
+/**
+ * Draw a chart as wide as the box it goes in. Plot's default width is a fixed 640px and
+ * Plot does not resize on its own (https://observablehq.com/plot/features/plots, "The
+ * default width is 640"), so charts are redrawn when the page width changes (see
+ * watchChartWidth). Below `min` the chart is drawn at `min` and scaled down by CSS
+ * (figure svg { max-width: 100% }), so long labels still fit on a phone.
+ */
+const chartWidth = (id, min = 320) => Math.max(min, Math.floor($(id)?.clientWidth || 640));
+
 /** Y-axis ticks for small counts: whole numbers only (no "0.5 requests"). */
 const countY = (max) => (max <= 8 ? { ticks: Array.from({ length: Math.max(1, max) + 1 }, (_, i) => i), tickFormat: 'd' } : { tickFormat: '~s' });
 
@@ -338,7 +456,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const YEAR_COLORS = [BLUE, '#6f9bd6', GRAY, '#c8c8c8'];
 
 /** Requests per month as one line per calendar year (used for ranges over 13 months). */
-function yearChart(rows, title, spanText) {
+function yearChart(rows, title, spanText, width) {
   const pts = rows.map((r) => ({
     year: r.ym.slice(0, 4), month: MONTHS[Number(r.ym.slice(5, 7)) - 1], ym: r.ym, n: r.n,
     partial: !!r.span, span: r.span, series: r.ym.slice(0, 4),
@@ -365,6 +483,7 @@ function yearChart(rows, title, spanText) {
     ariaLabel: 'Requests per month, one line per year',
     ariaDescription: `Line chart with one line per calendar year (${[...years].reverse().join(', ')}), months January to December along the bottom. The newest year is the thickest line.` +
       (part.length ? ' Months with only some days are shown as separate hollow dots, not joined to the line.' : ''),
+    width,
     height: 280,
     marginLeft: 56,
     x: { type: 'point', domain: MONTHS, label: null },
@@ -430,10 +549,12 @@ async function renderMonthly() {
   // More than 13 months: one line per calendar year, Jan to Dec along the bottom,
   // so years sit on top of each other instead of one long line plus a shifted copy.
   const byYear = rows.length > 13;
-  const chart = byYear ? yearChart(rows, title, spanText) : Plot.plot({
+  const width = chartWidth('monthly');
+  const chart = byYear ? yearChart(rows, title, spanText, width) : Plot.plot({
     ariaLabel: 'Requests per month',
     ariaDescription: 'Line chart of requests per month for the filtered requests' + (hasPrior ? ', with the same month a year earlier where available' : '') +
       (part.length ? '. Months with only some days are shown as separate hollow dots, not joined to the line.' : '.'),
+    width,
     height: 260,
     marginLeft: 56,
     x: { type: 'utc', label: null, ticks: 6, tickFormat: '%b %Y' },
@@ -476,7 +597,7 @@ async function renderAgencyResponse() {
         el('button', {
           type: 'button', class: 'link', 'aria-pressed': String(state.agency === r.agency),
           'aria-label': state.agency === r.agency ? `Stop filtering to ${r.agency}` : `Filter the page to ${r.agency}`,
-          onclick: () => { state.agency = state.agency === r.agency ? '' : r.agency; refresh(); },
+          onclick: () => { const agency = state.agency === r.agency ? '' : r.agency; applyNow(() => ({ agency })); },
         }, r.agency),
         r.agency_name ? el('span', { class: 'muted', text: ` ${r.agency_name}` }) : null),
     },
@@ -496,12 +617,8 @@ function dayBefore(iso) {
 
 /** Show the requests created before the From date that are still not closed. */
 function showBacklog(agency) {
-  const before = state.start;
-  state.end = dayBefore(before);
-  state.start = manifest.window.start;
-  state.status = NOT_CLOSED;
-  if (agency) state.agency = agency;
-  refresh();
+  const patch = { end: dayBefore(state.start), start: manifest.window.start, status: NOT_CLOSED, ...(agency ? { agency } : {}) };
+  applyNow(() => patch);
   $('filters-h').scrollIntoView({ block: 'start' });
 }
 
@@ -554,6 +671,7 @@ async function renderAgency() {
   const chart = Plot.plot({
     ariaLabel: 'Requests by agency and status',
     ariaDescription: 'Stacked horizontal bars: one bar per agency (top 8), split by request status.',
+    width: chartWidth('agency'),
     marginLeft: 70,
     height: 40 + 34 * new Set(rows.map((r) => r.agency)).size,
     x: { label: 'Requests', grid: true, tickFormat: '~s' },
@@ -585,6 +703,7 @@ async function renderTimeline() {
   const chart = Plot.plot({
     ariaLabel: 'Requests at this address per month, by problem',
     ariaDescription: `Stacked bars, one per month, split into ${types.join(', ')}.`,
+    width: chartWidth('timeline'),
     height: 280,
     marginLeft: 56,
     x: { type: 'utc', label: null, tickFormat: '%b %Y', ticks: 6 },
@@ -652,6 +771,7 @@ async function renderAddressCompare() {
   const chart = Plot.plot({
     ariaLabel: 'Share of top problems: this address, its community district, its council district',
     ariaDescription: 'Dot chart comparing each top problem\'s share of requests at this address, in its community district, and in its council district.',
+    width: chartWidth('acmp', 420),
     marginLeft: 180,
     height: 50 + 30 * rows.length,
     x: { label: 'Share of requests', tickFormat: '.0%', grid: true },
@@ -673,7 +793,7 @@ async function renderAddresses() {
     SELECT address_norm AS a, count(*)::INTEGER AS n, mode(complaint_type) AS top_type
     FROM req WHERE ${where()} AND address_norm IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 15`);
   $('addresses').replaceChildren(table(rows, [
-    { key: 'a', label: 'Address', render: (r) => el('button', { type: 'button', class: 'link', 'aria-label': `Filter to ${r.a}`, onclick: () => { state.addr = r.a; refresh(); } }, r.a) },
+    { key: 'a', label: 'Address', render: (r) => el('button', { type: 'button', class: 'link', 'aria-label': `Filter to ${r.a}`, onclick: () => applyNow(() => ({ addr: r.a })) }, r.a) },
     { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
     { key: 'top_type', label: 'Most common problem' },
   ], 'Select an address to filter the page to it'));
@@ -720,6 +840,7 @@ async function renderCompare() {
   const chart = Plot.plot({
     ariaLabel: 'Share of top problems: district, borough, city',
     ariaDescription: 'Dot chart comparing each top problem\'s share of requests in this district, its borough, and the city.',
+    width: chartWidth('compare', 420),
     marginLeft: 180,
     height: 50 + 30 * rows.length,
     x: { label: 'Share of requests', tickFormat: '.0%', grid: true },
@@ -908,13 +1029,33 @@ function trackFilters() {
   }, 1500);
 }
 
+// Redraw the charts (only the charts) when the page gets wider or narrower, e.g. a
+// window resize or a phone turned sideways. lastChartWidth is set after each refresh.
+let lastChartWidth = null;
+const chartWidthKey = () => document.querySelector('main')?.clientWidth || 0;
+function watchChartWidth() {
+  let timer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      if (lastChartWidth === null || chartWidthKey() === lastChartWidth) return;
+      lastChartWidth = chartWidthKey();
+      try {
+        await Promise.all([renderMonthly(), renderAgency(), ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare()] : [renderCompare()])]);
+      } catch (err) { console.error(err); }
+    }, 250);
+  });
+}
+
 let refreshSeq = 0;
+let lastRefreshFailed = false; // Apply always reruns after a failed refresh
 async function refresh() {
   const seq = ++refreshSeq;
   trackFilters();
   writeUrl();
   syncForm();
   renderChips();
+  renderPending();
   describeFiltersForPrint();
   page = 0;
   setStatus($('status'), 'Updating…');
@@ -929,9 +1070,13 @@ async function refresh() {
     if (seq !== refreshSeq) return;
     await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgencyResponse(), renderAgency(), renderBacklog(), renderDetail(), renderMap(),
       ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare()] : [renderAddresses(), renderCompare()])]);
-    if (seq === refreshSeq) setStatus($('status'), `${fmtInt(total)} requests match.`);
+    // A link can carry dates in the wrong order: say so instead of just "0 requests match."
+    if (seq === refreshSeq) setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
+    lastRefreshFailed = false;
+    lastChartWidth = chartWidthKey();
   } catch (err) {
     console.error(err);
+    lastRefreshFailed = true;
     setStatus($('status'), `Something went wrong: ${err.message}`);
   }
 }
@@ -993,6 +1138,7 @@ async function main() {
     console.error(err);
     $('map').replaceChildren(el('p', { text: `The map could not load (${err.message}). Every number on this page is also in the tables.` }));
   }
+  watchChartWidth();
   await refresh();
 }
 
