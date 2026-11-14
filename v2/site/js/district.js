@@ -128,7 +128,7 @@ const ROWS = () => (SLIM ? 'rows' : 'req');
 const T = () => (SLIM && state.addr ? 'rows' : 'req');
 /** Whether a row-level panel draws now: always, except on a borough page before the reader opens it
  *  (or while its rows failed to load). */
-const rowsOpen = (panel) => !SLIM || (opened[panel] && !rowsError);
+const rowsOpen = (panel) => !slimLoadFailed && (!SLIM || (opened[panel] && !rowsError));
 let rowsError = null; // the last load of `rows` for the open panels failed (the charts are fine)
 let districtSources = []; // the district files, as loader sources (for a fallback from the slim file)
 
@@ -136,15 +136,21 @@ let districtSources = []; // the district files, as loader sources (for a fallba
 // after the second, a wide screen falls back to the district files. A phone never does on
 // its own: that path is what made phones reload. A good load resets the count.
 let slimFailures = 0;
+let slimLoadFailed = false; // the last foreground load of the page's rows failed: every section waits
 let fellBack = false; // the page now reads the district files because the slim file failed
-const narrowScreen = () => window.matchMedia('(max-width: 640px)').matches;
+/**
+ * A phone (or tablet), however it is held (#151 QA round 3): a coarse pointer, or a screen
+ * whose shorter side is 640 px or less. A narrow window alone is not the test: a phone held
+ * sideways is 844 px wide.
+ */
+const phoneLike = () => window.matchMedia('(pointer: coarse)').matches || Math.min(window.screen.width, window.screen.height) <= 640;
 
 const SLIM_RETRY_MSG = 'This borough\'s quick-loading file did not load. Press Apply filters to try again, or reload the page.';
 const SLIM_FALLBACK_PENDING_MSG = 'This borough\'s quick-loading file did not load. Press Apply filters to load the page from each district\'s file instead. That is much more data, and on a phone it can be slow or make the page reload.';
 const SLIM_FALLBACK_DONE_MSG = 'This page is reading each district\'s file, because the borough\'s quick-loading file did not load. That is much more data, and on a phone it can be slow or make the page reload. Reload the page to try the quick-loading file again.';
 
 /** The panels whose numbers would be stale after a failed load of the slim file. */
-const CHART_IDS = ['kpis', 'top', 'descriptors', 'monthly', 'agency-resp', 'backlog', 'agency'];
+const CHART_IDS = ['kpis', 'top', 'descriptors', 'monthly', 'agency-resp', 'backlog', 'agency', 'compare', 'cmp-note'];
 
 /**
  * The slim file failed to load in the foreground. Returns the status line. The charts are
@@ -152,12 +158,14 @@ const CHART_IDS = ['kpis', 'top', 'descriptors', 'monthly', 'agency-resp', 'back
  */
 function slimFailed() {
   slimFailures++;
+  slimLoadFailed = true;
   for (const id of CHART_IDS) if ($(id)) $(id).replaceChildren();
   // Said once, on the status line (a live region); the note under the filters is kept for
   // what stays true while the page is in use: that it reads the district files (A).
   showSlimNote('');
-  if (narrowScreen() || slimFailures < 2) return SLIM_RETRY_MSG;
+  if (phoneLike() || slimFailures < 2) { syncRowPanels(); return SLIM_RETRY_MSG; }
   fallBackToDistrictFiles();
+  syncRowPanels();
   return SLIM_FALLBACK_PENDING_MSG;
 }
 
@@ -198,7 +206,9 @@ const ROW_PANEL_ERRORS = {
  */
 function syncRowPanels() {
   for (const panel of ['map', 'addresses', 'detail']) {
-    const failed = SLIM && opened[panel] && Boolean(rowsError);
+    // Failed: its rows failed (an open section on a borough page), or the page's own rows
+    // failed (every section that was showing: its old content would not match the filters).
+    const failed = (slimLoadFailed && (opened[panel] || !SLIM)) || (SLIM && opened[panel] && Boolean(rowsError));
     const err = $(`${panel}-error`);
     if (err) { err.textContent = failed ? ROW_PANEL_ERRORS[panel] : ''; err.hidden = !failed; }
     if (panel === 'detail') {
@@ -209,7 +219,7 @@ function syncRowPanels() {
     const button = $(`${panel}-open`);
     if (button) button.hidden = !SLIM || (opened[panel] && !failed);
     if (panel === 'map') {
-      const show = !SLIM || (opened.map && !failed);
+      const show = !failed && (!SLIM || opened.map);
       $('map').hidden = !show;
       $('map-note').hidden = !show;
     }
@@ -1165,6 +1175,7 @@ async function refresh() {
   setStatus($('status'), 'Updating…');
   try {
     try { await ensureLoaded(); } catch (err) { err.boardstatLoad = true; err.boardstatSlim = SLIM; throw err; }
+    slimLoadFailed = false;
     // The open map, list or addresses: if their rows fail, the charts still draw, and each
     // of those sections says so inside itself. An address filter needs them for every panel.
     rowsError = null;

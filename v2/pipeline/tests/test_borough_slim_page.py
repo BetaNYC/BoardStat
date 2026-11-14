@@ -51,8 +51,8 @@ def test_a_failed_slim_file_is_retried_then_falls_back_only_on_a_wide_screen():
     assert "dataFiles.push(['b.parquet', `data/${slimFile}`]);" in src
     failed = re.search(r"function slimFailed\(\) \{.*?\n\}", src, re.DOTALL).group(0)
     assert "slimFailures++;" in failed
-    assert "if (narrowScreen() || slimFailures < 2) return SLIM_RETRY_MSG;" in failed
-    assert failed.index("narrowScreen()") < failed.index("fallBackToDistrictFiles();")
+    assert "if (phoneLike() || slimFailures < 2) { syncRowPanels(); return SLIM_RETRY_MSG; }" in failed
+    assert failed.index("phoneLike()") < failed.index("fallBackToDistrictFiles();")
     assert "if (SLIM) { slimFailures = 0; showSlimNote(''); } else if (fellBack) showSlimNote(SLIM_FALLBACK_DONE_MSG);" in src
     fb = re.search(r"function fallBackToDistrictFiles\(\) \{.*?\n\}", src, re.DOTALL).group(0)
     assert "SLIM = false;" in fb and "DROP TABLE IF EXISTS rows" in fb
@@ -89,3 +89,23 @@ def test_redraws_wait_for_both_loaders():
 ])
 def test_phone_warnings(text):
     assert text in (SITE / "district.html").read_text()
+
+
+def test_a_phone_held_sideways_is_still_a_phone():
+    """#151 QA round 3: no automatic fallback on a phone, however it is held: a coarse
+    pointer or a screen whose shorter side is 640 px or less; never the window width."""
+    src = (JS / "district.js").read_text()
+    assert ("const phoneLike = () => window.matchMedia('(pointer: coarse)').matches"
+            " || Math.min(window.screen.width, window.screen.height) <= 640;") in src
+    assert "max-width: 640px" not in src[src.index("let slimFailures"):src.index("function fallBackToDistrictFiles")]
+
+
+def test_a_failed_page_load_clears_every_section():
+    """#151 QA round 3: after a failed load of the page's rows, the charts, Compare and every
+    open map, addresses or list are cleared (sections say so inside, buttons back)."""
+    src = (JS / "district.js").read_text()
+    assert "'compare', 'cmp-note'" in src
+    failed = re.search(r"function slimFailed\(\) \{.*?\n\}", src, re.DOTALL).group(0)
+    assert "slimLoadFailed = true;" in failed and failed.count("syncRowPanels();") == 2
+    assert "const failed = (slimLoadFailed && (opened[panel] || !SLIM)) || (SLIM && opened[panel] && Boolean(rowsError));" in src
+    assert "const rowsOpen = (panel) => !slimLoadFailed && (" in src
