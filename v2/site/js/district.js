@@ -291,7 +291,7 @@ async function renderTop() {
     FROM req WHERE ${where()} GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10`);
   const max = Math.max(1, ...rows.map((r) => r.n));
   if (!rows.length) { $('top').replaceChildren(el('p', { text: 'No requests match these filters.' })); return; }
-  const list = el('ol', { class: 'barlist', 'aria-label': 'Top 10 problems by number of requests' },
+  const list = el('ol', { class: 'barlist', 'aria-label': 'Top 10 request types by number of requests' },
     rows.map((r) => el('li', {}, el('button', {
       type: 'button', 'aria-pressed': String(selectedType === r.t),
       'aria-label': `${r.t}: ${fmtInt(r.n)} requests. Show descriptions.`,
@@ -301,7 +301,7 @@ async function renderTop() {
     table(rows, [
       { key: 't', label: 'Problem' }, { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
       { key: 'med', label: 'Median time to close', num: true, fmt: fmtDays },
-    ], 'Top 10 problems')));
+    ], 'Top 10 request types')));
 }
 
 async function renderDescriptors() {
@@ -701,8 +701,8 @@ async function renderAddressCompare() {
     { t: r.t, where: names[2], share: r.c ?? 0 },
   ]);
   const chart = Plot.plot({
-    ariaLabel: 'Share of top problems: this address, its community district, its council district',
-    ariaDescription: 'Dot chart comparing each top problem\'s share of requests at this address, in its community district, and in its council district.',
+    ariaLabel: 'Share of top request types: this address, its community district, its council district',
+    ariaDescription: 'Dot chart comparing each top request type\'s share of requests at this address, in its community district, and in its council district.',
     width: chartWidth('acmp', 420),
     marginLeft: 180,
     height: 50 + 30 * rows.length,
@@ -774,10 +774,10 @@ async function renderCompare() {
   const long = rows.flatMap((r) => series.map((x) => ({ t: r.t, where: x.name, share: r[x.key] ?? 0 })));
   const names = series.map((x) => x.name);
   const chart = Plot.plot({
-    ariaLabel: IS_BORO ? 'Share of top problems: borough, city' : 'Share of top problems: district, borough, city',
+    ariaLabel: IS_BORO ? 'Share of top request types: borough, city' : 'Share of top request types: district, borough, city',
     ariaDescription: IS_BORO
-      ? 'Dot chart comparing each top problem\'s share of requests in this borough and the city.'
-      : 'Dot chart comparing each top problem\'s share of requests in this district, its borough, and the city.',
+      ? 'Dot chart comparing each top request type\'s share of requests in this borough and the city.'
+      : 'Dot chart comparing each top request type\'s share of requests in this district, its borough, and the city.',
     width: chartWidth('compare', 420),
     marginLeft: 180,
     height: 50 + 30 * rows.length,

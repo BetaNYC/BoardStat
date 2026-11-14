@@ -6,9 +6,9 @@
   <title>District · BoardStat 2.0 (prototype)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css?v=9c7410fbb0">
+  <link rel="stylesheet" href="css/style.css?v=51edf95137">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=3d42a13c3b","./js/filterform.js":"./js/filterform.js?v=d9e37282ef","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=07d8618c8c","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=de61fbb9d4","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=f0aa91bbe9","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=f5bf733bd4","./js/filterform.js":"./js/filterform.js?v=d9e37282ef","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=07d8618c8c","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=de61fbb9d4","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -87,12 +87,13 @@
 
     <section class="panel" aria-labelledby="kpi-h">
       <h2 id="kpi-h">At a glance</h2>
+      <p class="muted caveat" id="kpi-caveat">311 counts are reports, not problems. Closed doesn't mean fixed.</p>
       <div class="kpis" id="kpis"></div>
     </section>
 
     <section class="panel" aria-labelledby="top-h">
-      <h2 id="top-h">Top 10 problems</h2>
-      <p class="muted no-print">Select a problem to see what people described.</p>
+      <h2 id="top-h">Top 10 request types</h2>
+      <p class="muted no-print">Select a request type to see what people described.</p>
       <div class="top-wrap">
         <div id="top"></div>
         <div id="descriptors" class="no-print" aria-live="polite"></div>
@@ -165,6 +166,6 @@
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html">What&rsquo;s changed</a>.</footer>
-  <script type="module" src="js/district.js?v=3d42a13c3b"></script>
+  <script type="module" src="js/district.js?v=f5bf733bd4"></script>
 </body>
 </html>
