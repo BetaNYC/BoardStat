@@ -127,6 +127,44 @@ BOROUGH_SLIM_COLUMNS = ["created_date", "complaint_type", "descriptor", "agency"
                         "status", "days_to_close", "year_month", "is_closed"]
 
 
+def check_borough_files(out_dir: Path, borough_files: dict[str, dict[str, Any]], cd_districts: list[dict[str, Any]]) -> dict[str, Any]:
+    """The nightly sync guard (#151): each borough file, read back from disk, must hold
+    exactly the rows of that borough's district files, also read from disk (cd // 100,
+    Joint Interest Areas included), and the manifest's row count must match the file.
+
+    Compared per borough: the row count, and an order-independent content hash, the sum
+    of DuckDB's hash() of every row over the columns both files share
+    (BOROUGH_SLIM_COLUMNS). A dropped, duplicated, extra or changed row changes one or
+    both. It reads only those columns, one pass over each file.
+    Raises PipelineError naming the borough and both numbers, so the nightly stops before
+    publishing (boardstat_nightly.py main(): a failure alerts staff and nothing is uploaded).
+    """
+    t0 = time.time()
+    cols = ", ".join(BOROUGH_SLIM_COLUMNS)
+    total = 0
+    con = duckdb.connect()
+    for slug, f in borough_files.items():
+        code = next(k for k, v in BOROUGHS.items() if borough_slug(v) == slug)
+        district_paths = [str(out_dir / d["file"]) for d in cd_districts if d.get("file") and d["id"] // 100 == code]
+        if not district_paths:
+            raise PipelineError(f"Borough file check: {f['name']} has a borough file but no district files.")
+        q = f"SELECT count(*), coalesce(sum(hash({cols}))::HUGEINT, 0) FROM read_parquet({{src}})"
+        b_rows, b_hash = con.execute(q.format(src=sql_str(str(out_dir / f["file"])))).fetchone()
+        d_rows, d_hash = con.execute(q.format(src="[" + ", ".join(sql_str(x) for x in district_paths) + "]")).fetchone()
+        name = f["name"]
+        if b_rows != d_rows:
+            raise PipelineError(f"Borough file check: {name}'s borough file has {b_rows:,} rows but its district files have {d_rows:,}. Not publishing.")
+        if f["rows"] != b_rows:
+            raise PipelineError(f"Borough file check: the manifest says {name}'s borough file has {f['rows']:,} rows but it has {b_rows:,}. Not publishing.")
+        if b_hash != d_hash:
+            raise PipelineError(f"Borough file check: {name}'s borough file and its district files both have {b_rows:,} rows, "
+                                f"but their contents differ (content hash {b_hash} vs {d_hash}). Not publishing.")
+        total += b_rows
+    elapsed = round(time.time() - t0, 1)
+    log("borough_check", result="ok", boroughs=len(borough_files), rows=total, elapsed_s=elapsed)
+    return {"boroughs": len(borough_files), "rows": total, "elapsed_s": elapsed}
+
+
 def borough_slug(name: str) -> str:
     """The slug site/js/place.js uses in borough links: 'Staten Island' -> 'staten-island'."""
     return name.lower().replace(" ", "-")
@@ -803,6 +841,7 @@ def build(
         borough_files[slug] = {"name": name, "file": f"borough/{slug}.parquet", "rows": n}
     log("borough_slim_written", files=len(borough_files), elapsed_s=round(time.time() - t_slim, 1),
         bytes=sum((out_dir / f["file"]).stat().st_size for f in borough_files.values()))
+    check_borough_files(out_dir, borough_files, districts["cd"])
 
     # Aggregates for the Compare panel. Located rows only, so district, borough
     # and city shares are computed over the same population.

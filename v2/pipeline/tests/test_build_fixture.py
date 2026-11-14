@@ -378,3 +378,46 @@ def test_validate_manifest_checks_borough_files(built):
         bb.validate_manifest(bad)
     older = {k: v for k, v in m.items() if k != "borough_files"}
     bb.validate_manifest(older)  # a build from before #151 is still valid
+
+
+def test_borough_check_passes_on_a_good_build(built):
+    """#151 nightly guard: the fixture build ran the check (it would have raised)."""
+    m, out, _ = built
+    r = bb.check_borough_files(out, m["borough_files"]["files"], m["districts"]["cd"])
+    assert r["boroughs"] == 2 and r["rows"] == sum(f["rows"] for f in m["borough_files"]["files"].values())
+
+
+def _rewrite(path, sql):
+    tmp = path.with_suffix(".tmp.parquet")
+    duckdb.sql(f"COPY ({sql.format(f=bb.sql_str(str(path)))}) TO {bb.sql_str(str(tmp))} (FORMAT parquet)")
+    tmp.replace(path)
+
+
+def test_borough_check_catches_a_dropped_row(built):
+    m, out, _ = built
+    path = out / m["borough_files"]["files"]["brooklyn"]["file"]
+    _rewrite(path, "SELECT * FROM {f} LIMIT (SELECT count(*) - 1 FROM {f})")
+    with pytest.raises(bb.PipelineError, match=r"Brooklyn's borough file has 1 rows but its district files have 2\. Not publishing\."):
+        bb.check_borough_files(out, m["borough_files"]["files"], m["districts"]["cd"])
+
+
+def test_borough_check_catches_a_changed_value(built):
+    m, out, _ = built
+    path = out / m["borough_files"]["files"]["brooklyn"]["file"]
+    _rewrite(path, "SELECT * REPLACE ('XYZ' AS agency) FROM {f}")
+    with pytest.raises(bb.PipelineError, match=r"Brooklyn's borough file and its district files both have 2 rows, but their contents differ"):
+        bb.check_borough_files(out, m["borough_files"]["files"], m["districts"]["cd"])
+
+
+def test_borough_check_catches_a_wrong_manifest_count(built):
+    m, out, _ = built
+    files = json.loads(json.dumps(m["borough_files"]["files"]))
+    files["manhattan"]["rows"] += 1
+    with pytest.raises(bb.PipelineError, match=r"the manifest says Manhattan's borough file has 3 rows but it has 2"):
+        bb.check_borough_files(out, files, m["districts"]["cd"])
+
+
+def test_build_runs_the_borough_check_before_the_manifest():
+    src = open(bb.__file__, encoding="utf-8").read()
+    build = src[src.index("def build("):src.index("def agreement_report(")]
+    assert build.index("check_borough_files(out_dir, borough_files, districts[\"cd\"])") < build.index('(out_dir / "manifest.json").write_text')

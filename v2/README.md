@@ -187,6 +187,8 @@ so the nightly job picks up **changed** rows as well as new ones.
 5. Runs the normal build into `v2/data-nightly/` and writes `changes.json`:
    new, updated and newly closed requests since the last publish, citywide and
    per district. The site shows it as "What changed since …".
+   The build checks its own per-borough files (#151) before it writes the
+   manifest: see "Borough file check" below.
 6. `--publish`: uploads to `data-next/` on beta.nyc, then swaps it with `data/`
    in one step (the street map folder moves across). It refuses to publish if
    total requests fell by more than 5%, then checks the live manifest.
@@ -221,6 +223,39 @@ launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/nyc.betanyc.boardstat-nigh
 ```
 
 Run it by hand without publishing: `uv run v2/pipeline/boardstat_nightly.py`.
+
+### Borough file check (#151)
+
+The per-borough files (`borough/<slug>.parquet`) are a second copy of what the
+district files hold, so the build checks every night that the two agree before it
+writes the manifest (`check_borough_files` in `boardstat_build.py`). For each
+borough it reads the new borough file back from disk and the borough's district
+files (`cd // 100`, Joint Interest Areas included), also from disk, and compares:
+
+- the row count;
+- an order-independent content hash: the sum of DuckDB's `hash()` of every row over
+  the nine columns both have (`BOROUGH_SLIM_COLUMNS`). A dropped, extra, duplicated
+  or changed row changes the count or the hash;
+- the row count the manifest will list (`borough_files.files[slug].rows`).
+
+It reads only those columns, once per file: 0.3 seconds for all 22.7 million located
+requests on office-mac (2026-11-13). It logs
+`{"event": "borough_check", "result": "ok", "boroughs": 5, "rows": …, "elapsed_s": …}`.
+
+**When it fires**, the build raises an error that names the borough and both numbers
+("Borough file check: Brooklyn's borough file has … rows but its district files
+have …. Not publishing."). The nightly stops there: `run()` never reaches the upload,
+and `main()` posts the error to #ops-website through Rosie as a failure, tagging Noel
+(#138). The site keeps yesterday's data, all of it (the upload swaps the whole
+`data/` folder at once, so nothing half-new goes live). What to do:
+
+1. Read the night's log (`~/Library/Logs/boardstat-nightly/<date>.log`): the
+   `failed` line carries the message.
+2. Run the build again by hand (`launchctl kickstart gui/$(id -u)/nyc.betanyc.boardstat-nightly`;
+   it publishes if it passes). A one-off disk or write problem passes on the rerun.
+3. If it fires again, do not publish around it: the borough and district files
+   disagree for a reason in the code or the data. Open an issue with the message and
+   the log; the site stays on the last good data meanwhile.
 
 ### One-time backfill to January 2020 (#108)
 
