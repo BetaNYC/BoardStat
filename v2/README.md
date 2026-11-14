@@ -31,7 +31,7 @@ internal reports, in Noel's private vault).
                 ▼
  v2/site/data/   (git-ignored, regenerated)
    manifest.json · boundaries/{cd,cc}.geojson · detail/{cd,cc}/<id>.parquet
-   agg/month_type.parquet · addresses.parquet · build-log.md
+   agg/month_type.parquet · addresses.parquet · borough/<slug>.parquet (#151) · build-log.md
                 │  plain HTTP, any static host
                 ▼
  v2/site/  index.html + district.html + map.html (ES modules, no build step)
@@ -363,7 +363,7 @@ usable location are in no district file and so on no borough page; the page
 states how many of those the city's own records assign to the borough.
 Council districts are never used, because they cross borough lines.
 
-**How it reads the data (no pipeline change).** The page registers each
+**How it reads the data (no pipeline change).** Since #151 a borough page draws its charts from a per-borough slim file instead, and reads the district files as below only for the map, the list, addresses and an address filter (see "Borough pages from per-borough slim files"). The page registers each
 district file and reads them as one table with
 `read_parquet(['d-301.parquet', ...])`
 ([DuckDB: reading multiple files](https://duckdb.org/docs/stable/data/multiple_files/overview)).
@@ -454,6 +454,96 @@ later, for 48 MB more. Other ways to make Brooklyn faster: open borough pages
 with a shorter default period, or have the pipeline write per-borough summaries
 for the charts and read detail only for the list and map (a layout with the
 previous year in its own files would also remove the re-fetch).
+
+## Borough pages from per-borough slim files (#151)
+
+A whole borough was too heavy for a phone: on Noel's iPhone, Brooklyn loaded once,
+then the tab kept dying and reloading (iOS ends a tab that uses too much memory). In
+Playwright WebKit with iPhone 13 emulation it peaked at about 1.6 GB. Since #151 the
+nightly build writes one small file per borough and the borough page draws from it.
+
+**The files.** `data/borough/<slug>.parquet`, one per borough (slugs as in
+`js/place.js`), written by `boardstat_build.py` (`BOROUGH_SLIM_COLUMNS`): every
+located request in the borough, the same rows as its district files (`cd // 100`,
+Joint Interest Areas included), with nine columns: `created_date, complaint_type,
+descriptor, agency, agency_name, status, days_to_close, year_month, is_closed`. Same
+order and 50,000-row groups as the district files (Closed first, then open, by
+created date), so the page range-loads them the same way. The manifest lists them
+under a new key, `borough_files` (`columns`, and per slug `file` and `rows`), and in
+`files` with their sizes. New files and a new key only: the district files, `agg`,
+`addresses.parquet` and every existing manifest key are unchanged (nyc-311-mcp
+reads them).
+
+| Borough | Rows (2020 on) | File |
+|---|---:|---:|
+| Manhattan | 4,579,637 | 44.3 MB |
+| Bronx | 4,856,874 | 44.4 MB |
+| Brooklyn | 6,862,161 | 65.3 MB |
+| Queens | 5,441,368 | 52.6 MB |
+| Staten Island | 948,993 | 9.6 MB |
+
+**Nightly cost** (measured 2026-11-13 on office-mac against the nightly's own district
+files, 22.7 million located requests): writing the five files takes about 7 seconds,
+and they add 216 MB to the build folder and to each night's upload.
+
+**Why rows and not a cube of counts.** The page's medians (time to close, per
+problem, per agency) cannot be added up from counts, and the filters combine freely
+(dates to the day, problems, descriptions with exclude, agency, status, "not yet
+closed"). A cube at that grain would be nearly as many rows as the requests
+themselves, and medians would still need either an approximation (a sketch or a
+histogram, so numbers that differ from today's) or the rows. So the file keeps the
+rows and drops the columns the charts never read (addresses, coordinates, the long
+text fields). The page then runs exactly the SQL it ran before, on a table a few
+times smaller, and every number is the same.
+
+**What the page does.** If `manifest.borough_files` lists the borough with every
+column the page needs (`slimFileFor` in `js/place.js`), the page loads that file as
+`req` (the same two steps as before: the From date on, then the year before in the
+background) and draws every chart and table from it. The map, the request list and
+the addresses with the most requests need columns the slim file does not have, so
+on a borough page they wait behind **Show the map**, **Show the addresses** and the
+list's own **Show the list of requests**. Opening one loads the district files as a
+second table, `rows`, through the same loader (`js/loadplan.js`, from the From date
+on), and every opened panel then follows the filters. An address filter needs
+`rows` for every panel; the page loads it and says so in a note under the filters.
+If the manifest has no `borough_files` (a build from before #151), the page loads
+the district files as before. District, council district and address pages, and the
+full-page map, are unchanged.
+
+**Measured 2026-11-13** (same data for before and after; before is 881cdcf). WebKit:
+Playwright WebKit 27.2, iPhone 13 emulation, peak memory of the WebContent process
+(a desktop stand-in for what iOS counts, not the phone itself), local server.
+Chromium: 390 px wide, server paced to 50 Mbit/s. "First draw" is every chart and
+table drawn; "complete" adds the year-earlier line.
+
+| Page | Before: first draw | Before: complete | After: first draw | After: complete |
+|---|---|---|---|---|
+| Brooklyn, WebKit | 10.1 s, 1.43 GB | 16.4 s, 1.56 GB, 183 MB | 3.5 s, 0.92 GB | 4.3 s, 0.98 GB, 48 MB |
+| Staten Island, WebKit | 5.1 s, 1.06 GB | 5.7 s, 1.08 GB, 23 MB | 2.3 s, 0.70 GB | 2.3 s, 0.70 GB, 6.5 MB |
+| CD 306, WebKit (unchanged) | 2.9 s, 0.99 GB | 7.9 MB | 2.9 s, 1.00 GB | 7.9 MB |
+| Brooklyn, 50 Mbit/s | 25.7 s, 90 MB | 48.9 s, 182 MB | 8.5 s, 24 MB | 14.5 s, 48 MB |
+| Staten Island, 50 Mbit/s | 6.6 s, 17 MB | 8.3 s, 23 MB | 2.5 s, 3.7 MB | 3.2 s, 6.4 MB |
+| CD 306, 50 Mbit/s (unchanged) | 5.5 s, 7.8 MB | — | 5.0 s, 7.8 MB | — |
+
+Brooklyn with **Show the map** pressed after the first draw: 4.5 s more locally
+(peak 1.47 GB in WebKit, 138 MB in all) and 23 s more at 50 Mbit/s. That is about
+what the whole page cost before, so a phone may still struggle with Brooklyn's map;
+the charts no longer depend on it.
+
+**Same numbers.** Every chart, table and filter list was compared, page against
+page, between 881cdcf and this version on seven borough views (all five boroughs;
+the default view, 2020 on, a status, an agency with "not yet closed", a problem in
+2024, excluded descriptions): identical. In Python, each slim file holds exactly
+the rows of its borough's district files (row count and a hash over every slim
+column), and the default view's count, open count, median and average match.
+
+**Deploy order.** 1. Merge to master. 2. Update the nightly clone
+(`/Volumes/Home_Remote/noneck_remote/Code/BoardStat`, `git pull`) so the 5:30 AM job
+runs the new `boardstat_build.py`. 3. Wait for the next 5:30 AM run: it writes and
+publishes `borough/*.parquet` and the new manifest key in the same upload as
+everything else. Until then the live manifest has no `borough_files`, and the new
+site code loads borough pages the old way, so the site can go up before or after
+that run. Rolling back the site code alone is safe too; the extra files are ignored.
 
 ## Traffic measurement (Google Analytics)
 
@@ -671,8 +761,9 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 - Detail files for the busiest districts are the largest downloads; on slow
   connections the first load of a district takes a few seconds.
 - The map shows at most the 60,000 most recent matching requests.
-- A borough page (#144) downloads far more than a district page: see
-  "Whole-borough view" above.
+- A borough page's map, request list and top addresses still read every district
+  file (about 140 MB for Brooklyn), so they wait behind a button (#151): see
+  "Borough pages from per-borough slim files" above.
 - "Same month a year earlier" only exists where the data covers both months
   (none before January 2021).
 - Boundary simplification (about 10 m) is per polygon, so hairline gaps can show

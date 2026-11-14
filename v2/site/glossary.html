@@ -83,7 +83,7 @@
         <dd>
           <p>A page for a whole borough, with the same charts, map, request list and filters as a district page. It counts every request that BoardStat <a href="#placed">placed</a> inside one of the borough's community districts or <a href="#jia">Joint Interest Areas</a> (parks and other areas outside every community district). These are the same requests the district pages count, added together, and the same requests the Compare panel uses for the borough.</p>
           <p>It does not count requests with <a href="#located">no usable location</a>, even when the city's own records name a district in that borough. The page says how many of those there are. Council districts are not used, because some cross borough lines.</p>
-          <p>A borough page loads much more data than one district. Brooklyn, the largest, downloads about 180 MB the first time. On a typical home connection the page appears in about half a minute, and the line for the same months a year earlier follows about 25 seconds later.</p>
+          <p>A borough page draws its charts and tables from one file per borough that BoardStat builds every night, with only what the charts need. Brooklyn, the largest, downloads about 25 MB before its charts appear and about 50 MB in all, a few seconds on a typical home connection. The map, the list of requests and the addresses with the most requests need every request's details, so on a borough page they wait until you press <strong>Show the map</strong>, <strong>Show the addresses</strong> or <strong>Show the list of requests</strong>. For Brooklyn that is about 140 MB more, which can be slow on a phone. An address filter needs those details too.</p>
         </dd>
       </dl>
     </section>
