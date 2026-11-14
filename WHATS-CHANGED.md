@@ -13,6 +13,7 @@ BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change re
 - **What changed:** A whole-borough page now draws its charts and tables from a smaller file that BoardStat builds every night for each borough, so they appear sooner and use less of a phone's memory. Before its charts appear, Brooklyn's page now downloads about 24 MB instead of 90 MB, and about 48 MB in all instead of 182 MB. The map, the addresses with the most requests and the list of requests load when you ask for them. They still need much more data, and on a phone a whole borough's map can be slow or make the page reload. Each night BoardStat checks that every borough file holds the same requests as that borough's district files, and does not publish the night's data if they differ.
 - **Who it affects:** Anyone who opens a whole-borough page, especially on a phone.
 - **More detail:** [Borough pages on phones](https://github.com/BetaNYC/BoardStat/issues/151) · [Pull request](https://github.com/BetaNYC/BoardStat/pull/154)
+- **Update 2026-11-13:** The download figures in this entry were corrected the same evening. It first said Brooklyn's page downloads about 48 MB instead of 182 MB before its charts appear; those are the figures for the whole page.
 
 ## 2026-11-13: "Top 10 request types", and what 311 counts mean
 
