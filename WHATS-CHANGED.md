@@ -7,7 +7,52 @@ This page lists the changes to BoardStat that a reader would notice: new pages, 
 
 BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change reaches the site at the next upload. Entries since November 2026 are dated by the day the change was merged on GitHub. BetaNYC's [nyc-311-mcp](https://github.com/BetaNYC/nyc-311-mcp) server reads BoardStat's data files, so a change to BoardStat's data can change its answers too. To report a bug or ask for a new feature, email [boardstat@beta.nyc](mailto:boardstat@beta.nyc) or [open an issue on GitHub](https://github.com/BetaNYC/BoardStat/issues).
 
-## Unreleased: A What's changed page
+## 2026-11-13: Whole-borough pages open faster, including on phones
+
+- **Tags:** Site, Data
+- **What changed:** A whole-borough page now draws its charts and tables from a smaller file that BoardStat builds every night for each borough, so they appear sooner and use less of a phone's memory. Brooklyn's page downloads about 48 MB instead of 182 MB before its charts appear. The map, the addresses with the most requests and the list of requests load when you ask for them. They still need much more data, and on a phone a whole borough's map can be slow or make the page reload. Each night BoardStat checks that every borough file holds the same requests as that borough's district files, and does not publish the night's data if they differ.
+- **Who it affects:** Anyone who opens a whole-borough page, especially on a phone.
+- **More detail:** [Borough pages on phones](https://github.com/BetaNYC/BoardStat/issues/151) · [Pull request](https://github.com/BetaNYC/BoardStat/pull/154)
+
+## 2026-11-13: "Top 10 request types", and what 311 counts mean
+
+- **Tags:** Site
+- **What changed:** The panel listing the 10 most common kinds of 311 requests is now called "Top 10 request types", because it shows what people report most, not the biggest problems in a place. Every district, council district, borough and address page now says at the top of "At a glance": "311 counts are reports, not problems. Closed doesn't mean fixed."
+- **More detail:** [The change](https://github.com/BetaNYC/BoardStat/issues/152) · [Pull request](https://github.com/BetaNYC/BoardStat/pull/153)
+
+## 2026-11-13: Change filters on the full-page map, and fold the filter panel away
+
+- **Tags:** Site
+- **What changed:** The full-page map has the same filters as the district page, behind a "Change filters" button. Filters you set on the map stay set when you go back, for community districts, council districts and boroughs. An address filter is never carried between pages, because BoardStat never puts a street address in a link. On every page, the filter panel can be folded away with "Hide filters"; on a phone it starts folded.
+- **More detail:** [The change](https://github.com/BetaNYC/BoardStat/issues/149) · [Pull request](https://github.com/BetaNYC/BoardStat/pull/150)
+
+## 2026-11-13: A whole borough at once
+
+- **Tags:** Site
+- **What changed:** You can now open a whole borough (Manhattan, the Bronx, Brooklyn, Queens or Staten Island) with the same charts, map, request list and filters as a community district. A borough page counts every community district and Joint Interest Area in the borough. Every community district page links to its borough, keeping the dates and filters.
+- **Who it affects:** Borough presidents' offices and anyone looking across a borough.
+- **More detail:** [Whole-borough view](https://github.com/BetaNYC/BoardStat/issues/144) · [Pull request](https://github.com/BetaNYC/BoardStat/pull/148)
+
+## 2026-11-13: A full-page map
+
+- **Tags:** Site
+- **What changed:** Under each district's map, "Open full-page map" opens the same map as big as your screen, with the same dates and filters. Its link can be shared. An address filter is not carried over, so the full-page map shows the whole district. The district and address maps now have a key.
+- **More detail:** [Full-page map](https://github.com/BetaNYC/BoardStat/issues/143) · [Pull request](https://github.com/BetaNYC/BoardStat/pull/147)
+
+## 2026-11-13: Filters you apply, and wider charts
+
+- **Tags:** Site
+- **What changed:** The filters are grouped into sections you can open and close. Changes in the filter form take effect when you press Apply filters, and the page tells you when filters have changed but not been applied. Reset filters and the shortcut buttons inside panels still update the page at once. Requests per month and Compare now use the full width of the page.
+- **More detail:** [Filters and Apply](https://github.com/BetaNYC/BoardStat/issues/142) · [Pull request](https://github.com/BetaNYC/BoardStat/pull/146)
+
+## 2026-11-13: The street map is open source
+
+- **Tags:** Site
+- **What changed:** Every map now uses one street map, built from OpenStreetMap data with Protomaps and hosted by BetaNYC with the rest of BoardStat. Since November 4, 2026, each map had first asked for the City's NYC basemap, which is served from Esri's ArcGIS, and used this street map only if that failed. The map credits OpenStreetMap in its corner. If the street map cannot load, the map says so and still shows the district boundaries and requests.
+- **Who it affects:** Anyone who uses BoardStat's maps. Streets and labels look different from the City's basemap.
+- **More detail:** [Open-source street map only](https://github.com/BetaNYC/BoardStat/issues/141) · [Pull request](https://github.com/BetaNYC/BoardStat/pull/145)
+
+## 2026-11-12: A What's changed page
 
 - **Tags:** Site
 - **What changed:** A new page lists every change to BoardStat a reader would notice, newest first, with a filter for site changes, data changes and corrections. Every page links to it at the bottom.
