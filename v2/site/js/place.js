@@ -94,3 +94,20 @@ export function sourceSql(names) {
 
 /** Link to a borough's page. */
 export const boroughUrl = (slug) => `district.html?geo=boro&id=${encodeURIComponent(slug)}`;
+
+/**
+ * The columns a borough page's charts and tables read (#151): what a borough slim file
+ * (boardstat_build.py BOROUGH_SLIM_COLUMNS) must have for the page to draw from it.
+ */
+export const SLIM_COLUMNS = ['created_date', 'complaint_type', 'descriptor', 'agency', 'agency_name', 'status', 'days_to_close', 'year_month'];
+
+/**
+ * The slim file the manifest lists for a borough (`manifest.borough_files`, #151), or null:
+ * an older build has none, and a file missing a column the page needs is not used.
+ */
+export function slimFileFor(manifest, slug) {
+  const bf = manifest?.borough_files;
+  const f = bf?.files?.[slug];
+  if (!f?.file || !Array.isArray(bf.columns) || !SLIM_COLUMNS.every((c) => bf.columns.includes(c))) return null;
+  return f.file;
+}

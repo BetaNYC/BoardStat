@@ -8,7 +8,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css?v=9c7410fbb0">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=3d42a13c3b","./js/filterform.js":"./js/filterform.js?v=d9e37282ef","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=07d8618c8c","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=de61fbb9d4","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=adc6b4ee0c","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=76a05c01cc","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=df696cc0c2","./js/filterform.js":"./js/filterform.js?v=d9e37282ef","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=07d8618c8c","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=5bdefd9c4f","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=b609c9704a","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -85,6 +85,8 @@
       <p class="status" id="status" role="status" aria-live="polite"></p>
     </form>
 
+    <p class="muted no-print" id="rows-note" hidden>An address filter needs each request's details, so this page loaded them for the whole borough. That takes longer and uses more memory, especially on a phone.</p>
+
     <section class="panel" aria-labelledby="kpi-h">
       <h2 id="kpi-h">At a glance</h2>
       <div class="kpis" id="kpis"></div>
@@ -124,6 +126,8 @@
 
     <section class="panel no-print" aria-labelledby="map-h">
       <h2 id="map-h">Map of requests</h2>
+      <p class="rows-open" id="map-open" hidden><button type="button" class="secondary" id="map-show">Show the map</button>
+        <span class="muted">The map needs each request's location, so it loads much more data for a whole borough (slow on a phone).</span></p>
       <div id="map" class="map" role="region" aria-label="Map of request locations, grouped into circles where many are close together. The tables on this page carry the same information."></div>
       <p class="map-note" id="map-note">Circles group nearby requests; select one to zoom in, or select a single point for details.</p>
       <div class="map-legend" id="map-legend"></div>
@@ -134,6 +138,8 @@
 
     <section class="panel no-print" aria-labelledby="addr-h">
       <h2 id="addr-h">Addresses with the most requests</h2>
+      <p class="rows-open" id="addresses-open" hidden><button type="button" class="secondary" id="addresses-show">Show the addresses</button>
+        <span class="muted">Addresses come from each request's details, so this loads much more data for a whole borough (slow on a phone).</span></p>
       <div id="addresses"></div>
     </section>
 
@@ -165,6 +171,6 @@
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html">What&rsquo;s changed</a>.</footer>
-  <script type="module" src="js/district.js?v=3d42a13c3b"></script>
+  <script type="module" src="js/district.js?v=df696cc0c2"></script>
 </body>
 </html>

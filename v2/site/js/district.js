@@ -10,7 +10,7 @@ import {
 } from './filterstate.js';
 import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
 import { createFilterForm, tableLists, DATE_ORDER_MSG } from './filterform.js';
-import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl } from './place.js';
+import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl, SLIM_COLUMNS, slimFileFor } from './place.js';
 import {
   periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly, DataChangedError, filesNamedIn, freshnessCheck, loadFailedText,
 } from './loadplan.js';
@@ -106,6 +106,58 @@ async function ensureLoaded() {
     `Loading requests from ${fmtDate(from)} on…${n > 1 && done ? ` (${done} of ${n} districts loaded)` : ''}`));
   loadedFrom = loader.loadedFrom();
   if (changed) tableLoads++;
+}
+
+// ------------------------------------------------------------- borough slim file (#151)
+//
+// The nightly build writes one slim file per borough (borough/<slug>.parquet): every
+// located request in the borough, with only SLIM_COLUMNS. A borough page with that file
+// loads it as `req` (the same two steps as above, a few MB instead of 100+), and every
+// chart and table draws from it, with the same SQL as before. The map, the request list
+// and top addresses need columns the slim file does not have, so on a borough page they
+// wait behind a button and then load the district files as `rows` (loadplan.js, from the
+// From date on). An address filter needs `rows` for every panel; the page says so.
+// Without the slim file (an older build) the page loads as before.
+let SLIM = false;
+let rowsLoader = null;
+const opened = { map: false, addresses: false, detail: false };
+
+/** The table with every column (the map, the list, addresses). */
+const ROWS = () => (SLIM ? 'rows' : 'req');
+/** The table the charts and tables read: the slim one, unless an address filter needs every column. */
+const T = () => (SLIM && state.addr ? 'rows' : 'req');
+/** Whether a row-level panel draws now: always, except on a borough page before the reader opens it. */
+const rowsOpen = (panel) => !SLIM || opened[panel];
+
+/** On a borough page: load the district files' rows the open panels or an address filter need. */
+async function ensureRows() {
+  if (!SLIM || !(state.addr || opened.map || opened.addresses || opened.detail)) return;
+  // An address filter draws every panel from `rows`, the year-earlier line included.
+  const from = state.addr ? priorFrom : periodFrom;
+  const target = from(state, manifest.window.start) ?? (rowsLoader.loadedFrom() === null ? from({ start: viewStart }, manifest.window.start) : null);
+  if (target === null) return;
+  await rowsLoader.loadFor(target, (f, done, n) => setStatus($('status'),
+    `Loading every request's details from ${fmtDate(f)} on, for the map, the list and addresses…${n > 1 && done ? ` (${done} of ${n} districts loaded)` : ''}`));
+}
+
+/** On a borough page: the buttons that open the map, top addresses and the list. */
+function setupRowPanels() {
+  if (!SLIM) return;
+  const open = (panel) => { if (opened[panel]) return; opened[panel] = true; if ($(`${panel}-open`)) $(`${panel}-open`).hidden = true; refresh(); };
+  $('map-open').hidden = false;
+  $('map').hidden = true;
+  $('map-note').hidden = true;
+  $('map-show').addEventListener('click', () => { $('map').hidden = false; $('map-note').hidden = false; open('map'); });
+  $('addresses-open').hidden = false;
+  $('addresses-show').addEventListener('click', () => open('addresses'));
+  // The list already sits behind "Show the list of requests"; opening it loads the rows.
+  $('detail-wrap').addEventListener('toggle', () => { if ($('detail-wrap').open) open('detail'); });
+}
+
+/** A plain note when an address filter made a borough page load every request's details. */
+function showRowsNote() {
+  const note = $('rows-note');
+  if (note) note.hidden = !(SLIM && state.addr);
 }
 
 /**
@@ -274,7 +326,7 @@ async function renderKpis() {
     SELECT count(*)::INTEGER AS n,
            count(*) FILTER (WHERE status IS DISTINCT FROM 'Closed')::INTEGER AS open_n,
            median(${CLOSED_DAYS}) AS med, avg(${CLOSED_DAYS}) AS avg
-    FROM req WHERE ${where()}`);
+    FROM ${T()} WHERE ${where()}`);
   total = k.n;
   const items = [
     ['Requests', fmtInt(k.n)],
@@ -288,7 +340,7 @@ async function renderKpis() {
 async function renderTop() {
   const rows = await query(`
     SELECT complaint_type AS t, count(*)::INTEGER AS n, median(${CLOSED_DAYS}) AS med
-    FROM req WHERE ${where()} GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10`);
+    FROM ${T()} WHERE ${where()} GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10`);
   const max = Math.max(1, ...rows.map((r) => r.n));
   if (!rows.length) { $('top').replaceChildren(el('p', { text: 'No requests match these filters.' })); return; }
   const list = el('ol', { class: 'barlist', 'aria-label': 'Top 10 problems by number of requests' },
@@ -309,7 +361,7 @@ async function renderDescriptors() {
   // The description filter is left off here so every description stays visible and selectable.
   const rows = await query(`
     SELECT ${DESC_SQL} AS d, count(*)::INTEGER AS n
-    FROM req WHERE ${where({ skipDesc: true })} AND complaint_type = ${lit(selectedType)} GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 15`);
+    FROM ${T()} WHERE ${where({ skipDesc: true })} AND complaint_type = ${lit(selectedType)} GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 15`);
   const verb = state.descEx ? 'Exclude' : 'Add';
   $('descriptors').replaceChildren(
     el('h3', { text: `What people described: ${selectedType}` }),
@@ -413,7 +465,7 @@ async function renderMonthly() {
   const draw = monthlyDraw.next();
   // Year-earlier counts are complete only from coverFrom on: what is loaded when the
   // query runs (rows are only ever added, so reading it first is safe).
-  const coverFrom = priorCoverStart(state, loadedFrom, manifest.window.start);
+  const coverFrom = priorCoverStart(state, T() === 'rows' ? rowsLoader.loadedFrom() : loadedFrom, manifest.window.start);
   const priorFailed = priorFailure;
   const effEnd = state.end < lastDataDay() ? state.end : lastDataDay();
   // When the dates reach the end of the data, the year-earlier series stops at the
@@ -429,12 +481,12 @@ async function renderMonthly() {
       SELECT strftime(d, '%Y-%m') AS ym FROM range(date_trunc('month', CAST(${lit(state.start)} AS DATE)),
         CAST(${lit(effEnd)} AS DATE) + INTERVAL 1 DAY, INTERVAL 1 MONTH) AS t(d)
     ), counts AS (
-      SELECT year_month AS ym, count(*)::INTEGER AS n FROM req WHERE ${where()} GROUP BY 1
+      SELECT year_month AS ym, count(*)::INTEGER AS n FROM ${T()} WHERE ${where()} GROUP BY 1
     ), m AS (
       SELECT ym, coalesce(n, 0)::INTEGER AS n FROM months LEFT JOIN counts USING (ym)
     ), prev_year AS (
       SELECT strftime(created_date + INTERVAL 12 MONTH, '%Y-%m') AS ym, count(*)::INTEGER AS n_prior
-      FROM req WHERE ${where({ skipDates: true })}
+      FROM ${T()} WHERE ${where({ skipDates: true })}
         AND created_date >= CAST(${lit(state.start)} AS DATE) - INTERVAL 12 MONTH
         AND ${prevEndSql}
         AND created_date >= CAST(${lit(manifest.window.start)} AS DATE)
@@ -520,7 +572,7 @@ async function renderAgencyResponse() {
            count(*) FILTER (WHERE ${NOT_CLOSED_SQL})::INTEGER AS open_n,
            count(*) FILTER (WHERE status = 'Closed')::INTEGER AS closed_n,
            median(${CLOSED_DAYS}) AS med, avg(${CLOSED_DAYS}) AS avg
-    FROM req WHERE ${where()} GROUP BY 1 ORDER BY 3 DESC, 1`);
+    FROM ${T()} WHERE ${where()} GROUP BY 1 ORDER BY 3 DESC, 1`);
   if (!rows.length) { $('agency-resp').replaceChildren(el('p', { text: 'No requests match these filters.' })); return; }
   $('agency-resp').replaceChildren(table(rows, [
     {
@@ -566,7 +618,7 @@ async function renderBacklog() {
   const rows = await query(`
     SELECT agency, any_value(agency_name) AS agency_name, count(*)::INTEGER AS n,
            strftime(min(created_date), '%Y-%m-%d') AS oldest
-    FROM req WHERE ${where({ skipDates: true, skipStatus: true })}
+    FROM ${T()} WHERE ${where({ skipDates: true, skipStatus: true })}
       AND created_date < CAST(${lit(state.start)} AS DATE) AND ${NOT_CLOSED_SQL}
     GROUP BY 1 ORDER BY 3 DESC, 1`);
   const n = rows.reduce((a, r) => a + r.n, 0);
@@ -589,9 +641,9 @@ async function renderBacklog() {
 
 async function renderAgency() {
   const rows = await query(`
-    WITH top_agencies AS (SELECT agency FROM req WHERE ${where()} GROUP BY 1 ORDER BY count(*) DESC LIMIT 8)
+    WITH top_agencies AS (SELECT agency FROM ${T()} WHERE ${where()} GROUP BY 1 ORDER BY count(*) DESC LIMIT 8)
     SELECT agency, coalesce(status, 'Unknown') AS status, count(*)::INTEGER AS n
-    FROM req WHERE ${where()} AND agency IN (SELECT agency FROM top_agencies) GROUP BY ALL ORDER BY agency, status`);
+    FROM ${T()} WHERE ${where()} AND agency IN (SELECT agency FROM top_agencies) GROUP BY ALL ORDER BY agency, status`);
   // Only 6 colors can be told apart, so keep Closed plus the 4 most common other
   // statuses and group the rest as "Other statuses" (the table keeps every status).
   const totals = new Map();
@@ -721,9 +773,10 @@ async function renderAddressCompare() {
 }
 
 async function renderAddresses() {
+  if (!rowsOpen('addresses')) return;
   const rows = await query(`
     SELECT address_norm AS a, count(*)::INTEGER AS n, mode(complaint_type) AS top_type
-    FROM req WHERE ${where()} AND address_norm IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 15`);
+    FROM ${ROWS()} WHERE ${where()} AND address_norm IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 15`);
   $('addresses').replaceChildren(table(rows, [
     { key: 'a', label: 'Address', render: (r) => el('button', { type: 'button', class: 'link', 'aria-label': `Filter to ${r.a}`, onclick: () => applyNow(() => ({ addr: r.a })) }, r.a) },
     { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
@@ -794,13 +847,14 @@ async function renderCompare() {
 }
 
 async function renderDetail() {
+  if (!rowsOpen('detail')) return;
   const rows = await query(`
     SELECT strftime(created_date, '%Y-%m-%d %H:%M') AS created, complaint_type AS t, descriptor AS d, status AS s, agency AS a,
            coalesce(incident_address, intersection_street_1 || ' & ' || intersection_street_2) AS addr,
            strftime(closed_date, '%Y-%m-%d') AS closed, ${CLOSED_DAYS} AS dtc,
            CASE WHEN ${NOT_CLOSED_SQL} THEN greatest(0, epoch(${asOfSql}) - epoch(created_date)) / 86400.0 END AS dopen,
            unique_key AS k
-    FROM req WHERE ${where()} ORDER BY created_date DESC, unique_key LIMIT ${PAGE} OFFSET ${page * PAGE}`);
+    FROM ${ROWS()} WHERE ${where()} ORDER BY created_date DESC, unique_key LIMIT ${PAGE} OFFSET ${page * PAGE}`);
   $('detail').replaceChildren(table(rows, [
     { key: 'created', label: 'Created' }, { key: 't', label: 'Problem' }, { key: 'd', label: 'Description' },
     { key: 's', label: 'Status' }, { key: 'a', label: 'Agency' }, { key: 'addr', label: 'Address' },
@@ -845,9 +899,22 @@ async function setupMap() {
   renderMapLegend($('map-legend'), { borough: IS_BORO });
 }
 
+/** The map, set up once, when it is first drawn (on a borough page, when the reader opens it). */
+let mapSetupFailed = false;
+async function setupMapOnce() {
+  if (mapCtx || mapSetupFailed) return;
+  try { await setupMap(); } catch (err) {
+    mapSetupFailed = true;
+    console.error(err);
+    $('map').replaceChildren(el('p', { text: `The map could not load (${err.message}). Every number on this page is also in the tables.` }));
+  }
+}
+
 async function renderMap() {
+  if (!rowsOpen('map')) return;
+  if (!mapCtx) await setupMapOnce();
   if (!mapCtx) return;
-  const shown = await loadRequestPoints(mapCtx, 'req', where());
+  const shown = await loadRequestPoints(mapCtx, ROWS(), where());
   if (ADDRESS_MODE && shown.first) mapCtx.map.jumpTo({ center: shown.first, zoom: 17 });
   $('map-note').textContent = mapNoteText(total, shown.count);
 }
@@ -992,8 +1059,9 @@ async function refresh() {
   priorFailure = null; // this refresh retries a failed background load (loadPriorYear)
   setStatus($('status'), 'Updating…');
   try {
-    try { await ensureLoaded(); } catch (err) { err.boardstatLoad = true; throw err; }
+    try { await ensureLoaded(); await ensureRows(); } catch (err) { err.boardstatLoad = true; throw err; }
     if (seq !== refreshSeq) return;
+    showRowsNote();
     if (firstLoadDone) await fillFilterOptions(); // a no-op unless the rows or the dates changed
     // A page whose first load failed finishes its setup after the first load that works.
     if (!firstLoadDone) await afterFirstLoad();
@@ -1082,11 +1150,21 @@ async function main() {
   const names = sourceNames(district);
   SRC = sourceSql(names);
   dataFiles = names.map((n, i) => [n, `data/${district.files[i]}`]);
-  if (rangeLoading()) loader = createLoader({ exec: query, sources: names.map((n) => sourceSql([n])), cols: LOAD_COLUMNS.join(', '), checkFresh: freshnessCheck(manifest.generated_at) });
+  // A borough page with its slim file (#151) draws its charts from that one file and reads
+  // the district files only for the map, the list, top addresses and an address filter.
+  const slimFile = IS_BORO && rangeLoading() ? slimFileFor(manifest, district.id) : null;
+  SLIM = Boolean(slimFile);
+  if (SLIM) {
+    loader = createLoader({ exec: query, sources: [lit('b.parquet')], cols: SLIM_COLUMNS.join(', '), checkFresh: freshnessCheck(manifest.generated_at) });
+    rowsLoader = createLoader({ exec: query, sources: names.map((n) => sourceSql([n])), cols: LOAD_COLUMNS.join(', '), checkFresh: freshnessCheck(manifest.generated_at), table: 'rows' });
+  } else if (rangeLoading()) {
+    loader = createLoader({ exec: query, sources: names.map((n) => sourceSql([n])), cols: LOAD_COLUMNS.join(', '), checkFresh: freshnessCheck(manifest.generated_at) });
+  }
   try {
     [Plot] = await Promise.all([
       import(PLOT_URL),
       ...names.map((n, i) => registerData(n, `data/${district.files[i]}`)),
+      ...(SLIM ? [registerData('b.parquet', `data/${slimFile}`)] : []),
       registerData('agg.parquet', 'data/agg/month_type.parquet'),
     ]);
     // The page's table lives in an in-memory database stored compressed ("COMPRESS: whether
@@ -1131,10 +1209,8 @@ async function main() {
   }
   if (loaded) await afterFirstLoad();
   setupFilters();
-  try { await setupMap(); } catch (err) {
-    console.error(err);
-    $('map').replaceChildren(el('p', { text: `The map could not load (${err.message}). Every number on this page is also in the tables.` }));
-  }
+  if (!SLIM) await setupMapOnce(); // a borough page with its slim file sets it up when the map is opened
+  setupRowPanels();
   watchChartWidth();
   if (loaded) await refresh();
   else setStatus($('status'), loadFailedText(loadError));
