@@ -323,6 +323,40 @@ header is honored. Socrata publishes no request-rate number
 The Sunday count check asks one grouped question per year (four per year if the portal
 finds a year too heavy) instead of one per month.
 
+### The 2010–2019 history, fetched once (#162)
+
+The City keeps 2010–2019 in its own dataset, `76ig-c548` (22,613,917 rows; the rows last
+changed on 2025-12-24). `fetch-history` downloads it into a month cache and **publishes
+nothing**: the site still starts at 2020-01-01, and a `--start` before 2020 is still refused
+until the rest of #108 is done. It uses the same `Soda` client, pacing, retries and month
+files (`76ig-c548_<start>_<end>.csv.gz` plus `.json`) as the build, the same 21 columns
+(`FIELDS_311`), and it needs the app token.
+
+```sh
+export SOCRATA_APP_TOKEN="$(security find-generic-password -s boardstat-socrata-app-token -w)"
+# 120 months, 1.8 GB; the first pull took 1 h 44 min (2026-11-15). Keep it outside the
+# repo and outside the nightly's cache.
+uv run v2/pipeline/boardstat_build.py fetch-history --cache ~/Backups/BetaNYC/nyc-open-data/311/cache
+#   --start / --end narrow it (2010-01-01 to 2019-12-31 only).
+
+# Has the City changed the old rows since the pull? Exit 0 = no, 3 = yes.
+uv run v2/pipeline/boardstat_build.py check-history --cache ~/Backups/BetaNYC/nyc-open-data/311/cache
+```
+
+- **Resumable.** A rerun downloads only the months that are missing.
+- **Refetches only on change.** The cache keeps `76ig-c548_state.json` with the dataset's
+  `rowsUpdatedAt` at the time of the pull. If the live value differs, the next
+  `fetch-history` moves every cached month into `superseded/<old rowsUpdatedAt>/` (never
+  deletes) and downloads them again. Without a state file it compares with 2025-12-24.
+- **Consistent.** If `rowsUpdatedAt` moves during the pull, the run stops; run it again.
+- It does not touch the nightly job, so the job does not need pausing. Keep it outside
+  the job's 5:30 run (and the 8:xx retry) anyway, so the two do not share the portal.
+
+On office-mac the result lives in `~/Backups/BetaNYC/nyc-open-data/311/`: the month cache,
+one Parquet file per year (2010 onward; 2020 onward copied from the nightly's cache),
+`311.duckdb` with a `requests_all` view, the City's two data dictionaries, and a
+`README.md` with row counts and the checks that were run. It is not in any repo.
+
 ### Loading only what the view needs (#108)
 
 With six years of data, the largest district (Council District 11, about one
@@ -641,7 +675,7 @@ cd v2/pipeline && uv run pytest
 | What | Dataset | Notes |
 |---|---|---|
 | 311 Service Requests from 2020 to Present | [`erm2-nwe9`](https://data.cityofnewyork.us/d/erm2-nwe9) | Updated daily. Pulled month by month, from 2020-01-01. |
-| 311 Service Requests 2010–2019 | [`76ig-c548`](https://data.cityofnewyork.us/d/76ig-c548) | Same 48 columns. **Not used yet** (phase 2 of #108). |
+| 311 Service Requests 2010–2019 | [`76ig-c548`](https://data.cityofnewyork.us/d/76ig-c548) | Same 48 columns and types. Rows last changed 2025-12-24. Downloaded once by `fetch-history` to a local cache (#162); **not on the site yet** (phase 2 of #108). |
 | Community Districts (DCP) | [`5crt-au7u`](https://data.cityofnewyork.us/d/5crt-au7u) | 71 features: 59 CDs + 12 Joint Interest Areas. Release 26c at build time. |
 | City Council Districts (DCP) | [`872g-cjhh`](https://data.cityofnewyork.us/d/872g-cjhh) | 51 features. Release 26c at build time. |
 
