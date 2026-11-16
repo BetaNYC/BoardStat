@@ -7,6 +7,12 @@ This page lists the changes to BoardStat that a reader would notice: new pages, 
 
 BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change reaches the site at the next upload. Entries since November 2026 are dated by the day the change was merged on GitHub. BetaNYC's [nyc-311-mcp](https://github.com/BetaNYC/nyc-311-mcp) server reads BoardStat's data files, so a change to BoardStat's data can change its answers too. To report a bug or ask for a new feature, email [boardstat@beta.nyc](mailto:boardstat@beta.nyc) or [open an issue on GitHub](https://github.com/BetaNYC/BoardStat/issues).
 
+## 2026-11-16: What's changed is in the top menu
+
+- **Tags:** Site
+- **What changed:** Every page's top menu now has a What's changed link, next to Help & feedback, so the list of changes is one click away from anywhere on BoardStat. The Help and feedback page also points to it. Before, the only link was in the small print at the bottom of each page.
+- **More detail:** [The change](https://github.com/BetaNYC/BoardStat/issues/168)
+
 ## 2026-11-13: Whole-borough pages open faster, including on phones
 
 - **Tags:** Site, Data
