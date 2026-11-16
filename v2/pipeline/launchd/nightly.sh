@@ -31,6 +31,10 @@ NOTIFY="${BOARDSTAT_NOTIFY:-}"
 # Twice a day (5:30, and 8:30 as a retry): skip if today's run already published.
 args=(--publish --skip-if-published-today)
 [ -n "$NOTIFY" ] && args+=(--notify "$NOTIFY")
+# The one-time 2010-2019 download (#162). If it is on this machine, the Sunday run
+# checks whether the City changed it since (#166). Elsewhere the check is skipped.
+HISTORY_CACHE="$HOME/Backups/BetaNYC/nyc-open-data/311/cache"
+[ -d "$HISTORY_CACHE" ] && args+=(--history-cache "$HISTORY_CACHE")
 
 cd "$REPO"
 echo "=== $(date '+%Y-%m-%d %H:%M:%S %Z') start (branch $(git branch --show-current), commit $(git rev-parse --short HEAD))" >>"$LOG"

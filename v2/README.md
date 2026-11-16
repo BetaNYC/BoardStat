@@ -201,7 +201,13 @@ so the nightly job picks up **changed** rows as well as new ones.
    no row was new or different. The row count alone can't tell: the watermark
    is kept to the second, so each night re-fetches the city's last batch.
 
-8. `--skip-if-published-today` (launchd passes it): exits quietly if a run
+8. `--history-cache DIR` (`nightly.sh` passes it when
+   `~/Backups/BetaNYC/nyc-open-data/311/cache` exists): on Sundays, after
+   publishing, asks whether the City changed the 2010–2019 data (`76ig-c548`)
+   since the one-time download (#166). One metadata call. If it changed, or the
+   call fails, Rosie posts an untagged warning with the refresh steps; the
+   night still counts as a success. `--check-history yes|no` forces it on or off.
+9. `--skip-if-published-today` (launchd passes it): exits quietly if a run
    already published today (New York date). launchd starts the job at 5:30 AM
    and again at 8:30 AM, so the 8:30 run is a retry for a morning NYC Open
    Data was down (429/503 on 2026-11-08 and 11-09) and can never publish
@@ -349,6 +355,10 @@ uv run v2/pipeline/boardstat_build.py check-history --cache ~/Backups/BetaNYC/ny
   `fetch-history` moves every cached month into `superseded/<old rowsUpdatedAt>/` (never
   deletes) and downloads them again. Without a state file it compares with 2025-12-24.
 - **Consistent.** If `rowsUpdatedAt` moves during the pull, the run stops; run it again.
+- **Checked weekly by the nightly** (#166): see item 8 under "Nightly refresh". When it
+  posts that the City changed the rows, run `fetch-history` as above, then rebuild the
+  Parquet files (`scripts/build_311_archive.py` in that folder) and copy the folder to
+  BetaNAS (append-only, never `--delete`).
 - It does not touch the nightly job, so the job does not need pausing. Keep it outside
   the job's 5:30 run (and the 8:xx retry) anyway, so the two do not share the portal.
 
