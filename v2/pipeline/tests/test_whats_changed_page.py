@@ -78,6 +78,26 @@ def test_every_page_links_to_whats_changed_in_its_footer():
         assert 'href="whats-changed.html"' in footer, f"{page.name}: no What's changed link in the footer"
 
 
+def test_every_page_links_to_whats_changed_in_its_top_menu():
+    """#168: the top menu, not only the footer, so the page is easy to find."""
+    import re
+    for page in sorted(SITE.glob("*.html")):
+        html = page.read_text(encoding="utf-8")
+        navs = re.findall(r'<nav class="site-nav"[^>]*>(.*?)</nav>', html, re.S)
+        assert len(navs) == 1, f"{page.name}: expected one site menu"
+        links = re.findall(r'<a href="([^"]+)"([^>]*)>', navs[0])
+        assert [h for h, _ in links] == ["./", "about.html", "glossary.html", "help.html", "whats-changed.html"], page.name
+        current = [h for h, a in links if 'aria-current="page"' in a]
+        if page.name == "whats-changed.html":
+            assert current == ["whats-changed.html"]
+
+
+def test_help_page_points_to_whats_changed_in_its_text():
+    html = (SITE / "help.html").read_text(encoding="utf-8")
+    main = html[html.index("<main"):html.index("</main>")]
+    assert 'href="whats-changed.html"' in main
+
+
 def parsed_file() -> dict:
     """The file as the renderer reads it (`whats_changed.py json`), so expected counts follow
     the file instead of being written into this test."""
