@@ -28,7 +28,10 @@ recent months, so on its own an old request that closes later would stay
 7. With ``--notify CHANNEL``: tell staff on Discord (Rosie) when something
    fails or looks wrong. Off by default. A FAILED post @-tags Noel
    (``FAILURE_TAGS``); warnings do not tag anyone.
-8. With ``--skip-if-published-today`` (what launchd passes): do nothing if a
+8. With ``--history-cache DIR``: on Sundays, after publishing, ask whether the
+   City changed the 2010-2019 data (``76ig-c548``) since the one-time download
+   in DIR (#162, #166). If it did, post a warning; the check never fails the night.
+9. With ``--skip-if-published-today`` (what launchd passes): do nothing if a
    run already published today (New York date). launchd starts the job twice,
    at 5:30 and 8:30, so the 8:30 run is a retry that only works on a day the
    5:30 run failed, and can never publish twice. A second failure on the same
@@ -495,6 +498,40 @@ def verify_live(generated_at: str) -> None:
     raise bb.PipelineError(f"Published, but {PUBLIC_MANIFEST} does not show generated_at {generated_at}")
 
 
+# --------------------------------------------------------------------------- 2010-2019 check (#166)
+
+
+def history_check_due(mode: str, history_cache: Path | None, today: dt.date) -> bool:
+    """The weekly 76ig-c548 check runs only with a cache folder, on Sundays (auto) or when forced."""
+    if history_cache is None or mode == "no":
+        return False
+    return mode == "yes" or today.weekday() == 6
+
+
+def check_history(soda: Any, cache_dir: Path) -> str | None:
+    """Did the City change 76ig-c548 since the fetch-history pull in ``cache_dir``?
+
+    One metadata call. Returns a warning line for staff, or None when nothing changed.
+    Never raises: the 2010-2019 copy is not on the site yet, so this must never stop
+    or fail a night that published fine."""
+    ds = bb.DATASET_311_HISTORIC
+    if not cache_dir.is_dir():
+        log("history_check_skipped", reason="cache folder missing", cache=cache_dir)
+        return f"Could not check the 2010-2019 data ({ds}): the cache folder {cache_dir} is missing."
+    try:
+        status = bb.history_status(soda.metadata(ds), bb.read_history_state(cache_dir))
+    except Exception as exc:  # noqa: BLE001 - a failed check is a warning, never a failed night
+        log("history_check_failed", error=str(exc)[:300])
+        return f"Could not check whether the City changed the 2010-2019 data ({ds}): {str(exc)[:200]}"
+    log("history_check", changed=status["changed"], live=status["rowsUpdatedAt_iso"],
+        baseline=status["baseline_iso"], baseline_from=status["baseline_from"])
+    if not status["changed"]:
+        return None
+    return (f"The City changed the 2010-2019 311 data ({ds}) on {status['rowsUpdatedAt_iso']}; our copy is from "
+            f"{status['baseline_iso']}. To refresh: boardstat_build.py fetch-history --cache {cache_dir}, then rebuild "
+            "the Parquet files and copy the folder to BetaNAS (BoardStat #166).")
+
+
 # --------------------------------------------------------------------------- alerts
 
 
@@ -551,6 +588,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     when.add_argument("--years", type=int, default=None, help="rolling window instead of a fixed start (tests, one-off runs)")
     p.add_argument("--today", type=dt.date.fromisoformat, default=None, help="override today's date (NYC), for tests")
     p.add_argument("--check-counts", choices=["auto", "yes", "no"], default="auto", help="weekly city count check; auto = Sundays")
+    p.add_argument("--history-cache", type=Path, default=None,
+                   help="fetch-history cache folder; with it, check weekly whether the City changed 2010-2019 (#166)")
+    p.add_argument("--check-history", choices=["auto", "yes", "no"], default="auto",
+                   help="weekly 2010-2019 change check (needs --history-cache); auto = Sundays")
     p.add_argument("--publish", action="store_true", help="upload to beta.nyc and swap it live")
     p.add_argument("--notify", metavar="CHANNEL", default=None, help="Discord channel name for alerts (off by default)")
     p.add_argument("--skip-if-published-today", action="store_true",
@@ -628,6 +669,12 @@ def run(args: argparse.Namespace) -> int:
         state["last_publish_run"] = run_id
         state["last_publish_at"] = now.isoformat(timespec="seconds")
         save_state(state_path, state)
+
+    # 7. Weekly: did the City change the 2010-2019 data? After publishing, never fatal.
+    if history_check_due(args.check_history, args.history_cache, today):
+        changed_history = check_history(soda, args.history_cache)
+        if changed_history:
+            warnings.append(changed_history)
 
     for w in warnings:
         notify(args.notify, f"BoardStat nightly: {w}")
