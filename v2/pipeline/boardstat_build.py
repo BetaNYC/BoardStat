@@ -19,10 +19,12 @@ Run from the repository root:
     uv run v2/pipeline/boardstat_build.py --out v2/site/data            # 2020-01-01 to today
     uv run v2/pipeline/boardstat_build.py --start 2025-11-01 --end 2026-11-04 --out v2/site/data
 
-Only data.cityofnewyork.us is contacted. An app token is read from the
-``SOCRATA_APP_TOKEN`` environment variable if set and sent as the
-``X-App-Token`` header (https://dev.socrata.com/docs/app-tokens). The token
-is never logged.
+Only data.cityofnewyork.us is contacted. An app token is required: it is
+read from the ``SOCRATA_APP_TOKEN`` environment variable and sent as the
+``X-App-Token`` header (https://dev.socrata.com/docs/app-tokens). If the
+variable is missing or empty the build stops before any network call
+(``require_app_token``); the nightly job fills it from the macOS Keychain item
+``boardstat-socrata-app-token``. The token is never logged.
 """
 
 from __future__ import annotations
@@ -189,6 +191,29 @@ def log(event: str, **fields: Any) -> None:
 
 class PipelineError(RuntimeError):
     """A failure the operator must see. Raised instead of continuing silently."""
+
+
+APP_TOKEN_ENV = "SOCRATA_APP_TOKEN"
+APP_TOKEN_KEYCHAIN_ITEM = "boardstat-socrata-app-token"
+
+
+def require_app_token() -> str:
+    """The Socrata app token from ``SOCRATA_APP_TOKEN``, or PipelineError.
+
+    Both entry points (this module's ``main`` and ``boardstat_nightly.run``) call it
+    before any network call, so a missing token stops the run instead of letting it go
+    keyless with only an ``app_token="unset"`` log line. Empty or whitespace-only counts
+    as missing. The error names the variable and the Keychain item, never a value.
+    ``Soda`` itself stays token-optional for tests and fixtures.
+    """
+    token = (os.environ.get(APP_TOKEN_ENV) or "").strip()
+    if not token:
+        raise PipelineError(
+            f"{APP_TOKEN_ENV} is missing or empty; refusing to contact NYC Open Data without an app token. "
+            f"The nightly job reads it from the macOS Keychain item '{APP_TOKEN_KEYCHAIN_ITEM}' "
+            "(is the item there, and the login Keychain unlocked?); for a hand run, export it first (v2/README.md)."
+        )
+    return token
 
 
 # --------------------------------------------------------------------------- HTTP
@@ -1067,9 +1092,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     check_start(args.start)  # before any network call
     require_data_license()  # before a download that can take hours
+    token = require_app_token()  # before any network call
     t0 = time.time()
-    token = os.environ.get("SOCRATA_APP_TOKEN") or None
-    log("start", start=args.start, end=args.end, out=args.out, app_token="set" if token else "unset")
+    log("start", start=args.start, end=args.end, out=args.out, app_token="set")
     soda = Soda(token=token)
 
     # 1. Schema check: never trust a dataset id silently.

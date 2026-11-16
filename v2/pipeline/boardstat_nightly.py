@@ -40,6 +40,9 @@ Run from the repository root:
 
 Secrets come from the environment (``SOCRATA_APP_TOKEN``, ``DISCORD_TOKEN``);
 ``nightly.sh`` reads them from the macOS Keychain. Neither is ever logged.
+``SOCRATA_APP_TOKEN`` is required: without it (Keychain item
+``boardstat-socrata-app-token`` missing or locked) the run stops before any
+network call, and ``main()`` reports the failure like any other.
 """
 
 from __future__ import annotations
@@ -557,6 +560,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def run(args: argparse.Namespace) -> int:
     bb.require_data_license()  # before any network call (#134)
+    token = bb.require_app_token()  # before any network call: never run keyless
     t0 = time.time()
     now = dt.datetime.now(dt.UTC)
     today = args.today or now.astimezone(NYC).date()
@@ -567,8 +571,7 @@ def run(args: argparse.Namespace) -> int:
     state = load_state(state_path)
     cache_311 = args.cache / "311"
     since = state.get("watermark") or initial_watermark(cache_311)
-    token = os.environ.get("SOCRATA_APP_TOKEN") or None
-    log("start", start=start, end=end, since=since, publish=args.publish, notify=args.notify, app_token="set" if token else "unset")
+    log("start", start=start, end=end, since=since, publish=args.publish, notify=args.notify, app_token="set")
     soda = bb.Soda(token=token)
     con = duckdb.connect()
     warnings: list[str] = []

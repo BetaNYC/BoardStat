@@ -117,8 +117,10 @@ From the repository root (needs [uv](https://docs.astral.sh/uv/) and network
 access to data.cityofnewyork.us):
 
 ```sh
-# Optional: a Socrata app token raises rate limits. Never commit it.
-# export SOCRATA_APP_TOKEN=...   (or set it in your Claude Code env)
+# Required: a Socrata app token (sent as X-App-Token). Never commit it.
+# Without it, or with it empty, the build stops before contacting the portal.
+export SOCRATA_APP_TOKEN="$(security find-generic-password -s boardstat-socrata-app-token -w)"
+#   (or set it in your Claude Code env)
 
 uv run v2/pipeline/boardstat_build.py --start 2026-01-01 --out v2/site/data
 #   default --start is 2020-01-01 (fixed; the full history), --end is today.
@@ -213,7 +215,7 @@ It runs the code in this checkout, so keep the checkout on `master`.
 
 ```sh
 # one time: secrets go in the login Keychain, never a file
-security add-generic-password -U -s boardstat-socrata-app-token -a boardstat -w   # prompts
+security add-generic-password -U -s boardstat-socrata-app-token -a boardstat -w   # prompts (required)
 security add-generic-password -U -s boardstat-rosie-discord-token -a boardstat -w # prompts (Rosie's DISCORD_TOKEN)
 
 bash v2/pipeline/launchd/install.sh ops-website   # 5:30 AM nightly, 8:30 AM retry; alerts to #ops-website
@@ -222,7 +224,17 @@ tail -f ~/Library/Logs/boardstat-nightly/$(date +%F).log         # watch it
 launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/nyc.betanyc.boardstat-nightly.plist  # stop it
 ```
 
-Run it by hand without publishing: `uv run v2/pipeline/boardstat_nightly.py`.
+Run it by hand without publishing: `uv run v2/pipeline/boardstat_nightly.py`
+(export `SOCRATA_APP_TOKEN` first, as under "How to run").
+
+**The app token is required.** If `nightly.sh` cannot read the Keychain item
+`boardstat-socrata-app-token` (missing, empty, or the login Keychain locked), it
+leaves `SOCRATA_APP_TOKEN` unset and writes a `STOP:` line to the night's log.
+The nightly then stops before any network call and reports the failure like any
+other: exit 2, and a FAILED post to #ops-website tagging Noel. It never runs
+without the token. Rosie's `DISCORD_TOKEN` comes from the same Keychain, so if the
+whole Keychain is locked the post cannot go out (the log says `notify_unavailable`);
+the GitHub freshness check below then opens an issue once the data is 26 hours old.
 
 ### Borough file check (#151)
 
