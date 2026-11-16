@@ -19,6 +19,11 @@ Run from the repository root:
     uv run v2/pipeline/boardstat_build.py --out v2/site/data            # 2020-01-01 to today
     uv run v2/pipeline/boardstat_build.py --start 2025-11-01 --end 2026-11-04 --out v2/site/data
 
+Fetch the 2010-2019 history (76ig-c548) to a local cache, publishing nothing (#162):
+
+    uv run v2/pipeline/boardstat_build.py fetch-history --cache ~/Backups/BetaNYC/nyc-open-data/311/cache
+    uv run v2/pipeline/boardstat_build.py check-history --cache ~/Backups/BetaNYC/nyc-open-data/311/cache
+
 Only data.cityofnewyork.us is contacted. An app token is required: it is
 read from the ``SOCRATA_APP_TOKEN`` environment variable and sent as the
 ``X-App-Token`` header (https://dev.socrata.com/docs/app-tokens). If the
@@ -74,7 +79,7 @@ def require_data_license() -> None:
 PORTAL = "https://data.cityofnewyork.us"
 
 DATASET_311 = "erm2-nwe9"  # 311 Service Requests from 2020 to Present
-DATASET_311_HISTORIC = "76ig-c548"  # 2010-2019, not used by the prototype yet
+DATASET_311_HISTORIC = "76ig-c548"  # 2010-2019: fetched to a local cache by `fetch-history` (#162), not built yet
 
 # History starts here, fixed (not a rolling window; issue #108). erm2-nwe9 holds
 # 2020-01-01 onward; earlier months live in 76ig-c548, which this build does not
@@ -459,8 +464,9 @@ def soql_ts(d: dt.date) -> str:
     return f"'{d.isoformat()}T00:00:00'"
 
 
-def fetch_month(soda: Soda, win: Window, cache_dir: Path, today: dt.date, max_age_h: float) -> Path:
-    """Fetch one month of 311 rows to a gzipped CSV in the cache.
+def fetch_month(soda: Soda, win: Window, cache_dir: Path, today: dt.date, max_age_h: float,
+                dataset: str = DATASET_311) -> Path:
+    """Fetch one month of 311 rows from ``dataset`` to a gzipped CSV in the cache.
 
     Months that ended more than 60 days ago are reused from cache indefinitely
     (their statuses may lag; pass --refresh-all to refetch). Recent months are
@@ -468,7 +474,7 @@ def fetch_month(soda: Soda, win: Window, cache_dir: Path, today: dt.date, max_ag
     dates and statuses keep changing.
     """
     cache_dir.mkdir(parents=True, exist_ok=True)
-    path = cache_dir / f"{DATASET_311}_{win.start.isoformat()}_{win.end.isoformat()}.csv.gz"
+    path = cache_dir / f"{dataset}_{win.start.isoformat()}_{win.end.isoformat()}.csv.gz"
     meta_path = path.with_suffix(".json")
     if path.exists() and meta_path.exists():
         meta = json.loads(meta_path.read_text())
@@ -493,7 +499,7 @@ def fetch_month(soda: Soda, win: Window, cache_dir: Path, today: dt.date, max_ag
                 "$limit": str(PAGE_SIZE),
                 "$offset": str(offset),
             }
-            r = soda.get(f"/resource/{DATASET_311}.csv", params=params)
+            r = soda.get(f"/resource/{dataset}.csv", params=params)
             reader = csv.reader(io.StringIO(r.content.decode("utf-8")))
             header = next(reader, None)
             if header != FIELDS_311:
@@ -511,6 +517,158 @@ def fetch_month(soda: Soda, win: Window, cache_dir: Path, today: dt.date, max_ag
     meta_path.write_text(json.dumps({"rows": rows, "fetched_at_epoch": time.time(), "window": [win.start.isoformat(), win.end.isoformat()]}))
     log("month_fetched", month=win.label, rows=rows, elapsed_s=round(time.time() - t0, 1))
     return path
+
+
+# --------------------------------------------------------------------------- 2010-2019 history (#162)
+#
+# `fetch-history` fills a month cache from 76ig-c548 and publishes nothing. The site still
+# starts at HISTORY_START (check_start is untouched) until the rest of #108 is done. The City
+# last changed the old rows on 2025-12-24 (the dataset's rowsUpdatedAt, read from
+# /api/views/76ig-c548.json on 2026-11-15), so the pull is meant to happen once: a rerun
+# downloads only missing months, and cached months are fetched again only when the City has
+# changed the rows since the pull. Superseded month files are moved aside, never deleted,
+# because the cache is meant to live in ~/Backups.
+
+HISTORIC_FIRST = dt.date(2010, 1, 1)
+HISTORIC_LAST = dt.date(2019, 12, 31)
+HISTORIC_BASELINE_ROWS_UPDATED_AT = 1766600348  # 2025-12-24T18:19:08Z
+HISTORY_STATE_FILE = f"{DATASET_311_HISTORIC}_state.json"
+HISTORY_CHANGED_EXIT = 3
+
+
+def check_history_range(start: dt.date, end_inclusive: dt.date) -> None:
+    """76ig-c548 holds 2010-01-01 to 2019-12-31; refuse anything outside it."""
+    if start < HISTORIC_FIRST or end_inclusive > HISTORIC_LAST or end_inclusive < start:
+        raise PipelineError(
+            f"fetch-history covers {HISTORIC_FIRST} to {HISTORIC_LAST} ({DATASET_311_HISTORIC}); "
+            f"got {start} to {end_inclusive}. 2020 onward comes from {DATASET_311} through the normal build."
+        )
+
+
+def read_history_state(cache_dir: Path) -> dict[str, Any] | None:
+    path = cache_dir / HISTORY_STATE_FILE
+    return json.loads(path.read_text()) if path.exists() else None
+
+
+def write_history_state(cache_dir: Path, state: dict[str, Any]) -> None:
+    path = cache_dir / HISTORY_STATE_FILE
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(state, indent=2) + "\n")
+    tmp.replace(path)
+
+
+def history_status(meta: dict[str, Any], state: dict[str, Any] | None) -> dict[str, Any]:
+    """Compare the dataset's rowsUpdatedAt with the one the cache was pulled at.
+
+    With no state file yet, the comparison is with HISTORIC_BASELINE_ROWS_UPDATED_AT
+    (2025-12-24), the last change known when #162 was written.
+    """
+    live = meta.get("rowsUpdatedAt")
+    if live is None:
+        raise PipelineError(f"{DATASET_311_HISTORIC} metadata has no rowsUpdatedAt; cannot tell whether the rows changed")
+    baseline = state["rowsUpdatedAt"] if state and state.get("rowsUpdatedAt") is not None else HISTORIC_BASELINE_ROWS_UPDATED_AT
+    return {
+        "dataset": DATASET_311_HISTORIC,
+        "rowsUpdatedAt": int(live),
+        "rowsUpdatedAt_iso": epoch_to_iso(live),
+        "baseline": int(baseline),
+        "baseline_iso": epoch_to_iso(baseline),
+        "baseline_from": "cache state file" if state else "HISTORIC_BASELINE_ROWS_UPDATED_AT",
+        "changed": int(live) != int(baseline),
+    }
+
+
+def history_month_files(cache_dir: Path) -> list[Path]:
+    return sorted(cache_dir.glob(f"{DATASET_311_HISTORIC}_*.csv*"))
+
+
+def set_aside_history(cache_dir: Path, rows_updated_iso: str | None) -> Path:
+    """Move every cached 76ig-c548 month into superseded/<old rowsUpdatedAt>/. Never deletes."""
+    stamp = (rows_updated_iso or "unknown").replace(":", "")
+    dest = cache_dir / "superseded" / stamp
+    dest.mkdir(parents=True, exist_ok=True)
+    for f in history_month_files(cache_dir):
+        target = dest / f.name
+        if target.exists():
+            raise PipelineError(f"{target} already exists; refusing to overwrite a superseded month")
+        f.replace(target)
+    return dest
+
+
+def fetch_history(soda: Soda, cache_dir: Path, start: dt.date = HISTORIC_FIRST, end_inclusive: dt.date = HISTORIC_LAST,
+                  today: dt.date | None = None) -> dict[str, Any]:
+    """Fill ``cache_dir`` with 76ig-c548 months; return the state written to the cache.
+
+    Resumable: months already in the cache are kept, unless the City changed the rows
+    since they were fetched (rowsUpdatedAt differs from the cache's state file), in which
+    case they are set aside and fetched again. Stops if the rows change during the pull.
+    """
+    check_history_range(start, end_inclusive)
+    today = today or dt.date.today()
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    meta = soda.metadata(DATASET_311_HISTORIC)
+    check_schema(meta, FIELDS_311, DATASET_311_HISTORIC, name_hint="311 Service Requests")
+    state = read_history_state(cache_dir)
+    status = history_status(meta, state)
+    log("history_status", **status)
+    if status["changed"] and history_month_files(cache_dir):
+        moved_to = set_aside_history(cache_dir, status["baseline_iso"])
+        log("history_set_aside", reason="rowsUpdatedAt changed", moved_to=moved_to)
+    started = {"dataset": DATASET_311_HISTORIC, "name": meta.get("name"), "url": f"{PORTAL}/d/{DATASET_311_HISTORIC}",
+               "rowsUpdatedAt": status["rowsUpdatedAt"], "rowsUpdatedAt_iso": status["rowsUpdatedAt_iso"],
+               "fields": FIELDS_311, "start": start.isoformat(), "end": end_inclusive.isoformat(), "complete": False}
+    write_history_state(cache_dir, started)
+
+    months: dict[str, int] = {}
+    for win in month_windows(start, end_inclusive):
+        # Every 2010-2019 month ended long ago, so fetch_month reuses a cached file as is.
+        path = fetch_month(soda, win, cache_dir, today, max_age_h=0.0, dataset=DATASET_311_HISTORIC)
+        months[win.label] = json.loads(path.with_suffix(".json").read_text())["rows"]
+
+    after = soda.metadata(DATASET_311_HISTORIC).get("rowsUpdatedAt")
+    if after is None or int(after) != status["rowsUpdatedAt"]:
+        raise PipelineError(
+            f"{DATASET_311_HISTORIC} rowsUpdatedAt moved from {status['rowsUpdatedAt_iso']} to {epoch_to_iso(after)} "
+            "during the pull; run fetch-history again to refetch from a consistent copy."
+        )
+    done = {**started, "complete": True, "months": months, "rows": sum(months.values()),
+            "completed_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}
+    write_history_state(cache_dir, done)
+    log("history_done", months=len(months), rows=done["rows"])
+    return done
+
+
+def parse_history_args(argv: list[str]) -> argparse.Namespace:
+    p = argparse.ArgumentParser(prog="boardstat_build.py",
+                                description="2010-2019 311 history (76ig-c548): fetch to a local cache, or check for changes. Publishes nothing.")
+    sub = p.add_subparsers(dest="command", required=True)
+    f = sub.add_parser("fetch-history", help="fill a month cache from 76ig-c548; resumable; refetches only if the City changed the rows")
+    f.add_argument("--cache", type=Path, required=True, help="folder for the month files (keep it outside the repo)")
+    f.add_argument("--start", type=dt.date.fromisoformat, default=HISTORIC_FIRST, help=f"default {HISTORIC_FIRST}")
+    f.add_argument("--end", type=dt.date.fromisoformat, default=HISTORIC_LAST, help=f"inclusive, default {HISTORIC_LAST}")
+    c = sub.add_parser("check-history", help=f"report whether 76ig-c548 changed since the pull; exit {HISTORY_CHANGED_EXIT} if it did")
+    c.add_argument("--cache", type=Path, help="the fetch-history cache; without it, compare with 2025-12-24")
+    return p.parse_args(argv)
+
+
+def history_main(argv: list[str]) -> int:
+    args = parse_history_args(argv)
+    token = require_app_token()  # before any network call
+    soda = Soda(token=token)
+    if args.command == "fetch-history":
+        check_history_range(args.start, args.end)
+        log("start", command="fetch-history", start=args.start, end=args.end, cache=args.cache, app_token="set")
+        state = fetch_history(soda, args.cache, args.start, args.end)
+        print(json.dumps({k: state[k] for k in ("dataset", "rowsUpdatedAt_iso", "rows", "complete")}))
+        return 0
+    meta = soda.metadata(DATASET_311_HISTORIC)
+    state = read_history_state(args.cache) if args.cache else None
+    status = history_status(meta, state)
+    print(json.dumps(status))
+    return HISTORY_CHANGED_EXIT if status["changed"] else 0
+
+
+HISTORY_COMMANDS = ("fetch-history", "check-history")
 
 
 def fetch_boundary(soda: Soda, dataset_id: str, cache_dir: Path) -> tuple[Path, dict[str, Any]]:
@@ -1089,6 +1247,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] in HISTORY_COMMANDS:
+        return history_main(argv)
     args = parse_args(argv)
     check_start(args.start)  # before any network call
     require_data_license()  # before a download that can take hours
