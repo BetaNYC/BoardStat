@@ -15,6 +15,7 @@ import { createFilterForm, tableLists, DATE_ORDER_MSG } from './filterform.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql } from './place.js';
 import { periodFrom, createLoader, freshnessCheck, loadFailedText, filesNamedIn, DataChangedError } from './loadplan.js';
+import { reportLinkHref } from './report.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(window.location.search);
@@ -43,11 +44,15 @@ const defaultFilters = () => ({ ...defaults, types: [], descs: [], descEx: false
 /** The form's lists, from this page's rows, for the applied dates (filterform.js tableLists). */
 const formLists = tableLists(query, () => state);
 
-/** The link of this page and of the way back: same place, same filters, never an address. */
+/**
+ * The link of this page, of the way back and of "Report a data problem" (report.js):
+ * same place, same filters, never an address.
+ */
 function writeLinks() {
   const p = filtersToParams(geo, geoId, state, defaults);
   history.replaceState(null, '', `?${p.toString()}`);
   $('back-link').href = `district.html?${p.toString()}`;
+  $('report-link').href = reportLinkHref('map.html', p);
 }
 
 /** Make sure the table has every row these filters need (Closed requests from the From date on). */

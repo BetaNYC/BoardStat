@@ -14,6 +14,7 @@ import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughU
 import {
   periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly, DataChangedError, filesNamedIn, freshnessCheck, loadFailedText,
 } from './loadplan.js';
+import { reportLinkHref } from './report.js';
 
 const $ = (id) => document.getElementById(id);
 const PAGE = 50;
@@ -348,10 +349,21 @@ function writeUrl() {
   // The address page keeps the address it was opened with and does not rewrite its
   // URL at all; the district page's address filter is not kept in the link
   // (filtersToParams never writes it).
-  if (ADDRESS_MODE) return;
   const p = filtersToParams(geo, geoId, state, defaultDates());
+  updateReportLink(p);
+  if (ADDRESS_MODE) return;
   history.replaceState(null, '', `?${p.toString()}`);
   updateFullMapLink(p);
+}
+
+/**
+ * "Report a data problem" hands this page's place, dates and filters to the Help page's
+ * form (report.js reportLinkHref). On the address page too, but never the address:
+ * filtersToParams does not write it, and reportLinkHref keeps only the report's parameters.
+ */
+function updateReportLink(p) {
+  const a = $('report-link');
+  if (a) a.href = reportLinkHref(ADDRESS_MODE ? 'address.html' : 'district.html', p);
 }
 
 /** The "Open full-page map" link carries the same district, dates and filters (#143). */
@@ -1328,7 +1340,9 @@ async function main() {
   // Open on a wide screen, closed on a phone (filterform.js setupPanel, #149). Before the
   // first load, so the panel is in its place and the toggle works while the rows load.
   form.setupPanel({ scrollTo: $('filters-bar') });
-  if (!ADDRESS_MODE) updateFullMapLink(filtersToParams(geo, geoId, state, defaultDates()));
+  const firstParams = filtersToParams(geo, geoId, state, defaultDates());
+  updateReportLink(firstParams);
+  if (!ADDRESS_MODE) updateFullMapLink(firstParams);
   // A failed first load must never leave the page waiting: say so, and let Apply retry.
   let loaded = true;
   let loadError = null;
