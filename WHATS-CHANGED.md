@@ -7,11 +7,15 @@ This page lists the changes to BoardStat that a reader would notice: new pages, 
 
 BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change reaches the site at the next upload. Entries since November 2026 are dated by the day the change was merged on GitHub. BetaNYC's [nyc-311-mcp](https://github.com/BetaNYC/nyc-311-mcp) server reads BoardStat's data files, so a change to BoardStat's data can change its answers too. To report a bug or ask for a new feature, email [boardstat@beta.nyc](mailto:boardstat@beta.nyc) or [open an issue on GitHub](https://github.com/BetaNYC/BoardStat/issues).
 
-## Unreleased: Report a data problem
+## 2026-11-18: Report a data problem
 
 - **Tags:** Site
 - **What changed:** You can now tell BetaNYC when a number, a request or a place on BoardStat looks wrong. District, council district, borough, address and full-page map pages have a "Report a data problem" link, and the form is on the Help and feedback page. A report holds what you write and the web address of the page you were on, with its dates and filters, and never a street address. The form does not ask for a name or email, so use the email button if you want a reply. A BetaNYC staff member reads every report. The About, Help and home pages used to say that nothing you type is sent to BetaNYC; they now say a report you choose to send is the one exception.
 - **More detail:** [The rollout](https://github.com/BetaNYC/betanyc-ai-workspace/issues/1700)
+## 2026-11-18: What's changed moved from the top menu to the About page
+
+- **Tags:** Site
+- **What changed:** The What's changed link is no longer in the top menu. The About page now links to it, under "Where the data comes from". What's changed is still its own page, and the Help and feedback page and the bottom of every page still link to it.
 
 ## 2026-11-16: What's changed is in the top menu
 

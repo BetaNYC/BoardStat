@@ -78,18 +78,28 @@ def test_every_page_links_to_whats_changed_in_its_footer():
         assert 'href="whats-changed.html"' in footer, f"{page.name}: no What's changed link in the footer"
 
 
-def test_every_page_links_to_whats_changed_in_its_top_menu():
-    """#168: the top menu, not only the footer, so the page is easy to find."""
+def test_top_menu_has_four_links_and_no_whats_changed():
+    """The top menu is Districts, About, Glossary, Help & feedback. What's changed is its own
+    page, reached from the About page, the Help page and every footer, not from the top menu."""
     import re
     for page in sorted(SITE.glob("*.html")):
         html = page.read_text(encoding="utf-8")
         navs = re.findall(r'<nav class="site-nav"[^>]*>(.*?)</nav>', html, re.S)
         assert len(navs) == 1, f"{page.name}: expected one site menu"
         links = re.findall(r'<a href="([^"]+)"([^>]*)>', navs[0])
-        assert [h for h, _ in links] == ["./", "about.html", "glossary.html", "help.html", "whats-changed.html"], page.name
-        current = [h for h, a in links if 'aria-current="page"' in a]
-        if page.name == "whats-changed.html":
-            assert current == ["whats-changed.html"]
+        assert [h for h, _ in links] == ["./", "about.html", "glossary.html", "help.html"], page.name
+
+
+def test_about_page_points_to_whats_changed_in_its_text():
+    html = (SITE / "about.html").read_text(encoding="utf-8")
+    main = html[html.index("<main"):html.index("</main>")]
+    assert 'href="whats-changed.html"' in main
+
+
+def test_whats_changed_is_its_own_page_not_part_of_about():
+    about = (SITE / "about.html").read_text(encoding="utf-8")
+    assert "data-whats-changed" not in about and "wc-entry" not in about
+    assert "data-whats-changed" in PAGE.read_text(encoding="utf-8")
 
 
 def test_help_page_points_to_whats_changed_in_its_text():
