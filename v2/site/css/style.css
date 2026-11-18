@@ -274,3 +274,23 @@ header.site .site-nav a { white-space: nowrap; }
 
 /* A section whose data could not load says so inside itself (#151). */
 .section-error { margin: 0.5rem 0; font-weight: 600; }
+
+/* "Report a data problem" form on the Help page (js/report.js). The textarea matches the
+   other text boxes; boxes and the button are at least 44px tall for fingers. */
+textarea {
+  font: inherit; color: var(--bnyc-dark-gray); background: var(--bnyc-white);
+  border: 1px solid var(--bnyc-border-gray); border-radius: 4px; padding: 0.35rem 0.5rem; max-width: 100%;
+}
+.report form { max-width: 40rem; }
+.report .field { margin: 0 0 1rem; }
+.report textarea, .report input[type="text"] { width: 100%; min-height: 44px; }
+.report textarea { resize: vertical; }
+.report [aria-invalid="true"] { border: 2px solid var(--bnyc-dark-gray); }
+.report-actions { margin: 0.5rem 0 0; }
+.report-actions button { min-height: 44px; }
+.field-error { margin: 0.25rem 0 0; font-weight: 600; }
+/* "Report a data problem" on the district, address and map pages: the link is 44px tall for fingers. */
+.report-link { margin: 0 0 0.5rem; }
+.report-link a { display: inline-flex; align-items: center; min-height: 44px; }
+/* The honeypot: off screen, out of the tab order (tabindex -1) and hidden from screen readers (aria-hidden). */
+.report-hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }

@@ -111,6 +111,40 @@ it is never carried between the district page and the map, in either direction, 
 the map page cannot set one (it has no address list). Both pages say so. Nothing is
 kept in session storage.
 
+**Report a data problem (Help page, `js/report.js`).** The Help page's "Give feedback"
+section has a short form that files a report through BetaNYC's data-issue intake
+(betanyc-ai-workspace epic #1594): `POST https://www.beta.nyc/wp-json/betanyc-data/v1/report`,
+JSON, with exactly `schema` (`betanyc-data-issue/1`), `tool` (`boardstat`), `kind`
+(`problem-report`), `page_url`, `description` (required, 2,000 characters), `record`
+(optional, 300) and `website` (a honeypot people leave empty). It asks for no name or
+email and sends none, so BetaNYC cannot write back; the page says so and points to the
+email button for a reply. The answer decides the message: 201 thanks and clears the
+form; 429 says to try again (in about N minutes, from `Retry-After`); anything else, or
+no answer, says it did not go through, keeps the text and points to email.
+The district, address and full-page map pages link to the form ("Does a number look
+wrong? Report a data problem": under the "At a glance" caveat on the district and
+address pages, under the data date at the foot of the map). The link hands the page over
+explicitly: `help.html?from=<page>&<parameters>#report-h`, where the parameters are the
+page's applied place, dates and filters, made by the same `filtersToParams` as its other
+links and rewritten whenever they are (`reportLinkHref` in `js/report.js`; `writeUrl` in
+`js/district.js`, which also runs on the address page, and `writeLinks` in
+`js/fullmap.js`). **The link never carries an address**: `filtersToParams` never writes
+`addr`, and `reportLinkHref` keeps only the parameters listed below. Its plain
+`href="help.html#report-h"` still works without JavaScript. `page_url` is, in order: the
+hand-off, when `from` is exactly `district.html`, `map.html` or `address.html` (anything
+else is ignored), built from the site's folder plus that file name and the Help page's
+own parameters, without `from`; else the BoardStat page the visitor came from (same
+origin, inside the site's folder; a look-alike host never counts); else the Help page
+itself. Only the `geo`, `id`, `start`, `end`, `type`, `desc`, `descx`, `agency` and
+`status` parameters are kept, so the address page's `addr` (a street address) never
+reaches a report; over 500 characters it drops the query string. The form shows the
+visitor that address before they send. Without JavaScript the whole form stays hidden
+and the email button still works.
+From localhost the endpoint answers 403, so a local preview never files anything. The
+endpoint must also list `https://www.beta.nyc/boardstat` among its allowed sites before
+the form can work on beta.nyc. Tests: `tests-js/report.test.mjs` (a fake `fetch`, never
+the network) and `pipeline/tests/test_report_form.py` (the page's markup).
+
 ## How to run
 
 From the repository root (needs [uv](https://docs.astral.sh/uv/) and network

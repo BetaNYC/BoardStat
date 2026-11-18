@@ -6,9 +6,9 @@
   <title>Help and feedback · BoardStat 2.0 (prototype)</title>
   <meta name="description" content="How to use BoardStat 2.0, answers to common questions, and how to send BetaNYC feedback.">
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css?v=ab40cd7e12">
+  <link rel="stylesheet" href="css/style.css?v=7470ecbf98">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=f0aa91bbe9","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=2a4cbb8089","./js/filterform.js":"./js/filterform.js?v=d9e37282ef","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=509ef447f9","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=5bdefd9c4f","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=b56294c924","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=f0aa91bbe9","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=2e7e9fbc4c","./js/filterform.js":"./js/filterform.js?v=d9e37282ef","./js/filtersql.js":"./js/filtersql.js?v=c21bd132b2","./js/filterstate.js":"./js/filterstate.js?v=122ff66f8f","./js/fullmap.js":"./js/fullmap.js?v=6510144769","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=5bdefd9c4f","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=b56294c924","./js/report.js":"./js/report.js?v=3bbe70f781","./js/requestmap.js":"./js/requestmap.js?v=90c3f2ec09"}}</script>
   <!-- importmap:end -->
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
@@ -45,6 +45,34 @@
         <li>what you expected to see, and what you saw instead</li>
         <li>your phone or computer and browser, if something looked broken</li>
       </ul>
+
+      <!-- Hidden until js/report.js runs, so a browser without JavaScript never shows a dead button; the email button above still works. -->
+      <div class="report" id="report" hidden>
+        <h3 id="report-h">Report a data problem</h3>
+        <p>If a number, a request or a place on BoardStat looks wrong, tell us here. A BetaNYC staff member reads every report.</p>
+        <p>This form does not ask for your name or email, so we cannot write back to you. If you would like a reply, use the email button above. Please leave out personal details, such as your name, phone number or email address.</p>
+        <form id="report-form" aria-labelledby="report-h" novalidate>
+          <div class="field">
+            <label for="report-desc">What looks wrong?</label>
+            <p class="field-hint" id="report-desc-hint">Required. Up to 2,000 characters.</p>
+            <textarea id="report-desc" name="description" rows="5" maxlength="2000" required aria-describedby="report-desc-hint"></textarea>
+            <p class="field-error" id="report-desc-error" hidden></p>
+          </div>
+          <div class="field">
+            <label for="report-record">Which number, request or place?</label>
+            <p class="field-hint" id="report-record-hint">Optional. For example a 311 request number, the name of a chart, or a district. Up to 300 characters.</p>
+            <input type="text" id="report-record" name="record" maxlength="300" aria-describedby="report-record-hint">
+            <p class="field-error" id="report-record-error" hidden></p>
+          </div>
+          <div class="report-hp" aria-hidden="true">
+            <label for="report-website">Leave this box empty</label>
+            <input type="text" id="report-website" name="website" tabindex="-1" autocomplete="off">
+          </div>
+          <p class="report-page">Your report also includes the web address of the page you were on, so we can see what you saw: <span id="report-page-url"></span></p>
+          <p class="report-actions"><button type="submit" id="report-send">Send report</button></p>
+          <p class="status" id="report-status" role="status" aria-live="polite"></p>
+        </form>
+      </div>
     </section>
 
     <section class="panel" aria-labelledby="start-h">
@@ -80,7 +108,7 @@
         <dd><p>Yes, back to January 1, 2020. A page opens on about the last year; move the From date earlier to see more. Going back to 2010 is planned.</p></dd>
 
         <dt>Is anything I type sent anywhere?</dt>
-        <dd><p>No. BoardStat runs in your browser: your filters and the addresses you search for stay on your device.</p></dd>
+        <dd><p>Only a report you send with the Report a data problem form above: what you write in it, and the web address it shows. BoardStat runs in your browser, so your filters and the addresses you search for stay on your device.</p></dd>
 
         <dt>Is this an official City of New York tool?</dt>
         <dd><p>No. BoardStat is a BetaNYC prototype built on the City's open data. For official 311 information, see <a href="https://portal.311.nyc.gov/">NYC311</a>.</p></dd>
@@ -89,5 +117,6 @@
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html">What&rsquo;s changed</a>.</footer>
+  <script type="module" src="js/report.js?v=3bbe70f781"></script>
 </body>
 </html>
