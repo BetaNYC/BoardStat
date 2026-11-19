@@ -1131,11 +1131,11 @@ async function renderAddressLinks() {
   $('addr-links').replaceChildren(...(out.length ? ['In ', ...out, '. Select a district to see all of it.'] : []));
   $('addr-links').after(el('p', { class: 'no-print' }, bLink, el('span', { class: 'muted', text: ' (political and administrative districts, opens in a new tab)' })));
   $('boundary-note').textContent = state.bbl
-    ? `Every request on tax lot ${state.bbl}, under any address. Requests that gave only a cross street, or that the city did not match to a lot, are not included.`
+    ? `Every request on tax lot ${state.bbl} (BBL), under any address. Requests that gave only a cross street, or that the city did not match to a lot, are not included.`
     : 'Every request whose address matches this one exactly, as the city spelled it. Requests that gave only a cross street are not included.';
   addrLot = state.bbl || a?.bbl || null;
   if (!addrLot) return;
-  $('addr-links').after(el('div', { class: 'no-print same-lot', id: 'same-lot', hidden: true }));
+  $('addr-links').after(el('p', { class: 'no-print', id: 'same-lot', hidden: true }));
   await renderSameLot();
 }
 
@@ -1163,21 +1163,16 @@ async function renderSameLot() {
   box.hidden = rows.length < 2 && !state.bbl;
   if (box.hidden) return box.replaceChildren();
   const all = rows.reduce((t, r) => t + r.n, 0);
-  const lead = state.bbl
-    ? el('p', {}, `Showing every request on this building's tax lot (BBL ${addrLot}): ${fmtInt(all)} under ${rows.length === 1 ? 'one address' : `${rows.length} addresses`}. `)
-    : el('p', {}, `311 also recorded this building's tax lot (BBL ${addrLot}) under ${rows.length - 1 === 1 ? 'another address' : `${rows.length - 1} other addresses`}.`);
-  const action = state.bbl
-    ? el('a', { class: 'button secondary', href: addressHref(state.addr) }, `Show only ${state.addr}`)
-    : el('a', { class: 'button', href: addressHref(state.addr, addrLot) }, `Show all ${fmtInt(all)} requests for this building`);
-  const list = table(rows, [
-    { key: 'a', label: 'Address', render: (r) => (r.a === state.addr
-      ? el('strong', { 'aria-current': 'page' }, `${r.a} (this address)`)
-      : el('a', { href: addressHref(r.a) }, r.a)) },
-    { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
-  ], 'Addresses on this lot, with requests for the dates and filters chosen');
-  const details = el('details', { class: 'as-table' }, el('summary', {}, `See the ${rows.length} addresses`), list);
-  if (state.bbl) details.open = true;
-  box.replaceChildren(lead, el('p', {}, action), details);
+  // Same shape as the ZIP/district line above: links joined by " · ".
+  const out = [el('a', { href: 'glossary.html#bbl' }, 'Same tax lot'), ': '];
+  rows.forEach((r, k) => {
+    if (k) out.push(' · ');
+    out.push(r.a === state.addr ? el('strong', {}, r.a) : el('a', { href: addressHref(r.a) }, r.a), ` (${fmtInt(r.n)})`);
+  });
+  out.push('. ', state.bbl
+    ? el('a', { href: addressHref(state.addr) }, `See only ${state.addr}`)
+    : el('a', { href: addressHref(state.addr, addrLot) }, `See all ${fmtInt(all)} requests for this lot`), '.');
+  box.replaceChildren(...out);
 }
 
 // ------------------------------------------------------------- refresh / boot

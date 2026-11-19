@@ -7,6 +7,12 @@ This page lists the changes to BoardStat that a reader would notice: new pages, 
 
 BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change reaches the site at the next upload. Entries since November 2026 are dated by the day the change was merged on GitHub. BetaNYC's [nyc-311-mcp](https://github.com/BetaNYC/nyc-311-mcp) server reads BoardStat's data files, so a change to BoardStat's data can change its answers too. To report a bug or ask for a new feature, email [boardstat@beta.nyc](mailto:boardstat@beta.nyc) or [open an issue on GitHub](https://github.com/BetaNYC/BoardStat/issues).
 
+## Unreleased: Address pages show the building's other addresses
+
+- **Tags:** Site
+- **What changed:** 311 records an address the way it was typed, so one building's requests can be split across several addresses. An address page now lists the other addresses on the same tax lot, with their number of requests, and links to a view of every request on the lot.
+- **More detail:** [The change](https://github.com/BetaNYC/BoardStat/issues/110)
+
 ## 2026-11-18: Report a data problem
 
 - **Tags:** Site
