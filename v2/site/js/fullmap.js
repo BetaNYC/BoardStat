@@ -39,7 +39,7 @@ let loadCount = 0;
 let listsKey = null; // the loads and dates the form's lists were made for
 
 /** The filters a link with no filters opens with (Reset's target). This page never has an address. */
-const defaultFilters = () => ({ ...defaults, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' });
+const defaultFilters = () => ({ ...defaults, types: [], descs: [], descEx: false, agency: '', status: '', addr: '', bbl: '' });
 
 /** The form's lists, from this page's rows, for the applied dates (filterform.js tableLists). */
 const formLists = tableLists(query, () => state);
@@ -133,7 +133,7 @@ async function main() {
   if (IS_BORO) $('back-link').textContent = '← Back to the borough page';
   defaults = { start: manifest.window.default_start || manifest.window.start, end: manifest.window.end };
   // A link never carries an address (filtersToParams), and this page ignores one if it does.
-  state = { ...filtersFromParams(params, defaults), addr: '' };
+  state = { ...filtersFromParams(params, defaults), addr: '', bbl: '' };
 
   document.title = `Map · ${district.label} · BoardStat 2.0 (prototype)`;
   $('title').textContent = `Map of requests: ${district.label}`;

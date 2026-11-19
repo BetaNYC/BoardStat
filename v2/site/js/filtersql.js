@@ -22,6 +22,7 @@ export function whereSql(s, { skipType = false, skipDates = false, skipDesc = fa
   if (!skipAgency && s.agency) w.push(`agency = ${lit(s.agency)}`);
   if (!skipDesc && s.descs.length) w.push(`${DESC_SQL} ${s.descEx ? 'NOT IN' : 'IN'} (${s.descs.map(lit).join(', ')})`);
   if (!skipStatus && s.status) w.push(s.status === NOT_CLOSED ? NOT_CLOSED_SQL : `status = ${lit(s.status)}`);
-  if (s.addr) w.push(`address_norm = ${lit(s.addr)}`);
+  if (s.bbl) w.push(`bbl = ${lit(s.bbl)}`);
+  else if (s.addr) w.push(`address_norm = ${lit(s.addr)}`);
   return w.join(' AND ');
 }

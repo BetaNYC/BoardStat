@@ -6,7 +6,7 @@
 // the draft; the Apply button copies the draft to applied and runs the queries.
 
 /** Field names, in the order a person reads the form. */
-export const FILTER_FIELDS = ['start', 'end', 'types', 'descs', 'descEx', 'agency', 'status', 'addr'];
+export const FILTER_FIELDS = ['start', 'end', 'types', 'descs', 'descEx', 'agency', 'status', 'addr', 'bbl'];
 
 /** A copy that shares no arrays with the original. */
 export function copyFilters(s) {
@@ -91,6 +91,8 @@ export function filtersFromParams(params, defaults) {
     agency: params.get('agency') || '',
     status: params.get('status') || '',
     addr: params.get('addr') || '',
+    // A tax lot (borough-block-lot, 10 digits): every request on the building's lot, whatever address was typed.
+    bbl: /^\d{10}$/.test(params.get('bbl') || '') ? params.get('bbl') : '',
   };
 }
 
@@ -133,6 +135,7 @@ export function describeFilters(s, fmtDate) {
   if (s.agency) parts.push(`agency: ${s.agency}`);
   if (s.descs?.length) parts.push(`${s.descEx ? 'excluding descriptions' : 'descriptions'}: ${s.descs.join(', ')}`);
   if (s.status) parts.push(`status: ${s.status === NOT_CLOSED ? 'not yet closed' : s.status}`);
-  if (s.addr) parts.push(`address: ${s.addr}`);
+  if (s.bbl) parts.push(`tax lot (BBL): ${s.bbl}`);
+  else if (s.addr) parts.push(`address: ${s.addr}`);
   return parts;
 }
