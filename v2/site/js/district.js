@@ -6,9 +6,9 @@ import {
 } from './lib.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
 import {
-  NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus,
+  NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus, isLot, addressParams,
 } from './filterstate.js';
-import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
+import { whereSql, NOT_CLOSED_SQL, DESC_SQL, LOT_SQL } from './filtersql.js';
 import { createFilterForm, tableLists, DATE_ORDER_MSG } from './filterform.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl, SLIM_COLUMNS, slimFileFor } from './place.js';
 import {
@@ -89,7 +89,7 @@ const TWO_STEP = IS_BORO;
 // from the file instead, so the long text fields never sit in memory.
 const LOAD_COLUMNS = ['unique_key', 'created_date', 'closed_date', 'agency', 'agency_name', 'complaint_type', 'descriptor', 'status',
   'incident_address', 'intersection_street_1', 'intersection_street_2', 'incident_zip', 'borough', 'latitude', 'longitude',
-  'cd', 'cc', 'days_to_close', 'address_norm', 'year_month', 'bbl'];
+  'cd', 'cc', 'days_to_close', 'address_norm', 'year_month', ...(ADDRESS_MODE ? ['bbl'] : [])];
 // Files built before range loading have no is_closed column or default_start; load those whole.
 const rangeLoading = () => Boolean(manifest.window.default_start);
 
@@ -1056,7 +1056,7 @@ function renderAbout() {
     : 'Every request with a location was placed in this district by BoardStat, using where it happened and today\'s boundary lines.' +
       (unloc ? ` Not counted: ${fmtInt(unloc)} requests since ${longDate(manifest.window.start)} (all dates, not only the ones chosen above) that have no usable location but that the city's own records assign to this community district.` : '');
   $('about').replaceChildren(
-    el('p', {}, !ADDRESS_MODE ? '' : state.bbl ? 'This page shows every request the city recorded on this building\'s tax lot (BBL), whatever address was typed. ' : 'This page shows only requests whose address matches exactly, as the city spelled it. ', text),
+    el('p', {}, !ADDRESS_MODE ? '' : isLot(params.get('bbl')) ? 'This page shows every request at this address, plus every request on its tax lot (BBL) under any other address. ' : 'This page shows only requests whose address matches exactly, as the city spelled it. ', text),
     el('ul', { class: 'more-links' },
       el('li', {}, el('a', { class: 'button', href: 'about.html', text: 'About BoardStat: sources and history' })),
       el('li', {}, el('a', { class: 'button secondary', href: 'glossary.html', text: 'Glossary: terms and how numbers are counted' }))),
@@ -1103,8 +1103,8 @@ function boroughCountsText(place, unloc) {
 async function renderAddressLinks() {
   const [a] = await query(`
     SELECT mode(incident_zip) AS zip, mode(cd) AS cd, mode(cc) AS cc, mode(borough) AS boro,
-           median(longitude) AS lng, median(latitude) AS lat, mode(bbl) AS bbl FROM req
-    WHERE ${state.bbl ? `bbl = ${lit(state.bbl)}` : `address_norm = ${lit(state.addr)}`}`);
+           median(longitude) AS lng, median(latitude) AS lat, mode(bbl) FILTER (WHERE ${LOT_SQL}) AS bbl FROM req
+    WHERE address_norm = ${lit(state.addr)}`);
   addrInfo = a || null;
   const link = (g, id) => {
     const d = manifest.districts[g]?.find((x) => String(x.id) === String(id));
@@ -1128,50 +1128,67 @@ async function renderAddressLinks() {
   const bUrl = `https://boundaries.beta.nyc/?${bq}`;
   const bLink = el('button', { type: 'button', class: 'link', onclick: () => window.open(bUrl, '_blank', 'noopener,noreferrer') },
     'See the boundaries around this address on the BetaNYC Boundaries Map');
-  $('addr-links').replaceChildren(...(out.length ? ['In ', ...out, '. Select a district to see all of it.'] : []));
-  $('addr-links').after(el('p', { class: 'no-print' }, bLink, el('span', { class: 'muted', text: ' (political and administrative districts, opens in a new tab)' })));
-  $('boundary-note').textContent = state.bbl
-    ? `Every request on tax lot ${state.bbl} (BBL), under any address. Requests that gave only a cross street, or that the city did not match to a lot, are not included.`
-    : 'Every request whose address matches this one exactly, as the city spelled it. Requests that gave only a cross street are not included.';
+  // The same-lot line is counted before anything is drawn, so both lines appear together.
   addrLot = state.bbl || a?.bbl || null;
-  if (!addrLot) return;
-  $('addr-links').after(el('p', { class: 'no-print', id: 'same-lot', hidden: true }));
-  await renderSameLot();
+  const lotLine = el('p', { class: 'no-print', id: 'same-lot', hidden: true });
+  if (addrLot) {
+    $('addr-links').after(lotLine);
+    // A failed count must not stop the page: refresh() draws the line again.
+    try { await renderSameLot(); } catch (err) { console.error(err); }
+  }
+  $('addr-links').replaceChildren(...(out.length ? ['In ', ...out, '. Select a district to see all of it.'] : []));
+  (addrLot ? lotLine : $('addr-links')).after(el('p', { class: 'no-print' }, bLink, el('span', { class: 'muted', text: ' (political and administrative districts, opens in a new tab)' })));
+  $('boundary-note').textContent = state.bbl
+    ? `Every request at this address, plus every request on its tax lot (${state.bbl}, BBL) under any other address. Requests that gave only a cross street are not included.`
+    : 'Every request whose address matches this one exactly, as the city spelled it. Requests that gave only a cross street are not included.';
 }
 
-/** A link to this page for another address, keeping the district and filters, never the lot. */
-function addressHref(addr, bbl = '') {
-  const p = new URLSearchParams(location.search);
-  p.set('addr', addr);
-  if (bbl) p.set('bbl', bbl); else p.delete('bbl');
-  return `address.html?${p}`;
-}
+/** A link to an address page with this page's district and applied filters. */
+const addressHref = (addr, bbl = '') => `address.html?${addressParams(geo, geoId, state, defaultDates(), addr, bbl)}`;
 
 /**
  * Address page: other addresses on the same tax lot (BBL). 311 records the address as typed,
  * so one building can be split across street numbers (a corner lot, a range of street numbers).
  * Counts follow the applied filters.
  */
+let sameLotKey = null; // the filters the same-lot line was last counted for, so it is counted once per change
+const SAME_LOT_MAX = 8; // a big complex can have dozens of addresses on one lot
+
 async function renderSameLot() {
   const box = $('same-lot');
   if (!box || !addrLot) return;
+  // Every request at this address or on its lot, by address. The page's own address keeps
+  // all its requests, so its count is the same as the page's.
+  const where = whereSql({ ...state, bbl: addrLot });
+  if (where === sameLotKey) return;
   const rows = await query(`
     SELECT address_norm AS a, count(*)::INTEGER AS n FROM ${ROWS()}
-    WHERE ${whereSql({ ...state, addr: '', bbl: addrLot })} AND address_norm IS NOT NULL
+    WHERE ${where} AND address_norm IS NOT NULL
     GROUP BY 1 ORDER BY 2 DESC, 1`);
-  // Only worth showing when the lot has more than this one address.
-  box.hidden = rows.length < 2 && !state.bbl;
-  if (box.hidden) return box.replaceChildren();
-  const all = rows.reduce((t, r) => t + r.n, 0);
+  sameLotKey = where;
+  const others = rows.filter((r) => r.a !== state.addr);
+  const lot = el('a', { href: 'glossary.html#bbl' }, 'tax lot');
+  if (!others.length) {
+    // The lot view always offers the way back; an address page with nothing to add shows nothing.
+    box.hidden = !state.bbl;
+    box.replaceChildren(...(state.bbl ? ['No other address on this ', lot, ' has requests for these filters. ',
+      el('a', { href: addressHref(state.addr) }, `See only ${state.addr}`), '.'] : []));
+    return;
+  }
+  const shown = others.slice(0, SAME_LOT_MAX);
+  const total = rows.reduce((t, r) => t + r.n, 0);
   // Same shape as the ZIP/district line above: links joined by " · ".
-  const out = [el('a', { href: 'glossary.html#bbl' }, 'Same tax lot'), ': '];
-  rows.forEach((r, k) => {
+  const out = ['Also on this ', lot, ': '];
+  shown.forEach((r, k) => {
     if (k) out.push(' · ');
-    out.push(r.a === state.addr ? el('strong', {}, r.a) : el('a', { href: addressHref(r.a) }, r.a), ` (${fmtInt(r.n)})`);
+    out.push(`${fmtInt(r.n)}${k ? '' : (r.n === 1 ? ' request' : ' requests')} at `, el('a', { href: addressHref(r.a) }, r.a));
   });
+  const more = others.length - shown.length;
+  if (more > 0) out.push(` · and ${fmtInt(more)} more ${more === 1 ? 'address' : 'addresses'}`);
   out.push('. ', state.bbl
     ? el('a', { href: addressHref(state.addr) }, `See only ${state.addr}`)
-    : el('a', { href: addressHref(state.addr, addrLot) }, `See all ${fmtInt(all)} requests for this lot`), '.');
+    : el('a', { href: addressHref(state.addr, addrLot) }, `See all ${fmtInt(total)} requests at these ${fmtInt(rows.length)} addresses`), '.');
+  box.hidden = false;
   box.replaceChildren(...out);
 }
 
@@ -1212,7 +1229,7 @@ function watchChartWidth() {
       if (loader?.loadPending() || rowsLoader?.loadPending()) return; // the refresh after that load draws at the new width
       lastChartWidth = chartWidthKey();
       try {
-        await Promise.all([renderMonthly(), renderAgency(), ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare(), renderSameLot()] : [renderCompare()])]);
+        await Promise.all([renderMonthly(), renderAgency(), ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare()] : [renderCompare()])]);
       } catch (err) { console.error(err); }
     }, 250);
   });
@@ -1314,7 +1331,7 @@ async function main() {
     hideFilters();
     return;
   }
-  const label = ADDRESS_MODE ? params.get('addr') : district.label;
+  const label = !ADDRESS_MODE ? district.label : isLot(params.get('bbl')) ? `${params.get('addr')} and its tax lot` : params.get('addr');
   document.title = `${label} · BoardStat 2.0 (prototype)`;
   $('title').textContent = label;
   renderDataStatus(manifest, $('as-of'), $('stale'));

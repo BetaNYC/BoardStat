@@ -8,6 +8,9 @@ export function lit(s) {
   return `'${String(s).replace(/'/g, "''")}'`;
 }
 
+/** SQL test for a real tax lot, the same rule as isLot() in filterstate.js. */
+export const LOT_SQL = `regexp_matches(bbl, '^[1-5][0-9]{9}$') AND substr(bbl, 2, 5) <> '00000' AND substr(bbl, 7, 4) <> '0000'`;
+
 export const NOT_CLOSED_SQL = `status IS DISTINCT FROM 'Closed'`;
 // A missing descriptor is shown and filtered as "(none)", as in the descriptor table.
 export const DESC_SQL = `coalesce(descriptor, '(none)')`;
@@ -22,7 +25,8 @@ export function whereSql(s, { skipType = false, skipDates = false, skipDesc = fa
   if (!skipAgency && s.agency) w.push(`agency = ${lit(s.agency)}`);
   if (!skipDesc && s.descs.length) w.push(`${DESC_SQL} ${s.descEx ? 'NOT IN' : 'IN'} (${s.descs.map(lit).join(', ')})`);
   if (!skipStatus && s.status) w.push(s.status === NOT_CLOSED ? NOT_CLOSED_SQL : `status = ${lit(s.status)}`);
-  if (s.bbl) w.push(`bbl = ${lit(s.bbl)}`);
+  // A tax lot view keeps every request at its own address too (some have no bbl, or another one).
+  if (s.bbl) w.push(s.addr ? `(bbl = ${lit(s.bbl)} OR address_norm = ${lit(s.addr)})` : `bbl = ${lit(s.bbl)}`);
   else if (s.addr) w.push(`address_norm = ${lit(s.addr)}`);
   return w.join(' AND ');
 }
