@@ -294,3 +294,6 @@ textarea {
 .report-link a { display: inline-flex; align-items: center; min-height: 44px; }
 /* The honeypot: off screen, out of the tab order (tabindex -1) and hidden from screen readers (aria-hidden). */
 .report-hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+
+/* Address page: the other addresses on the same tax lot (BBL). Two columns, so keep them close. */
+.same-lot .table-wrap { max-width: 32rem; }

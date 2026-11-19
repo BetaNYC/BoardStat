@@ -1135,39 +1135,49 @@ async function renderAddressLinks() {
     : 'Every request whose address matches this one exactly, as the city spelled it. Requests that gave only a cross street are not included.';
   addrLot = state.bbl || a?.bbl || null;
   if (!addrLot) return;
-  $('addr-links').after(el('p', { class: 'no-print', id: 'same-lot' }));
+  $('addr-links').after(el('div', { class: 'no-print same-lot', id: 'same-lot', hidden: true }));
   await renderSameLot();
 }
 
+/** A link to this page for another address, keeping the district and filters, never the lot. */
+function addressHref(addr, bbl = '') {
+  const p = new URLSearchParams(location.search);
+  p.set('addr', addr);
+  if (bbl) p.set('bbl', bbl); else p.delete('bbl');
+  return `address.html?${p}`;
+}
+
 /**
- * Address page: other spellings on the same tax lot (BBL). 311 records the address as typed,
+ * Address page: other addresses on the same tax lot (BBL). 311 records the address as typed,
  * so one building can be split across street numbers (a corner lot, a range of street numbers).
  * Counts follow the applied filters.
  */
 async function renderSameLot() {
-  const p = $('same-lot');
-  if (!p || !addrLot) return;
-  const lot = addrLot;
+  const box = $('same-lot');
+  if (!box || !addrLot) return;
   const rows = await query(`
     SELECT address_norm AS a, count(*)::INTEGER AS n FROM ${ROWS()}
-    WHERE ${whereSql({ ...state, addr: '', bbl: lot })} AND address_norm IS NOT NULL
+    WHERE ${whereSql({ ...state, addr: '', bbl: addrLot })} AND address_norm IS NOT NULL
     GROUP BY 1 ORDER BY 2 DESC, 1`);
-  p.replaceChildren();
-  if (state.bbl) {
-    p.append(`Addresses on this lot: ${rows.map((r) => `${r.a} (${fmtInt(r.n)})`).join(', ') || 'none in these dates'}. `);
-    const only = new URLSearchParams(location.search); only.delete('bbl');
-    p.append(el('a', { href: `address.html?${only}` }, `Show only ${state.addr}`));
-  } else {
-    const others = rows.filter((r) => r.a !== state.addr);
-    if (others.length) {
-      const all = rows.reduce((t, r) => t + r.n, 0);
-      p.append(`The city also recorded requests on this building's tax lot (BBL ${lot}) under ${others.length === 1 ? 'another address' : 'other addresses'}: `,
-        others.map((r) => `${r.a} (${fmtInt(r.n)})`).join(', '), '. ');
-      const withLot = new URLSearchParams(location.search); withLot.set('bbl', lot);
-      p.append(el('a', { href: `address.html?${withLot}` }, `Show all ${fmtInt(all)} requests for this building`));
-    }
-  }
-  p.hidden = !p.childNodes.length;
+  // Only worth showing when the lot has more than this one address.
+  box.hidden = rows.length < 2 && !state.bbl;
+  if (box.hidden) return box.replaceChildren();
+  const all = rows.reduce((t, r) => t + r.n, 0);
+  const lead = state.bbl
+    ? el('p', {}, `Showing every request on this building's tax lot (BBL ${addrLot}): ${fmtInt(all)} under ${rows.length === 1 ? 'one address' : `${rows.length} addresses`}. `)
+    : el('p', {}, `311 also recorded this building's tax lot (BBL ${addrLot}) under ${rows.length - 1 === 1 ? 'another address' : `${rows.length - 1} other addresses`}.`);
+  const action = state.bbl
+    ? el('a', { class: 'button secondary', href: addressHref(state.addr) }, `Show only ${state.addr}`)
+    : el('a', { class: 'button', href: addressHref(state.addr, addrLot) }, `Show all ${fmtInt(all)} requests for this building`);
+  const list = table(rows, [
+    { key: 'a', label: 'Address', render: (r) => (r.a === state.addr
+      ? el('strong', { 'aria-current': 'page' }, `${r.a} (this address)`)
+      : el('a', { href: addressHref(r.a) }, r.a)) },
+    { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
+  ], 'Addresses on this lot, with requests for the dates and filters chosen');
+  const details = el('details', { class: 'as-table' }, el('summary', {}, `See the ${rows.length} addresses`), list);
+  if (state.bbl) details.open = true;
+  box.replaceChildren(lead, el('p', {}, action), details);
 }
 
 // ------------------------------------------------------------- refresh / boot
