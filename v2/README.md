@@ -688,7 +688,11 @@ the About page:
 - GA's "page changes based on browser history events" setting can only be
   turned off in the GA property, not in code. So BoardStat never writes an
   address into the URL after load: the address page never rewrites its URL, and
-  the district page no longer keeps the address filter in its link. The Boundaries
+  the district page no longer keeps the address filter in its link. The address
+  page's `bbl` (a tax lot, which identifies a property as an address does) is handled
+  like `addr`: links the address page draws itself carry it (`addressParams` in
+  `js/filterstate.js`), but `filtersToParams` never writes it, analytics drops it (not
+  in `SAFE_PARAMS`) and a data-problem report never carries it. The Boundaries
   Map link is a button (`noopener,noreferrer`), so Google's outbound-click event
   never sees the address in it.
 - Recommended in GA (someone with access): turn off "Page changes based on
