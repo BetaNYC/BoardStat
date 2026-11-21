@@ -102,7 +102,7 @@ export async function loadRequestPoints(ctx, from, where) {
 
 /** The line under the map: how many requests it shows out of how many match, and how to use it. */
 export function mapNoteText(total, shown) {
-  return (total > MAP_CAP ? `Showing the ${fmtInt(MAP_CAP)} most recent of ${fmtInt(total)} matching requests. ` : `Showing all ${fmtInt(shown)} matching requests. `) +
+  return (total > MAP_CAP ? `Showing the ${fmtInt(MAP_CAP)} most recent of ${fmtInt(total)} matching requests. ` : shown === 1 ? 'Showing the 1 matching request. ' : `Showing all ${fmtInt(shown)} matching requests. `) +
     'Circles group nearby requests; select one to zoom in, or select a single point for details.';
 }
 
