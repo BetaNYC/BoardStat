@@ -140,3 +140,9 @@ test('the status line says "1 request matches." and "N requests match." (#180)',
   assert.equal(matchMsg(0), '0 requests match.');
   assert.equal(matchMsg(1234), '1,234 requests match.');
 });
+
+test('map note: one request reads singular (#180)', async () => {
+  const { mapNoteText } = await import('../site/js/requestmap.js');
+  assert.match(mapNoteText(1, 1), /^Showing the 1 matching request\. /);
+  assert.match(mapNoteText(2, 2), /^Showing all 2 matching requests\. /);
+});
