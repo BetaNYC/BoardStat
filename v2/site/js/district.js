@@ -9,7 +9,7 @@ import {
   NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus,
 } from './filterstate.js';
 import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
-import { createFilterForm, tableLists, DATE_ORDER_MSG } from './filterform.js';
+import { createFilterForm, tableLists, DATE_ORDER_MSG, matchMsg } from './filterform.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl, SLIM_COLUMNS, slimFileFor } from './place.js';
 import {
   periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly, DataChangedError, filesNamedIn, freshnessCheck, loadFailedText,
@@ -1213,7 +1213,7 @@ async function refresh() {
       ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare()] : [renderAddresses(), renderCompare()])]);
     // A link can carry dates in the wrong order: say so instead of just "0 requests match."
     // A section whose rows failed says so inside itself (syncRowPanels); the count stays here.
-    if (seq === refreshSeq) setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
+    if (seq === refreshSeq) setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : matchMsg(total));
     lastRefreshFailed = Boolean(rowsError);
     lastChartWidth = chartWidthKey();
     // After the form's own Apply or Reset on a phone: close the panel, focus its toggle.
@@ -1332,7 +1332,7 @@ async function main() {
     lists: formLists,
     onApply: (s) => { state = s; refresh(); },
     lastFailed: () => lastRefreshFailed,
-    matchText: () => `${fmtInt(total)} requests match.`,
+    matchText: () => matchMsg(total),
     setStatus: (msg) => setStatus($('status'), msg),
     lockAddress: ADDRESS_MODE,
   });

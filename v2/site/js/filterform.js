@@ -10,11 +10,13 @@
 //
 // The page supplies the lists to choose from (it knows where its rows are) and what to do
 // on Apply. The pure decisions are exported for v2/tests-js.
-import { el, fmtDate } from './lib.js';
+import { el, fmtDate, fmtInt } from './lib.js';
 import { whereSql, DESC_SQL, NOT_CLOSED_SQL, lit } from './filtersql.js';
 import { copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED, describeFilters } from './filterstate.js';
 
 export const DATE_ORDER_MSG = 'The From date is after the To date. Change one of them, then press Apply filters.';
+/** The status line after a page counts its requests: "1 request matches.", "2 requests match." */
+export const matchMsg = (n) => `${fmtInt(n)} ${n === 1 ? 'request matches' : 'requests match'}.`;
 export const PENDING_MSG = 'Filters changed. Press Apply filters to update the page.';
 
 /**
