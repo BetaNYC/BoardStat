@@ -10,7 +10,7 @@ BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change re
 ## Unreleased: Address pages show other addresses on the same tax lot
 
 - **Tags:** Site
-- **What changed:** 311 records an address the way it was typed, so one building's requests can be split across several addresses. An address page now lists the other addresses on the same tax lot (the city's number for a piece of land), with their number of requests, and links to a view of every request at the address and on its lot. A tax lot can also hold more than one building, such as a large complex. When 311 recorded the same address on more than one tax lot, for example a building's lot before and after it became a condominium, the page names the other lots too.
+- **What changed:** 311 records an address the way it was typed, so one building's requests can be split across several addresses. An address page now lists the other addresses on the same tax lot (the city's number for a piece of land), with how many of their requests are on that lot, and links to a view of every request at the address and on its lot. A tax lot can also hold more than one building, such as a large complex. When 311 recorded the same address on more than one tax lot, for example a building's lot before and after it became a condominium, the page names the other lots too.
 - **More detail:** [The change](https://github.com/BetaNYC/BoardStat/issues/110)
 
 ## 2026-11-18: Report a data problem

@@ -1194,11 +1194,12 @@ async function renderSameLot() {
   }
   const shown = others.slice(0, SAME_LOT_MAX);
   const total = rows.reduce((t, r) => t + r.n, 0);
-  // Same shape as the ZIP/district line above: links joined by " · ".
-  const out = ['Also on this ', lot, ': '];
+  // Same shape as the ZIP/district line above: links joined by " · ". Each count is only that
+  // address's requests on this lot, so it can be lower than the total on the page it links to.
+  const out = ['Requests on this ', lot, ' at other addresses: '];
   shown.forEach((r, k) => {
     if (k) out.push(' · ');
-    out.push(`${fmtInt(r.n)}${k ? '' : (r.n === 1 ? ' request' : ' requests')} at `, el('a', { href: addressHref(r.a) }, r.a));
+    out.push(`${fmtInt(r.n)} at `, el('a', { href: addressHref(r.a) }, r.a));
   });
   const more = others.length - shown.length;
   if (more > 0) out.push(` · and ${fmtInt(more)} more ${more === 1 ? 'address' : 'addresses'}`);
