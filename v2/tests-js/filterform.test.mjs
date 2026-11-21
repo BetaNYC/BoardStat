@@ -3,7 +3,7 @@
 // Run: node --test v2/tests-js/   (also run by `uv run pytest` in v2/pipeline)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyCheck, findChoice, pendingSummary, DATE_ORDER_MSG, PENDING_MSG } from '../site/js/filterform.js';
+import { applyCheck, findChoice, pendingSummary, matchMsg, DATE_ORDER_MSG, PENDING_MSG } from '../site/js/filterform.js';
 import { filtersFromParams, filtersToParams, copyFilters, patchBoth, keepKnownStatus } from '../site/js/filterstate.js';
 import { whereSql } from '../site/js/filtersql.js';
 
@@ -133,4 +133,10 @@ test('the filter panel: open on a wide district page, closed on a phone and alwa
   assert.equal(panelClosesAfterApply({ mapPage: true, phone: false }), true);
   assert.equal(toggleLabel(true), 'Hide filters');
   assert.equal(toggleLabel(false), 'Change filters');
+});
+
+test('the status line says "1 request matches." and "N requests match." (#180)', () => {
+  assert.equal(matchMsg(1), '1 request matches.');
+  assert.equal(matchMsg(0), '0 requests match.');
+  assert.equal(matchMsg(1234), '1,234 requests match.');
 });

@@ -8,10 +8,10 @@
 // the map and the filters use, in a compressed in-memory database, from the From date on
 // (plus every request not yet closed). Moving the From date earlier appends only what is
 // missing, so a change of filters reads nothing again.
-import { loadManifest, renderDataStatus, registerData, reregisterData, query, el, setStatus, fmtDate, fmtInt } from './lib.js';
+import { loadManifest, renderDataStatus, registerData, reregisterData, query, el, setStatus, fmtDate } from './lib.js';
 import { filtersFromParams, filtersToParams, keepKnownStatus } from './filterstate.js';
 import { whereSql } from './filtersql.js';
-import { createFilterForm, tableLists, DATE_ORDER_MSG } from './filterform.js';
+import { createFilterForm, tableLists, DATE_ORDER_MSG, matchMsg } from './filterform.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql } from './place.js';
 import { periodFrom, createLoader, freshnessCheck, loadFailedText, filesNamedIn, DataChangedError } from './loadplan.js';
@@ -99,7 +99,7 @@ async function redraw() {
     const shown = await loadRequestPoints(mapCtx, 'req', where);
     if (mine !== seq) return;
     $('map-note').textContent = mapNoteText(total, shown.count);
-    setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
+    setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : matchMsg(total));
     lastFailed = false;
     // The panel closes after Apply at every width here, focus on its toggle (filterform.js).
     form.afterRedraw();
@@ -145,7 +145,7 @@ async function main() {
     lists: formLists,
     onApply: (s) => { state = s; redraw(); },
     lastFailed: () => lastFailed,
-    matchText: () => `${fmtInt(total)} requests match.`,
+    matchText: () => matchMsg(total),
     setStatus: (msg) => setStatus($('status'), msg),
   });
   form.set(state);
