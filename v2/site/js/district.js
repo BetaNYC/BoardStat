@@ -341,7 +341,9 @@ function freshDataFiles(err) {
 const defaultDates = () => ({ start: viewStart, end: manifest.window.end });
 
 function readState() {
-  return filtersFromParams(params, defaultDates());
+  const s = filtersFromParams(params, defaultDates());
+  // Only the address page loads the bbl column; elsewhere a bbl in a link is ignored, as on the map.
+  return ADDRESS_MODE ? s : { ...s, bbl: '' };
 }
 
 function writeUrl() {
@@ -799,6 +801,10 @@ async function renderAgency() {
   ], 'Requests by agency and status (top 8 agencies)');
 }
 
+/** Address page: what its panels count, the address or (a `bbl` link) the address and its lot. */
+const here = () => (state.bbl ? 'this address and its tax lot' : 'this address');
+const Here = () => (state.bbl ? 'This address and its tax lot' : 'This address');
+
 /** Address page: requests per month, split by the five most common problems. */
 async function renderTimeline() {
   const OTHER = 'Other problems';
@@ -813,7 +819,7 @@ async function renderTimeline() {
   const data = rows.map((r) => ({ ...r, date: new Date(`${r.ym}-01T00:00:00Z`) }));
   const d3sum = (ds) => { const m = new Map(); for (const d of ds) m.set(d.ym, (m.get(d.ym) || 0) + d.n); return m.values(); };
   const chart = Plot.plot({
-    ariaLabel: 'Requests at this address per month, by problem',
+    ariaLabel: `Requests at ${here()} per month, by problem`,
     ariaDescription: `Stacked bars, one per month, split into ${types.join(', ')}.`,
     width: chartWidth('timeline'),
     height: 280,
@@ -831,7 +837,7 @@ async function renderTimeline() {
     { key: 'ym', label: 'Month', fmt: (v) => monthLabel(v) },
     { key: 't', label: 'Problem' },
     { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
-  ], 'Requests at this address per month, by problem');
+  ], `Requests at ${here()} per month, by problem`);
 }
 
 /**
@@ -855,7 +861,7 @@ async function renderAddressCompare() {
   );
   const ymStart = state.start.slice(0, 7);
   const ymEnd = state.end.slice(0, 7);
-  $('acmp-note').textContent = `Share of each problem among requests at this address, next to the same share across ${[cdLabel, ccLabel].filter(Boolean).join(' and ') || 'its districts'}. ` +
+  $('acmp-note').textContent = `Share of each problem among requests at ${here()}, next to the same share across ${[cdLabel, ccLabel].filter(Boolean).join(' and ') || 'its districts'}. ` +
     `The address uses your From and To dates; the districts use whole months, ${monthLabel(ymStart)} to ${monthLabel(ymEnd)}. Problem, description, agency and status filters do not apply here.`;
   const rows = await query(`
     WITH a AS (
@@ -873,16 +879,16 @@ async function renderAddressCompare() {
       max(g_share) FILTER (WHERE geo_kind = 'cd') AS d,
       max(g_share) FILTER (WHERE geo_kind = 'cc') AS c
     FROM top LEFT JOIN gs USING (t) GROUP BY top.t, top.a_share ORDER BY a DESC, top.t`);
-  if (!rows.length) { $('acmp').replaceChildren(el('p', { text: 'No requests at this address in these dates.' })); return; }
-  const names = ['This address', cdLabel || 'Community district', ccLabel || 'Council district'];
+  if (!rows.length) { $('acmp').replaceChildren(el('p', { text: `No requests at ${here()} in these dates.` })); return; }
+  const names = [Here(), cdLabel || 'Community district', ccLabel || 'Council district'];
   const long = rows.flatMap((r) => [
     { t: r.t, where: names[0], share: r.a ?? 0 },
     { t: r.t, where: names[1], share: r.d ?? 0 },
     { t: r.t, where: names[2], share: r.c ?? 0 },
   ]);
   const chart = Plot.plot({
-    ariaLabel: 'Share of top request types: this address, its community district, its council district',
-    ariaDescription: 'Dot chart comparing each top request type\'s share of requests at this address, in its community district, and in its council district.',
+    ariaLabel: `Share of top request types: ${here()}, its community district, its council district`,
+    ariaDescription: `Dot chart comparing each top request type's share of requests at ${here()}, in its community district, and in its council district.`,
     width: chartWidth('acmp', 420),
     marginLeft: 180,
     height: 50 + 30 * rows.length,
@@ -894,10 +900,10 @@ async function renderAddressCompare() {
   });
   chartWithTable($('acmp'), chart, rows, [
     { key: 't', label: 'Problem' },
-    { key: 'a', label: 'This address', num: true, fmt: fmtPct },
+    { key: 'a', label: names[0], num: true, fmt: fmtPct },
     { key: 'd', label: names[1], num: true, fmt: fmtPct },
     { key: 'c', label: names[2], num: true, fmt: fmtPct },
-  ], 'Share of requests by problem: this address and its districts');
+  ], `Share of requests by problem: ${here()} and its districts`);
 }
 
 async function renderAddresses() {
@@ -1103,8 +1109,11 @@ function boroughCountsText(place, unloc) {
 async function renderAddressLinks() {
   const [a] = await query(`
     SELECT mode(incident_zip) AS zip, mode(cd) AS cd, mode(cc) AS cc, mode(borough) AS boro,
-           median(longitude) AS lng, median(latitude) AS lat, mode(bbl) FILTER (WHERE ${LOT_SQL}) AS bbl FROM req
-    WHERE address_norm = ${lit(state.addr)}`);
+           median(longitude) AS lng, median(latitude) AS lat,
+           -- The lot with the most requests at this address; a tie goes to the lot used most recently.
+           (SELECT bbl FROM req WHERE address_norm = ${lit(state.addr)} AND ${LOT_SQL}
+            GROUP BY bbl ORDER BY count(*) DESC, max(created_date) DESC, bbl LIMIT 1) AS bbl
+    FROM req WHERE address_norm = ${lit(state.addr)}`);
   addrInfo = a || null;
   const link = (g, id) => {
     const d = manifest.districts[g]?.find((x) => String(x.id) === String(id));
@@ -1165,14 +1174,22 @@ async function renderSameLot() {
     SELECT address_norm AS a, count(*)::INTEGER AS n FROM ${ROWS()}
     WHERE ${where} AND address_norm IS NOT NULL
     GROUP BY 1 ORDER BY 2 DESC, 1`);
+  // Other lots 311 recorded for this same address, e.g. a building's lot before and after it
+  // became a condominium. The line names them, so a lot view never hides them silently.
+  const otherLots = await query(`
+    SELECT bbl AS b, count(*)::INTEGER AS n FROM ${ROWS()}
+    WHERE ${whereSql({ ...state, bbl: '' })} AND ${LOT_SQL} AND bbl <> ${lit(addrLot)}
+    GROUP BY 1 ORDER BY 2 DESC, 1`);
   sameLotKey = where;
+  const lotsNote = otherLots.length ? [' ', ...otherLots.flatMap((r, k) => [k ? ' · ' : `${state.addr} also has `,
+    `${fmtInt(r.n)} ${r.n === 1 ? 'request' : 'requests'} on tax lot `, el('a', { href: addressHref(state.addr, r.b) }, r.b)]), '.'] : [];
   const others = rows.filter((r) => r.a !== state.addr);
   const lot = el('a', { href: 'glossary.html#bbl' }, 'tax lot');
   if (!others.length) {
     // The lot view always offers the way back; an address page with nothing to add shows nothing.
-    box.hidden = !state.bbl;
+    box.hidden = !state.bbl && !lotsNote.length;
     box.replaceChildren(...(state.bbl ? ['No other address on this ', lot, ' has requests for these filters. ',
-      el('a', { href: addressHref(state.addr) }, `See only ${state.addr}`), '.'] : []));
+      el('a', { href: addressHref(state.addr) }, `See only ${state.addr}`), '.'] : []), ...lotsNote);
     return;
   }
   const shown = others.slice(0, SAME_LOT_MAX);
@@ -1187,7 +1204,7 @@ async function renderSameLot() {
   if (more > 0) out.push(` · and ${fmtInt(more)} more ${more === 1 ? 'address' : 'addresses'}`);
   out.push('. ', state.bbl
     ? el('a', { href: addressHref(state.addr) }, `See only ${state.addr}`)
-    : el('a', { href: addressHref(state.addr, addrLot) }, `See all ${fmtInt(total)} requests at these ${fmtInt(rows.length)} addresses`), '.');
+    : el('a', { href: addressHref(state.addr, addrLot) }, `See all ${fmtInt(total)} ${total === 1 ? 'request' : 'requests'} at ${rows.length === 1 ? '1 address' : `these ${fmtInt(rows.length)} addresses`}`), '.', ...lotsNote);
   box.hidden = false;
   box.replaceChildren(...out);
 }
@@ -1271,7 +1288,7 @@ async function refresh() {
     await renderKpis();
     if (seq !== refreshSeq) return;
     await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgencyResponse(), renderAgency(), renderBacklog(), renderDetail(), renderMap(),
-      ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare(), renderSameLot()] : [renderAddresses(), renderCompare()])]);
+      ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare(), renderSameLot().catch((err) => console.error(err))] : [renderAddresses(), renderCompare()])]);
     // A link can carry dates in the wrong order: say so instead of just "0 requests match."
     // A section whose rows failed says so inside itself (syncRowPanels); the count stays here.
     if (seq === refreshSeq) setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : `${fmtInt(total)} requests match.`);
