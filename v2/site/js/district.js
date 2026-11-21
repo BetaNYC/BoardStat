@@ -6,9 +6,9 @@ import {
 } from './lib.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
 import {
-  NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus,
+  NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus, isLot, addressParams,
 } from './filterstate.js';
-import { whereSql, NOT_CLOSED_SQL, DESC_SQL } from './filtersql.js';
+import { whereSql, NOT_CLOSED_SQL, DESC_SQL, LOT_SQL } from './filtersql.js';
 import { createFilterForm, tableLists, DATE_ORDER_MSG, matchMsg } from './filterform.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl, SLIM_COLUMNS, slimFileFor } from './place.js';
 import {
@@ -49,6 +49,7 @@ let total = 0;
 let mapCtx = null;
 let selectedType = null;
 let addrInfo = null; // address page: { zip, cd, cc, boro, lng, lat } of the address
+let addrLot = null; // address page: the address's tax lot (BBL), if 311 recorded one
 let asOfSql = null; // build time as an NYC-local TIMESTAMP literal; "days open" is measured to it
 let viewStart = null; // the From date a link without dates opens with (manifest.window.default_start)
 let loader = null; // loads the req table (loadplan.js); null when the file is loaded whole
@@ -88,7 +89,7 @@ const TWO_STEP = IS_BORO;
 // from the file instead, so the long text fields never sit in memory.
 const LOAD_COLUMNS = ['unique_key', 'created_date', 'closed_date', 'agency', 'agency_name', 'complaint_type', 'descriptor', 'status',
   'incident_address', 'intersection_street_1', 'intersection_street_2', 'incident_zip', 'borough', 'latitude', 'longitude',
-  'cd', 'cc', 'days_to_close', 'address_norm', 'year_month'];
+  'cd', 'cc', 'days_to_close', 'address_norm', 'year_month', ...(ADDRESS_MODE ? ['bbl'] : [])];
 // Files built before range loading have no is_closed column or default_start; load those whole.
 const rangeLoading = () => Boolean(manifest.window.default_start);
 
@@ -340,7 +341,9 @@ function freshDataFiles(err) {
 const defaultDates = () => ({ start: viewStart, end: manifest.window.end });
 
 function readState() {
-  return filtersFromParams(params, defaultDates());
+  const s = filtersFromParams(params, defaultDates());
+  // Only the address page loads the bbl column; elsewhere a bbl in a link is ignored, as on the map.
+  return ADDRESS_MODE ? s : { ...s, bbl: '' };
 }
 
 function writeUrl() {
@@ -396,7 +399,7 @@ let form = null;
 
 /** The filters a link with no filters opens with (the Reset button's target). */
 function defaultFilters() {
-  return { start: viewStart, end: manifest.window.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: ADDRESS_MODE ? state.addr : '' };
+  return { start: viewStart, end: manifest.window.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: ADDRESS_MODE ? state.addr : '', bbl: ADDRESS_MODE ? state.bbl : '' };
 }
 
 /** Shortcut buttons in the panels (an agency, a description, an address) apply at once. */
@@ -798,6 +801,10 @@ async function renderAgency() {
   ], 'Requests by agency and status (top 8 agencies)');
 }
 
+/** Address page: what its panels count, the address or (a `bbl` link) the address and its lot. */
+const here = () => (state.bbl ? 'this address and its tax lot' : 'this address');
+const Here = () => (state.bbl ? 'This address and its tax lot' : 'This address');
+
 /** Address page: requests per month, split by the five most common problems. */
 async function renderTimeline() {
   const OTHER = 'Other problems';
@@ -812,7 +819,7 @@ async function renderTimeline() {
   const data = rows.map((r) => ({ ...r, date: new Date(`${r.ym}-01T00:00:00Z`) }));
   const d3sum = (ds) => { const m = new Map(); for (const d of ds) m.set(d.ym, (m.get(d.ym) || 0) + d.n); return m.values(); };
   const chart = Plot.plot({
-    ariaLabel: 'Requests at this address per month, by problem',
+    ariaLabel: `Requests at ${here()} per month, by problem`,
     ariaDescription: `Stacked bars, one per month, split into ${types.join(', ')}.`,
     width: chartWidth('timeline'),
     height: 280,
@@ -830,7 +837,7 @@ async function renderTimeline() {
     { key: 'ym', label: 'Month', fmt: (v) => monthLabel(v) },
     { key: 't', label: 'Problem' },
     { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
-  ], 'Requests at this address per month, by problem');
+  ], `Requests at ${here()} per month, by problem`);
 }
 
 /**
@@ -854,7 +861,7 @@ async function renderAddressCompare() {
   );
   const ymStart = state.start.slice(0, 7);
   const ymEnd = state.end.slice(0, 7);
-  $('acmp-note').textContent = `Share of each problem among requests at this address, next to the same share across ${[cdLabel, ccLabel].filter(Boolean).join(' and ') || 'its districts'}. ` +
+  $('acmp-note').textContent = `Share of each problem among requests at ${here()}, next to the same share across ${[cdLabel, ccLabel].filter(Boolean).join(' and ') || 'its districts'}. ` +
     `The address uses your From and To dates; the districts use whole months, ${monthLabel(ymStart)} to ${monthLabel(ymEnd)}. Problem, description, agency and status filters do not apply here.`;
   const rows = await query(`
     WITH a AS (
@@ -872,16 +879,16 @@ async function renderAddressCompare() {
       max(g_share) FILTER (WHERE geo_kind = 'cd') AS d,
       max(g_share) FILTER (WHERE geo_kind = 'cc') AS c
     FROM top LEFT JOIN gs USING (t) GROUP BY top.t, top.a_share ORDER BY a DESC, top.t`);
-  if (!rows.length) { $('acmp').replaceChildren(el('p', { text: 'No requests at this address in these dates.' })); return; }
-  const names = ['This address', cdLabel || 'Community district', ccLabel || 'Council district'];
+  if (!rows.length) { $('acmp').replaceChildren(el('p', { text: `No requests at ${here()} in these dates.` })); return; }
+  const names = [Here(), cdLabel || 'Community district', ccLabel || 'Council district'];
   const long = rows.flatMap((r) => [
     { t: r.t, where: names[0], share: r.a ?? 0 },
     { t: r.t, where: names[1], share: r.d ?? 0 },
     { t: r.t, where: names[2], share: r.c ?? 0 },
   ]);
   const chart = Plot.plot({
-    ariaLabel: 'Share of top request types: this address, its community district, its council district',
-    ariaDescription: 'Dot chart comparing each top request type\'s share of requests at this address, in its community district, and in its council district.',
+    ariaLabel: `Share of top request types: ${here()}, its community district, its council district`,
+    ariaDescription: `Dot chart comparing each top request type's share of requests at ${here()}, in its community district, and in its council district.`,
     width: chartWidth('acmp', 420),
     marginLeft: 180,
     height: 50 + 30 * rows.length,
@@ -893,10 +900,10 @@ async function renderAddressCompare() {
   });
   chartWithTable($('acmp'), chart, rows, [
     { key: 't', label: 'Problem' },
-    { key: 'a', label: 'This address', num: true, fmt: fmtPct },
+    { key: 'a', label: names[0], num: true, fmt: fmtPct },
     { key: 'd', label: names[1], num: true, fmt: fmtPct },
     { key: 'c', label: names[2], num: true, fmt: fmtPct },
-  ], 'Share of requests by problem: this address and its districts');
+  ], `Share of requests by problem: ${here()} and its districts`);
 }
 
 async function renderAddresses() {
@@ -1055,7 +1062,7 @@ function renderAbout() {
     : 'Every request with a location was placed in this district by BoardStat, using where it happened and today\'s boundary lines.' +
       (unloc ? ` Not counted: ${fmtInt(unloc)} requests since ${longDate(manifest.window.start)} (all dates, not only the ones chosen above) that have no usable location but that the city's own records assign to this community district.` : '');
   $('about').replaceChildren(
-    el('p', {}, ADDRESS_MODE ? 'This page shows only requests whose address matches exactly, as the city spelled it. ' : '', text),
+    el('p', {}, !ADDRESS_MODE ? '' : isLot(params.get('bbl')) ? 'This page shows every request at this address, plus every request on its tax lot (BBL) under any other address. ' : 'This page shows only requests whose address matches exactly, as the city spelled it. ', text),
     el('ul', { class: 'more-links' },
       el('li', {}, el('a', { class: 'button', href: 'about.html', text: 'About BoardStat: sources and history' })),
       el('li', {}, el('a', { class: 'button secondary', href: 'glossary.html', text: 'Glossary: terms and how numbers are counted' }))),
@@ -1102,7 +1109,11 @@ function boroughCountsText(place, unloc) {
 async function renderAddressLinks() {
   const [a] = await query(`
     SELECT mode(incident_zip) AS zip, mode(cd) AS cd, mode(cc) AS cc, mode(borough) AS boro,
-           median(longitude) AS lng, median(latitude) AS lat FROM req WHERE address_norm = ${lit(state.addr)}`);
+           median(longitude) AS lng, median(latitude) AS lat,
+           -- The lot with the most requests at this address; a tie goes to the lot used most recently.
+           (SELECT bbl FROM req WHERE address_norm = ${lit(state.addr)} AND ${LOT_SQL}
+            GROUP BY bbl ORDER BY count(*) DESC, max(created_date) DESC, bbl LIMIT 1) AS bbl
+    FROM req WHERE address_norm = ${lit(state.addr)}`);
   addrInfo = a || null;
   const link = (g, id) => {
     const d = manifest.districts[g]?.find((x) => String(x.id) === String(id));
@@ -1126,9 +1137,77 @@ async function renderAddressLinks() {
   const bUrl = `https://boundaries.beta.nyc/?${bq}`;
   const bLink = el('button', { type: 'button', class: 'link', onclick: () => window.open(bUrl, '_blank', 'noopener,noreferrer') },
     'See the boundaries around this address on the BetaNYC Boundaries Map');
+  // The same-lot line is counted before anything is drawn, so both lines appear together.
+  addrLot = state.bbl || a?.bbl || null;
+  const lotLine = el('p', { class: 'no-print', id: 'same-lot', hidden: true });
+  if (addrLot) {
+    $('addr-links').after(lotLine);
+    // A failed count must not stop the page: refresh() draws the line again.
+    try { await renderSameLot(); } catch (err) { console.error(err); }
+  }
   $('addr-links').replaceChildren(...(out.length ? ['In ', ...out, '. Select a district to see all of it.'] : []));
-  $('addr-links').after(el('p', { class: 'no-print' }, bLink, el('span', { class: 'muted', text: ' (political and administrative districts, opens in a new tab)' })));
-  $('boundary-note').textContent = 'Every request whose address matches this one exactly, as the city spelled it. Requests that gave only a cross street are not included.';
+  (addrLot ? lotLine : $('addr-links')).after(el('p', { class: 'no-print' }, bLink, el('span', { class: 'muted', text: ' (political and administrative districts, opens in a new tab)' })));
+  $('boundary-note').textContent = state.bbl
+    ? `Every request at this address, plus every request on its tax lot (${state.bbl}, BBL) under any other address. Requests that gave only a cross street are not included.`
+    : 'Every request whose address matches this one exactly, as the city spelled it. Requests that gave only a cross street are not included.';
+}
+
+/** A link to an address page with this page's district and applied filters. */
+const addressHref = (addr, bbl = '') => `address.html?${addressParams(geo, geoId, state, defaultDates(), addr, bbl)}`;
+
+/**
+ * Address page: other addresses on the same tax lot (BBL). 311 records the address as typed,
+ * so one building can be split across street numbers (a corner lot, a range of street numbers).
+ * Counts follow the applied filters.
+ */
+let sameLotKey = null; // the filters the same-lot line was last counted for, so it is counted once per change
+const SAME_LOT_MAX = 8; // a big complex can have dozens of addresses on one lot
+
+async function renderSameLot() {
+  const box = $('same-lot');
+  if (!box || !addrLot) return;
+  // Every request at this address or on its lot, by address. The page's own address keeps
+  // all its requests, so its count is the same as the page's.
+  const where = whereSql({ ...state, bbl: addrLot });
+  if (where === sameLotKey) return;
+  const rows = await query(`
+    SELECT address_norm AS a, count(*)::INTEGER AS n FROM ${ROWS()}
+    WHERE ${where} AND address_norm IS NOT NULL
+    GROUP BY 1 ORDER BY 2 DESC, 1`);
+  // Other lots 311 recorded for this same address, e.g. a building's lot before and after it
+  // became a condominium. The line names them, so a lot view never hides them silently.
+  const otherLots = await query(`
+    SELECT bbl AS b, count(*)::INTEGER AS n FROM ${ROWS()}
+    WHERE ${whereSql({ ...state, bbl: '' })} AND ${LOT_SQL} AND bbl <> ${lit(addrLot)}
+    GROUP BY 1 ORDER BY 2 DESC, 1`);
+  sameLotKey = where;
+  const lotsNote = otherLots.length ? [' ', ...otherLots.flatMap((r, k) => [k ? ' · ' : `${state.addr} also has `,
+    `${fmtInt(r.n)} ${r.n === 1 ? 'request' : 'requests'} on tax lot `, el('a', { href: addressHref(state.addr, r.b) }, r.b)]), '.'] : [];
+  const others = rows.filter((r) => r.a !== state.addr);
+  const lot = el('a', { href: 'glossary.html#bbl' }, 'tax lot');
+  if (!others.length) {
+    // The lot view always offers the way back; an address page with nothing to add shows nothing.
+    box.hidden = !state.bbl && !lotsNote.length;
+    box.replaceChildren(...(state.bbl ? ['No other address on this ', lot, ' has requests for these filters. ',
+      el('a', { href: addressHref(state.addr) }, `See only ${state.addr}`), '.'] : []), ...lotsNote);
+    return;
+  }
+  const shown = others.slice(0, SAME_LOT_MAX);
+  const total = rows.reduce((t, r) => t + r.n, 0);
+  // Same shape as the ZIP/district line above: links joined by " · ". Each count is only that
+  // address's requests on this lot, so it can be lower than the total on the page it links to.
+  const out = ['Requests on this ', lot, ' at other addresses: '];
+  shown.forEach((r, k) => {
+    if (k) out.push(' · ');
+    out.push(`${fmtInt(r.n)} at `, el('a', { href: addressHref(r.a) }, r.a));
+  });
+  const more = others.length - shown.length;
+  if (more > 0) out.push(` · and ${fmtInt(more)} more ${more === 1 ? 'address' : 'addresses'}`);
+  out.push('. ', state.bbl
+    ? el('a', { href: addressHref(state.addr) }, `See only ${state.addr}`)
+    : el('a', { href: addressHref(state.addr, addrLot) }, `See all ${fmtInt(total)} ${total === 1 ? 'request' : 'requests'} at ${rows.length === 1 ? '1 address' : `these ${fmtInt(rows.length)} addresses`}`), '.', ...lotsNote);
+  box.hidden = false;
+  box.replaceChildren(...out);
 }
 
 // ------------------------------------------------------------- refresh / boot
@@ -1210,7 +1289,7 @@ async function refresh() {
     await renderKpis();
     if (seq !== refreshSeq) return;
     await Promise.all([renderTop(), renderDescriptors(), renderMonthly(), renderAgencyResponse(), renderAgency(), renderBacklog(), renderDetail(), renderMap(),
-      ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare()] : [renderAddresses(), renderCompare()])]);
+      ...(ADDRESS_MODE ? [renderTimeline(), renderAddressCompare(), renderSameLot().catch((err) => console.error(err))] : [renderAddresses(), renderCompare()])]);
     // A link can carry dates in the wrong order: say so instead of just "0 requests match."
     // A section whose rows failed says so inside itself (syncRowPanels); the count stays here.
     if (seq === refreshSeq) setStatus($('status'), state.start > state.end ? DATE_ORDER_MSG : matchMsg(total));
@@ -1270,7 +1349,7 @@ async function main() {
     hideFilters();
     return;
   }
-  const label = ADDRESS_MODE ? params.get('addr') : district.label;
+  const label = !ADDRESS_MODE ? district.label : isLot(params.get('bbl')) ? `${params.get('addr')} and its tax lot` : params.get('addr');
   document.title = `${label} · BoardStat 2.0 (prototype)`;
   $('title').textContent = label;
   renderDataStatus(manifest, $('as-of'), $('stale'));

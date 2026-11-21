@@ -6,7 +6,7 @@
 // the draft; the Apply button copies the draft to applied and runs the queries.
 
 /** Field names, in the order a person reads the form. */
-export const FILTER_FIELDS = ['start', 'end', 'types', 'descs', 'descEx', 'agency', 'status', 'addr'];
+export const FILTER_FIELDS = ['start', 'end', 'types', 'descs', 'descEx', 'agency', 'status', 'addr', 'bbl'];
 
 /** A copy that shares no arrays with the original. */
 export function copyFilters(s) {
@@ -91,7 +91,29 @@ export function filtersFromParams(params, defaults) {
     agency: params.get('agency') || '',
     status: params.get('status') || '',
     addr: params.get('addr') || '',
+    // A tax lot (borough-block-lot): every request on the address's lot, whatever address was typed.
+    bbl: isLot(params.get('bbl')) ? params.get('bbl') : '',
   };
+}
+
+/**
+ * Whether `b` is a real tax lot (BBL): borough 1 to 5, then a 5-digit block and a 4-digit
+ * lot, neither all zeros. 311 uses 0000000000 as a placeholder on some requests.
+ */
+export function isLot(b) {
+  return /^[1-5]\d{9}$/.test(b || '') && b.slice(1, 6) !== '00000' && b.slice(6) !== '0000';
+}
+
+/**
+ * Link parameters for an address page: the district and the applied filters (as
+ * filtersToParams makes them), the address, and a tax lot when given. For links the
+ * address page draws itself; it never rewrites its own URL.
+ */
+export function addressParams(geo, id, s, defaults, addr, bbl = '') {
+  const p = filtersToParams(geo, id, s, defaults);
+  p.set('addr', addr);
+  if (bbl) p.set('bbl', bbl);
+  return p;
 }
 
 /**
@@ -133,6 +155,7 @@ export function describeFilters(s, fmtDate) {
   if (s.agency) parts.push(`agency: ${s.agency}`);
   if (s.descs?.length) parts.push(`${s.descEx ? 'excluding descriptions' : 'descriptions'}: ${s.descs.join(', ')}`);
   if (s.status) parts.push(`status: ${s.status === NOT_CLOSED ? 'not yet closed' : s.status}`);
-  if (s.addr) parts.push(`address: ${s.addr}`);
+  if (s.bbl) parts.push(`address: ${s.addr} and its tax lot (BBL ${s.bbl})`);
+  else if (s.addr) parts.push(`address: ${s.addr}`);
   return parts;
 }

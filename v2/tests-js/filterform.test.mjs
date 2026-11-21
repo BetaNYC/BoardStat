@@ -8,7 +8,7 @@ import { filtersFromParams, filtersToParams, copyFilters, patchBoth, keepKnownSt
 import { whereSql } from '../site/js/filtersql.js';
 
 const defaults = { start: '2025-11-01', end: '2026-11-13' };
-const base = { ...defaults, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' };
+const base = { ...defaults, types: [], descs: [], descEx: false, agency: '', status: '', addr: '', bbl: '' };
 const fmt = (d) => d;
 
 test('Apply checks the date order first, even with nothing changed (#142)', () => {
