@@ -6,10 +6,13 @@
   <title>District · BoardStat 2.0 (prototype)</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl.css">
   <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/web.css">
   <link rel="stylesheet" href="css/style.css?v=7470ecbf98">
+  <link rel="stylesheet" href="css/ui-theme.css?v=91df980fed">
   <!-- importmap:start -->
-  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=f0aa91bbe9","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=fefeffd543","./js/filterform.js":"./js/filterform.js?v=41048610a8","./js/filtersql.js":"./js/filtersql.js?v=1578e97ca7","./js/filterstate.js":"./js/filterstate.js?v=85206515a6","./js/fullmap.js":"./js/fullmap.js?v=859dd25526","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=5bdefd9c4f","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=b56294c924","./js/report.js":"./js/report.js?v=3bbe70f781","./js/requestmap.js":"./js/requestmap.js?v=0b6701b41c"}}</script>
+  <script type="importmap">{"imports":{"./js/about.js":"./js/about.js?v=f0aa91bbe9","./js/analytics.js":"./js/analytics.js?v=6ed76567f7","./js/district.js":"./js/district.js?v=96ead49857","./js/filterform.js":"./js/filterform.js?v=43abc467fa","./js/filtersql.js":"./js/filtersql.js?v=1578e97ca7","./js/filterstate.js":"./js/filterstate.js?v=85206515a6","./js/fullmap.js":"./js/fullmap.js?v=829f00d261","./js/index.js":"./js/index.js?v=3fd6abff7b","./js/lib.js":"./js/lib.js?v=28e14914ab","./js/loadplan.js":"./js/loadplan.js?v=5bdefd9c4f","./js/map.js":"./js/map.js?v=aacaa1cf30","./js/place.js":"./js/place.js?v=b56294c924","./js/report.js":"./js/report.js?v=3bbe70f781","./js/requestmap.js":"./js/requestmap.js?v=0b6701b41c","./js/uisdk.js":"./js/uisdk.js?v=fb941cda7a","@ui-sdk/web/combobox":"https://cdn.jsdelivr.net/npm/@ui-sdk/web@0.1.0-beta.14/dist/entries/combobox.js","@ui-sdk/web/checkbox":"https://cdn.jsdelivr.net/npm/@ui-sdk/web@0.1.0-beta.14/dist/entries/checkbox.js","@ui-sdk/web/button":"https://cdn.jsdelivr.net/npm/@ui-sdk/web@0.1.0-beta.14/dist/entries/button.js","@ui-sdk/web/agent":"https://cdn.jsdelivr.net/npm/@ui-sdk/web@0.1.0-beta.14/dist/agent.js","@ui-sdk/core/agent":"https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/page/agent/agent.js","@ui-sdk/core/button":"https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/components/button/button.js","@ui-sdk/core/checkbox":"https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/components/checkbox/checkbox.js","@ui-sdk/core/combobox":"https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/components/combobox/combobox.js","@ui-sdk/core/renderer":"https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/renderer.js","@ui-sdk/core/switch":"https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/components/switch/switch.js"},"scopes":{"https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/":{"#dev":"https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/foundation/kernel/dev-stub.js","#name-check":"https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/foundation/text/name-check-stub.js"}}}</script>
   <!-- importmap:end -->
+  <script type="module" src="js/uisdk.js?v=fb941cda7a"></script>
   <script src="js/analytics.js?v=6ed76567f7"></script>
 </head>
 <body>
@@ -50,21 +53,34 @@
         <summary><span class="fg-title">Problem and description</span> <span class="fg-count" data-count-for="problem"></span></summary>
         <div class="fg-body fg-pair">
           <div>
-            <label for="f-type">Problem (formerly Complaint Type)</label>
-            <p class="field-hint" id="type-order">Suggestions are listed with the most requests in these dates first.</p>
-            <input type="text" id="f-type" list="type-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="type-order type-help">
-            <datalist id="type-options"></datalist>
-            <span class="sr-only" id="type-help">Choose one or more problems. Selected problems are listed below with remove buttons. Press Enter in an empty box to apply the filters.</span>
-            <ul class="chips" id="type-chips" aria-label="Selected problems"></ul>
+            <ui-combobox id="f-type" multiple>
+              <ui-combobox-label>Problem (formerly Complaint Type)</ui-combobox-label>
+              <p class="field-hint" id="type-order">Suggestions are listed with the most requests in these dates first.</p>
+              <ui-combobox-chips>
+                <ui-combobox-input><input type="text" placeholder="Type to search" aria-describedby="type-order type-help"></ui-combobox-input>
+              </ui-combobox-chips>
+              <span class="sr-only" id="type-help">Choose one or more problems. Each one you choose is shown with a remove button; Backspace in the empty box removes the last one. Press Enter in the empty box to apply the filters.</span>
+              <ui-combobox-content hidden>
+                <ui-combobox-empty>No problem matches.</ui-combobox-empty>
+                <ui-combobox-list></ui-combobox-list>
+              </ui-combobox-content>
+              <template><ui-combobox-item><ui-combobox-item-text></ui-combobox-item-text></ui-combobox-item></template>
+            </ui-combobox>
           </div>
           <div>
-            <label for="f-desc">Description (formerly Descriptor)</label>
-            <p class="field-hint" id="desc-order">Suggestions are listed with the most requests in these dates first.</p>
-            <input type="text" id="f-desc" list="desc-options" autocomplete="off" placeholder="Type to search, Enter to add" aria-describedby="desc-order desc-help">
-            <datalist id="desc-options"></datalist>
-            <span class="sr-only" id="desc-help">Lists the descriptions used for the selected problems, or for every problem if none is selected. Selected descriptions are listed below with remove buttons. Press Enter in an empty box to apply the filters.</span>
-            <ul class="chips" id="desc-chips" aria-label="Selected descriptions"></ul>
-            <label class="choice" for="f-desc-ex"><input type="checkbox" id="f-desc-ex"> Exclude these descriptions</label>
+            <ui-combobox id="f-desc" multiple>
+              <ui-combobox-label>Description (formerly Descriptor)</ui-combobox-label>
+              <p class="field-hint" id="desc-order">Suggestions are listed with the most requests in these dates first.</p>
+              <ui-combobox-chips>
+                <ui-combobox-input><input type="text" placeholder="Type to search" aria-describedby="desc-order desc-help"></ui-combobox-input>
+              </ui-combobox-chips>
+              <span class="sr-only" id="desc-help">Lists the descriptions used for the selected problems, or for every problem if none is selected. Each one you choose is shown with a remove button; Backspace in the empty box removes the last one. Press Enter in the empty box to apply the filters.</span>
+              <ui-combobox-content hidden>
+                <ui-combobox-empty>No description matches.</ui-combobox-empty>
+                <div class="vlist"><ui-combobox-list></ui-combobox-list></div>
+              </ui-combobox-content>
+            </ui-combobox>
+            <label class="choice"><ui-checkbox id="f-desc-ex"><ui-checkbox-indicator aria-hidden="true"></ui-checkbox-indicator></ui-checkbox> Exclude these descriptions</label>
           </div>
         </div>
       </details>
@@ -77,8 +93,8 @@
       </details>
       <div id="addr-filter" class="addr-filter" hidden><span class="label">Address</span> <span id="addr-value"></span> <button type="button" class="link" id="addr-clear">Clear address</button></div>
       <div class="filter-actions">
-        <button type="submit" id="apply">Apply filters</button>
-        <button type="button" class="secondary" id="reset">Reset filters</button>
+        <ui-button><button type="submit" id="apply">Apply filters</button></ui-button>
+        <ui-button id="reset"><button type="button" class="secondary">Reset filters</button></ui-button>
         <button type="button" class="secondary" id="print">Print summary</button>
         <p class="pending" id="pending" aria-live="polite"></p>
       </div>
@@ -178,6 +194,6 @@
   </main>
 
   <footer class="site">A <a href="https://beta.nyc">BetaNYC</a> prototype. Not an official City of New York product. Questions or ideas? <a href="help.html#feedback">Send us feedback</a>. <a href="whats-changed.html">What&rsquo;s changed</a>.</footer>
-  <script type="module" src="js/district.js?v=fefeffd543"></script>
+  <script type="module" src="js/district.js?v=96ead49857"></script>
 </body>
 </html>
