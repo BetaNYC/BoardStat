@@ -82,7 +82,12 @@ Apply and Reset are `ui-button`. Dates, Agency, Status and Print stay native unt
 The form still only edits its draft until Apply: it follows `valuechange` (pickers),
 `checkedchange` (Exclude) and `action` (Reset). Typed text that was never picked stays in
 the box (UI SDK would clear it when focus leaves), so Apply adds it if it names a choice
-exactly, or stops and says it names nothing, as before.
+exactly, or stops and says it names nothing, as before. Chip buttons are named "Remove
+problem filter X" or "Remove description filter X", and each chips row "Chosen problems",
+"Chosen descriptions" or "Excluded descriptions" (`chipNames`): UI SDK's own "Remove X"
+gave two buttons one name when a problem and a description share a name, as 14 do. If UI
+SDK does not load, a warning (`#parts-failed`) stays above the status line, even with the
+panel closed.
 
 - **One pinned version, one copy of the core.** `js/vendor-importmap.json` maps the
   `@ui-sdk/web` and `@ui-sdk/core` entries to UI SDK **0.1.0-beta.14**'s plain ES module
@@ -765,6 +770,10 @@ BOARDSTAT_RECORD_VENDOR=1 uv run pytest   # once, online: caches the pinned libr
 uv run pytest                             # every time after: offline
 ```
 
+- **No console errors.** A test fails if the page logs one, except the street map's
+  `basemap.json` 404 (the fixture has no street map; `ALLOWED_CONSOLE_ERRORS`). A test can
+  refuse a URL on purpose (`network.refuse`): `test_agent.py` refuses
+  extensions.duckdb.org and checks the page says it could not load the requests.
 - **Offline.** The tests serve `v2/site` with `serve.py`'s own handler on 127.0.0.1, with
   `tests-browser/fixture-data/` at `/data/`. Chromium starts with every host name resolving
   to nothing but localhost, so nothing reaches NYC Open Data or any other service. The
@@ -773,15 +782,18 @@ uv run pytest                             # every time after: offline
   page asks for anything else, or if a library is missing from the cache (run the
   `BOARDSTAT_RECORD_VENDOR=1` line again after changing a library version).
 - **The fixture** is a small, real slice of the published build: Queens Joint Interest Area
-  480 (8,273 requests), the community district boundaries, the manifest, and the rows of
+  480 (8,273 requests), the community district boundaries, the manifest, a `changes.json`
+  stub with nothing changed, and the rows of
   `agg/month_type.parquet` its Compare panel reads. `make_fixture.py` rebuilds it from files
   downloaded from https://www.beta.nyc/boardstat/data/; it never runs the pipeline.
 - **`serve.py --data DIR`** serves `DIR` at `/data/`, so the site can run on the fixture by
   hand too: `python3 v2/serve.py --data v2/tests-browser/fixture-data`, then open
   http://127.0.0.1:8000/district.html?geo=cd&id=480.
 - `test_filter_form.py`: the page loads the fixture; changing a filter changes only the form
-  until Apply, and Apply changes the counts and the link; and an accessibility-tree check
-  that every control on the filter form has a name and no two share one.
+  until Apply, and Apply changes the counts and the link; an accessibility-tree check
+  that every control and chips row on the filter form has a name and no two share one
+  (with "Derelict Vehicles" as both a problem and a description); the same form on the
+  full-page map and the address page.
 - `test_agent.py` (#187): UI SDK's agent bridge, `createAgent` from `@ui-sdk/web/agent`
   (imported in the page through its import map), sees every setting in "Problem and
   description", sets two problems, a description and Exclude, presses Apply, and the link

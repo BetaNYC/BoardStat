@@ -186,3 +186,40 @@ def test_typing_after_a_long_scroll_keeps_the_list_virtualized(district):
     info = page.evaluate("""() => { const items = [...document.querySelectorAll('#f-desc ui-combobox-item')];
       return { rendered: items.length, unindexed: items.filter((i) => !i.hasAttribute('index')).length }; }""")
     assert info["rendered"] > 0 and info["unindexed"] == 0, info
+
+
+def test_description_list_keeps_matching_the_text_after_click_away(district):
+    """QA round 1: the typed text stays after click-away (#142's rule), and the virtual
+    list must still show only its matches when the box is opened again."""
+    page = district
+    page.locator("#f-desc input").click()
+    page.keyboard.type("driver")
+    page.locator("h1").click()
+    assert page.evaluate("document.getElementById('f-desc').query") == "driver"
+    page.locator("#f-desc input").click()
+    page.keyboard.press("ArrowDown")
+    page.keyboard.press("ArrowDown")
+    page.wait_for_timeout(100)
+    rows = page.evaluate("""() => [...document.querySelectorAll('#f-desc ui-combobox-item')].map((i) => ({
+      text: i.textContent, hl: i.hasAttribute('data-highlighted'), index: i.getAttribute('index') }))""")
+    assert rows and all("driver" in r["text"].lower() for r in rows), rows
+    highlighted = [r for r in rows if r["hl"]]
+    assert len(highlighted) == 1 and highlighted[0]["index"] == "1", rows
+
+
+def test_parts_that_fail_to_load_leave_a_warning_that_stays(page, base_url, network):
+    """QA round 1: if UI SDK does not load (here: js/uisdk.js refused), the form says so in
+    its own warning line, and the count that follows does not replace it."""
+    network.refuse.append("/js/uisdk.js")
+    page.allow_console.append("uisdk.js")  # the refused file is a console error, on purpose
+    page.goto(base_url + DISTRICT_PATH)
+    wait_for_data(page, timeout=60_000)  # formPartsReady waits 20 s first
+    warning = page.locator("#parts-failed")
+    assert warning.is_visible()
+    assert warning.text_content().startswith("The Problem and Description boxes did not load")
+    assert page.get_by_role("alert").filter(has_text="did not load").count() == 1
+    assert "match" in page.locator("#status").text_content()  # the rest of the page still drew
+    page.locator("#filters-toggle").click()  # closed panel: the warning still shows
+    assert page.locator("#filters").evaluate("f => f.classList.contains('is-collapsed')")
+    assert warning.is_visible()
+    assert network.refused

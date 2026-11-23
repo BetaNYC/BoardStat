@@ -11,7 +11,7 @@
 import { loadManifest, renderDataStatus, registerData, reregisterData, query, el, setStatus, fmtDate } from './lib.js';
 import { filtersFromParams, filtersToParams, keepKnownStatus } from './filterstate.js';
 import { whereSql } from './filtersql.js';
-import { createFilterForm, tableLists, DATE_ORDER_MSG, matchMsg, formPartsReady, PARTS_FAILED_MSG } from './filterform.js';
+import { createFilterForm, tableLists, DATE_ORDER_MSG, matchMsg, formPartsReady, showPartsFailed } from './filterform.js';
 import { setupRequestMap, loadRequestPoints, mapNoteText, renderMapLegend } from './requestmap.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql } from './place.js';
 import { periodFrom, createLoader, freshnessCheck, loadFailedText, filesNamedIn, DataChangedError } from './loadplan.js';
@@ -142,7 +142,7 @@ async function main() {
 
   // The Problem and Description boxes, Exclude, Apply and Reset are UI SDK parts (#187).
   // The form sets their properties, so it waits until they are defined.
-  if (!(await formPartsReady())) setStatus($('status'), PARTS_FAILED_MSG);
+  if (!(await formPartsReady())) showPartsFailed();
   form = createFilterForm({
     defaults: defaultFilters,
     lists: formLists,

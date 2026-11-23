@@ -11,7 +11,10 @@
   sees the DuckDB worker's requests).
   Fill it once, with network access, by running the tests with BOARDSTAT_RECORD_VENDOR=1.
   That run fetches from those two hosts only; every other host stays blocked.
-- A test fails if the page asked for anything outside localhost and the cache.
+- A test fails if the page asked for anything outside localhost and the cache, or logged a
+  console error (QA round 1), except the one listed in ALLOWED_CONSOLE_ERRORS.
+- A test can refuse a URL on purpose (`network.refuse`), to check what the page does
+  without it.
 """
 import hashlib
 import json
@@ -39,10 +42,16 @@ OFFLINE_ARGS = ["--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost , EXC
 sys.path.insert(0, str(V2))
 import serve  # noqa: E402  (v2/serve.py)
 
+# Console errors a test may log without failing, matched against the message and its URL.
+# The fixture has no street map (data/basemap/, about 240 MB, README "How to run"), so
+# map.js's first check of basemap.json answers 404, and the map falls back to district
+# outlines on a blank background, as the README says it does.
+ALLOWED_CONSOLE_ERRORS = ["/data/basemap/basemap.json"]
+
 # The fixture district: Queens Joint Interest Area 480 (see make_fixture.py).
 DISTRICT_PATH = "district.html?geo=cd&id=480"
 MAP_PATH = "map.html?geo=cd&id=480"
-ADDRESS_PATH = "address.html"
+ADDRESS_PATH = "address.html?geo=cd&id=480&addr=LA%20GUARDIA%20AIRPORT"
 
 
 def vendor_file(url: str) -> Path:
@@ -77,10 +86,15 @@ class Network:
     def __init__(self):
         self.blocked: list[str] = []
         self.vendor: list[tuple[str, int]] = []  # (url, bytes) answered from the cache
+        self.refuse: list[str] = []  # URL parts a test refuses on purpose
+        self.refused: list[str] = []  # the URLs it refused
 
     def handle(self, route):
         url = route.request.url
         host = urlsplit(url).hostname or ""
+        if any(part in url for part in self.refuse):
+            self.refused.append(url)
+            return route.abort("connectionrefused")
         if host in LOCAL_HOSTS:
             return route.continue_()
         if host in VENDOR_HOSTS:
@@ -128,7 +142,13 @@ def page(context) -> Page:
     errors: list[str] = []
     p.on("pageerror", lambda e: errors.append(str(e)))
     p.errors = errors
+    console: list[str] = []
+    p.on("console", lambda m: m.type == "error" and console.append(f"{m.text} ({m.location.get('url', '')})"))
+    p.console_errors = console
+    p.allow_console = list(ALLOWED_CONSOLE_ERRORS)  # a test may add to it
     yield p
+    unexpected = [c for c in console if not any(a in c for a in p.allow_console)]
+    assert not unexpected, "The page logged console errors:\n" + "\n".join(unexpected)
 
 
 def wait_for_data(page: Page, timeout: float = 60_000) -> None:

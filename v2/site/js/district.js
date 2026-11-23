@@ -9,7 +9,7 @@ import {
   NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus, isLot, addressParams,
 } from './filterstate.js';
 import { whereSql, NOT_CLOSED_SQL, DESC_SQL, LOT_SQL } from './filtersql.js';
-import { createFilterForm, tableLists, DATE_ORDER_MSG, matchMsg, formPartsReady, PARTS_FAILED_MSG } from './filterform.js';
+import { createFilterForm, tableLists, DATE_ORDER_MSG, matchMsg, formPartsReady, showPartsFailed } from './filterform.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl, SLIM_COLUMNS, slimFileFor } from './place.js';
 import {
   periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly, DataChangedError, filesNamedIn, freshnessCheck, loadFailedText,
@@ -1408,7 +1408,7 @@ async function main() {
   state = readState();
   // The Problem and Description boxes, Exclude, Apply and Reset are UI SDK parts (#187).
   // The form sets their properties, so it waits until they are defined.
-  if (!(await formPartsReady())) setStatus($('status'), PARTS_FAILED_MSG);
+  if (!(await formPartsReady())) showPartsFailed();
   form = createFilterForm({
     defaults: defaultFilters,
     lists: formLists,

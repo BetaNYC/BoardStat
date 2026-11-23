@@ -205,7 +205,7 @@ main.fullmap #filters { margin: 0.5rem 0; }
 /* Print summary prints the district page; the map page has nothing to add. */
 main.fullmap #print { display: none; }
 #filters.is-collapsed { padding: 0; border: 0; background: none; box-shadow: none; margin: 0.25rem 0 0.75rem; }
-#filters.is-collapsed > :not(.status) { display: none; }
+#filters.is-collapsed > :not(.status, .parts-failed:not([hidden])) { display: none; }
 .filters-bar { margin: 1rem 0 0.25rem; }
 .filters-bar p { margin: 0; }
 .filters-bar #filters-summary { margin-bottom: 0.25rem; }

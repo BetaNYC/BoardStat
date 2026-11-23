@@ -46,7 +46,51 @@ export function formPartsReady(ms = 20000) {
   return Promise.race([parts, new Promise((resolve) => setTimeout(() => resolve(false), ms))]);
 }
 
-export const PARTS_FAILED_MSG = 'The Problem and Description boxes did not load. This can happen if the connection drops. Reload the page to try again.';
+export const PARTS_FAILED_MSG = 'The Problem and Description boxes did not load, so those filters, Exclude, Apply and Reset may not work. This can happen if the connection drops. Reload the page to try again.';
+
+/** Show PARTS_FAILED_MSG in the form's own warning line (#parts-failed), which the
+ *  status line's counts never overwrite, and which stays shown when the panel closes. */
+export function showPartsFailed($ = (id) => document.getElementById(id)) {
+  const node = $('parts-failed');
+  if (!node) return;
+  node.textContent = PARTS_FAILED_MSG;
+  node.hidden = false;
+}
+
+/**
+ * Names for a picker's chips row, chips and remove buttons (QA round 1). UI SDK names a
+ * remove button "Remove X", so a problem and a description with the same name (14 real
+ * names are both) gave two buttons one name, and it names the chips row like its
+ * combobox. Its own names are rewritten on every render, so a template cannot change
+ * them; an observer puts these back whenever UI SDK writes its own.
+ */
+export function chipNames(kind, exclude = false) {
+  const plural = kind === 'problem' ? 'problems' : 'descriptions';
+  return {
+    row: exclude ? `Excluded ${plural}` : `Chosen ${plural}`,
+    chip: (v) => `${exclude ? 'Excluded' : 'Chosen'} ${kind}: ${v}`,
+    remove: (v) => `Remove ${kind} filter ${v}`,
+  };
+}
+
+function nameChips(box, names) {
+  const row = box.querySelector('ui-combobox-chips');
+  if (!row) return () => {};
+  const set = (node, value) => { if (node && node.getAttribute('aria-label') !== value) node.setAttribute('aria-label', value); };
+  const apply = () => {
+    const n = names();
+    set(row, n.row);
+    if (row.hasAttribute('aria-labelledby')) row.removeAttribute('aria-labelledby');
+    for (const chip of row.querySelectorAll('ui-combobox-chip')) {
+      const value = chip.getAttribute('value') ?? '';
+      set(chip, n.chip(value));
+      set(chip.querySelector('ui-combobox-chip-remove > button'), n.remove(value));
+    }
+  };
+  new MutationObserver(apply).observe(row, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label', 'aria-labelledby'] });
+  apply();
+  return apply;
+}
 
 /** Whether two lists hold the same values in the same order. */
 const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -92,15 +136,23 @@ export function virtualList(box, { row = ROW_PX } = {}) {
       if (!rendered.has(value)) { list.append(node); rendered.set(value, node); }
     }
   }
-  box.addEventListener('querychange', (e) => {
-    if (e.defaultPrevented) return;
-    filter(e.detail.reason === 'input-change' ? e.detail.value : '');
-    // New matches start at the top. Left scrolled past the end of a shorter list, the
-    // window would hold no rows, and UI SDK would then draw every match itself.
-    scroller.scrollTop = 0;
+  let shownQuery = '';
+  /** Filter by the combobox's text as it is now. A querychange can still be cancelled
+   *  after this listener runs (bind() keeps unchosen text on click-away), so the list
+   *  waits a tick and reads `box.query` instead of trusting the event (QA round 1). */
+  function sync() {
+    const query = box.query ?? '';
+    filter(query);
+    if (query !== shownQuery) {
+      shownQuery = query;
+      // New matches start at the top. Left scrolled past the end of a shorter list, the
+      // window would hold no rows, and UI SDK would then draw every match itself.
+      scroller.scrollTop = 0;
+    }
     render();
-  });
-  box.addEventListener('openchange', () => requestAnimationFrame(render));
+  }
+  box.addEventListener('querychange', () => setTimeout(sync, 0));
+  box.addEventListener('openchange', () => requestAnimationFrame(sync));
   box.addEventListener('highlight', (e) => {
     const { index } = e.detail;
     if (index < 0) return;
@@ -114,7 +166,7 @@ export function virtualList(box, { row = ROW_PX } = {}) {
     /** Replace the choices (names), keeping the combobox's selection. */
     setItems(names) {
       all = asItems(names);
-      filter(box.query || '');
+      filter(box.query ?? '');
       for (const node of rendered.values()) node.remove();
       rendered.clear();
       render();
@@ -233,6 +285,9 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   let panel = null; // the open/close toggle (setupPanel): { mapPage, scrollTo }
   let formApplied = false; // the last change came from the form's own Apply or Reset
   let descList = null; // Description's virtualized list (virtualList), made on first use
+  // The chips' names (chipNames); Description's change with Exclude.
+  const nameTypeChips = nameChips($('f-type'), () => chipNames('problem'));
+  const nameDescChips = nameChips($('f-desc'), () => chipNames('description', draft.descEx));
 
   /** Open or close the panel. When closed, only its status line stays, under the summary line. */
   function showPanel(open) {
@@ -254,6 +309,8 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   /** The chips are UI SDK's (ui-combobox-chips); this marks Exclude mode and the address. */
   function renderChips() {
     $('f-desc').toggleAttribute('data-exclude', draft.descEx);
+    nameTypeChips();
+    nameDescChips();
     $('addr-filter').hidden = lockAddress || !draft.addr;
     $('addr-value').textContent = draft.addr;
   }

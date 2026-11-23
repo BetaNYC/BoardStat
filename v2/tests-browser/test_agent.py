@@ -93,3 +93,17 @@ def test_agent_does_not_see_controls_in_a_closed_group(district):
     district.evaluate("() => { document.getElementById('fg-problem').open = true; }")
     found = labels(agent(district, "return agent.snapshot();"))
     assert PROBLEM in found and DESCRIPTION in found and EXCLUDE in found
+
+
+def test_page_cannot_read_data_without_duckdbs_parquet_extension(page, base_url, network):
+    """Lesson BS-18, checked: DuckDB-WASM loads its Parquet reader from
+    extensions.duckdb.org, not jsDelivr. With that host refused, the page reads no data
+    and says so, instead of counting requests."""
+    network.refuse.append("extensions.duckdb.org")
+    page.allow_console.append("")  # the failed load is logged; the page's message is what we check
+    page.goto(base_url + DISTRICT_PATH)
+    page.wait_for_function("() => /could not|did not|failed|Reload/i.test(document.getElementById('status')?.textContent || '')", timeout=60_000)
+    status = page.locator("#status").text_content()
+    assert "match" not in status, status
+    assert any("extensions.duckdb.org" in u for u in network.refused)
+    print("\nStatus without the Parquet extension:", status)
