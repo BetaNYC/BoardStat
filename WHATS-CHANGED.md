@@ -7,6 +7,13 @@ This page lists the changes to BoardStat that a reader would notice: new pages, 
 
 BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change reaches the site at the next upload. Entries since November 2026 are dated by the day the change was merged on GitHub. BetaNYC's [nyc-311-mcp](https://github.com/BetaNYC/nyc-311-mcp) server reads BoardStat's data files, so a change to BoardStat's data can change its answers too. To report a bug or ask for a new feature, email [boardstat@beta.nyc](mailto:boardstat@beta.nyc) or [open an issue on GitHub](https://github.com/BetaNYC/BoardStat/issues).
 
+## Unreleased: New Problem and Description boxes on the filter form
+
+- **Tags:** Site
+- **What changed:** On district, council district, borough, address and full-page map pages, the Problem and Description boxes in the filter form are new. Type to narrow the list, then pick with the arrow keys and Enter or with a click. Each pick shows as a chip with a remove button, and Backspace in the empty box removes the last one. The list stays open, so you can pick several in a row. The Exclude these descriptions box and the Apply filters and Reset filters buttons are new too. They work as before: nothing changes on the page until you press Apply filters. The boxes come from UI SDK, an open-source library, styled in BetaNYC's colors, and they are built so that an AI assistant working in your browser can find and use them.
+- **Who it affects:** Anyone who filters by problem or description, including with a keyboard, a screen reader or Windows High Contrast.
+- **More detail:** [The change](https://github.com/BetaNYC/BoardStat/issues/187)
+
 ## 2026-11-21: Address pages show other addresses on the same tax lot
 
 - **Tags:** Site
