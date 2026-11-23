@@ -70,6 +70,45 @@ the district page's. That holds for community districts, council districts and
 boroughs. The map page's Print summary button is hidden. The address page gets the
 shared module for free, with no change in what it does.
 
+**Problem and Description pickers, in the NYSDS look (#187, slice 1).** Problem and
+Description are [UI SDK](https://ui-sdk.dev/docs/web-components) comboboxes
+(`ui-combobox multiple`): type to narrow the list, pick with the arrow keys and Enter or a
+click, and each pick shows as a chip with a "Remove …" button (Backspace in the empty box
+removes the last one). Their items are the same DuckDB lists as before (`tableLists`), set
+as data (`items`). Description's list is virtualized (UI SDK's documented pattern,
+`virtualList` in `js/filterform.js`): the combobox knows every item, but only the rows near
+the scroll position are in the page. "Exclude these descriptions" is a `ui-checkbox`;
+Apply and Reset are `ui-button`. Dates, Agency, Status and Print stay native until slice 2.
+The form still only edits its draft until Apply: it follows `valuechange` (pickers),
+`checkedchange` (Exclude) and `action` (Reset). Typed text that was never picked stays in
+the box (UI SDK would clear it when focus leaves), so Apply adds it if it names a choice
+exactly, or stops and says it names nothing, as before. Chip buttons are named "Remove
+problem filter X" or "Remove description filter X", and each chips row "Chosen problems",
+"Chosen descriptions" or "Excluded descriptions" (`chipNames`): UI SDK's own "Remove X"
+gave two buttons one name when a problem and a description share a name, as 14 do. If UI
+SDK does not load, a warning (`#parts-failed`) stays above the status line, even with the
+panel closed.
+
+- **One pinned version, one copy of the core.** `js/vendor-importmap.json` maps the
+  `@ui-sdk/web` and `@ui-sdk/core` entries to UI SDK **0.1.0-beta.14**'s plain ES module
+  files on jsDelivr; `stamp_assets.py` merges it into each page's import map, and
+  `js/uisdk.js` imports the three parts. Not UI SDK's one-file browser build: that build has
+  no agent bridge, and the bridge (`@ui-sdk/web/agent`) finds components through a
+  module-level registry in `@ui-sdk/core`, so it must share the page's copy. The default
+  look is `@ui-sdk/core@0.1.0-beta.14/dist/web.css`. To upgrade, change the version in both
+  files and run `stamp_assets.py`; a test checks every URL names the same exact version.
+- **The look.** `css/ui-theme.css` defines a custom NYSDS theme, `betanyc` (the seven
+  `--nys-color-theme*` tokens, per NYSDS "Creating a Custom Theme"), in BetaNYC's blues,
+  maps UI SDK's `--ui-*` tokens to it, and adds forced-colors rules (web.css has none).
+- **Size.** UI SDK adds 121 files, 736 KB, about 211 KB gzip to a form page (measured
+  2026-11-22, `test_ui_sdk_download_size`), next to about 9.3 MB gzip of DuckDB-WASM, Plot
+  and MapLibre. The agent bridge is not loaded by the page. Not yet measured on a phone.
+- **Agents.** `createAgent()` from `@ui-sdk/web/agent` sees Problem, Description, Exclude,
+  Apply and Reset (not the native controls). It does **not** see controls inside a closed
+  `<details>` group (UI SDK 0.1.0-beta.14): a step naming one fails with "No component …
+  on the page". Agency and status starts closed, and on a phone or the full-page map every
+  group does. `tests-browser/test_agent.py` pins both.
+
 **The filter panel opens and closes, on every page** (`setupPanel` in
 `js/filterform.js`). A "Hide filters" / "Change filters" button (`#filters-toggle`,
 `aria-expanded`) and a one-line summary of the applied filters (`#filters-summary`)
@@ -731,6 +770,10 @@ BOARDSTAT_RECORD_VENDOR=1 uv run pytest   # once, online: caches the pinned libr
 uv run pytest                             # every time after: offline
 ```
 
+- **No console errors.** A test fails if the page logs one, except the street map's
+  `basemap.json` 404 (the fixture has no street map; `ALLOWED_CONSOLE_ERRORS`). A test can
+  refuse a URL on purpose (`network.refuse`): `test_agent.py` refuses
+  extensions.duckdb.org and checks the page says it could not load the requests.
 - **Offline.** The tests serve `v2/site` with `serve.py`'s own handler on 127.0.0.1, with
   `tests-browser/fixture-data/` at `/data/`. Chromium starts with every host name resolving
   to nothing but localhost, so nothing reaches NYC Open Data or any other service. The
@@ -739,15 +782,25 @@ uv run pytest                             # every time after: offline
   page asks for anything else, or if a library is missing from the cache (run the
   `BOARDSTAT_RECORD_VENDOR=1` line again after changing a library version).
 - **The fixture** is a small, real slice of the published build: Queens Joint Interest Area
-  480 (8,273 requests), the community district boundaries, the manifest, and the rows of
+  480 (8,273 requests), the community district boundaries, the manifest, a `changes.json`
+  stub with nothing changed, and the rows of
   `agg/month_type.parquet` its Compare panel reads. `make_fixture.py` rebuilds it from files
   downloaded from https://www.beta.nyc/boardstat/data/; it never runs the pipeline.
 - **`serve.py --data DIR`** serves `DIR` at `/data/`, so the site can run on the fixture by
   hand too: `python3 v2/serve.py --data v2/tests-browser/fixture-data`, then open
   http://127.0.0.1:8000/district.html?geo=cd&id=480.
 - `test_filter_form.py`: the page loads the fixture; changing a filter changes only the form
-  until Apply, and Apply changes the counts and the link; and an accessibility-tree check
-  that every control on the filter form has a name and no two share one.
+  until Apply, and Apply changes the counts and the link; an accessibility-tree check
+  that every control and chips row on the filter form has a name and no two share one
+  (with "Derelict Vehicles" as both a problem and a description); the same form on the
+  full-page map and the address page.
+- `test_agent.py` (#187): UI SDK's agent bridge, `createAgent` from `@ui-sdk/web/agent`
+  (imported in the page through its import map), sees every setting in "Problem and
+  description", sets two problems, a description and Exclude, presses Apply, and the link
+  and counts match a fresh load of that link. Also: it cannot see controls in a closed group.
+- `test_pickers.py` (#187): keyboard (Tab, type, arrows, Enter, Escape, Backspace), click-away,
+  visible focus, forced colors, a 390 px screen, the virtualized Description list, and UI
+  SDK's download size (`uv run pytest -s -k size` prints it).
 
 ## Data sources
 
@@ -970,6 +1023,8 @@ Run on office-mac, 2026-11-04, with an app token, default window.
 | [pmtiles](https://docs.protomaps.com/pmtiles/) | 4.5.0 (JS), CLI 1.31.2 | BSD-3-Clause | Reading / extracting the street map file |
 | [@protomaps/basemaps](https://docs.protomaps.com/basemaps/maplibre) | 5.7.2 | BSD-3-Clause | Street map style |
 | [basemaps-assets](https://github.com/protomaps/basemaps-assets) | main | Noto Sans: SIL OFL 1.1 | Map labels' fonts and icons |
+| [@ui-sdk/web](https://ui-sdk.dev), [@ui-sdk/core](https://ui-sdk.dev) | 0.1.0-beta.14 | Apache-2.0 | Filter form: Problem and Description comboboxes, Exclude checkbox, Apply and Reset buttons (#187) |
+| [Playwright for Python](https://playwright.dev/python/) | >=1.55,<2 (1.65.2 locked; tests only) | Apache-2.0 | Browser tests (`v2/tests-browser`) |
 
 Street map data: © OpenStreetMap contributors (ODbL), via Protomaps; credited in the map's attribution.
 

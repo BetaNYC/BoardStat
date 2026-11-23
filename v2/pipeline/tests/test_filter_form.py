@@ -2,6 +2,7 @@
 that open and close, one Apply button, full-width charts, and no form control that reloads
 the page by itself. The form runs in one shared module, site/js/filterform.js."""
 
+import json
 import re
 from pathlib import Path
 
@@ -64,13 +65,24 @@ def test_compare_is_its_own_panel():
 
 
 def test_form_controls_do_not_refresh_on_change():
-    """The #142 bug: dates, agency, status and Exclude reloaded the page; problem chips did not."""
+    """The #142 bug: dates, agency, status and Exclude reloaded the page; problem chips did not.
+    Rewritten for #187: Problem, Description and Exclude are UI SDK parts, so their change
+    events (valuechange, checkedchange) are checked instead of the old change and keydown
+    listeners. Every one only updates the draft."""
     js = (JS / "filterform.js").read_text()
-    for control in ["f-start", "f-end", "f-agency", "f-status", "f-desc-ex", "f-type", "f-desc", "addr-clear"]:
-        lines = re.findall(rf"\$\('{control}'\)\.addEventListener\(.*", js)
+    bind = js[js.index("    bind(min, max) {"):]
+    for control in ["f-start", "f-end", "f-agency", "f-status", "addr-clear"]:
+        lines = re.findall(rf"\$\('{control}'\)\.addEventListener\(.*", bind)
         assert lines, control
         for line in lines:
             assert "onApply(" not in line and "apply()" not in line, line
+    for event in ["valuechange", "checkedchange"]:
+        m = re.search(rf"addEventListener\('{event}', \(e\) => \{{(.*?)\n\s*\}}\);|addEventListener\('{event}', \(e\) => \{{(.*?)\}}\);", bind, re.S)
+        assert m, event
+        body = m.group(1) or m.group(2)
+        assert "changed()" in body and "onApply(" not in body and "apply()" not in body, body
+    # The pickers follow UI SDK's events, not the old text box's change and keydown-to-add.
+    assert "addType(" not in js and "addDesc(" not in js
 
 
 def test_every_chart_is_drawn_at_its_box_width():
@@ -104,9 +116,10 @@ def test_apply_checks_date_order_before_skipping_and_retries_after_a_failure():
 
 
 def test_reset_clears_typed_text():
+    """#187: a picker's typed text is its `query`; its `value` is the chosen list."""
     js = (JS / "filterform.js").read_text()
     m = re.search(r"function reset\(\) \{.*?\n  \}", js, re.DOTALL)
-    assert m and "$('f-type').value = ''" in m.group(0) and "$('f-desc').value = ''" in m.group(0)
+    assert m and "$('f-type').query = ''" in m.group(0) and "$('f-desc').query = ''" in m.group(0)
 
 
 def test_form_says_how_the_suggestions_are_ordered():
@@ -160,3 +173,82 @@ def test_pages_with_nothing_to_show_have_no_filter_panel():
     for marker in ("'Data not available'", "'Borough not found' : 'District not found'", "'No address chosen'"):
         block = main[main.index(marker):]
         assert block.index("hideFilters();") < block.index("return;"), marker
+
+
+# ---------------------------------------------------------------- UI SDK parts (#187)
+
+UI_SDK_VERSION = re.compile(r"@ui-sdk/(?:web|core)@([^/]+)/")
+
+
+@pytest.mark.parametrize("page", FORM_PAGES)
+def test_problem_and_description_are_ui_sdk_comboboxes(page):
+    """#187: several picks shown as chips, from UI SDK's Combobox, named by its label."""
+    form = form_html(page)
+    for box, label in (("type", "Problem (formerly Complaint Type)"), ("desc", "Description (formerly Descriptor)")):
+        m = re.search(rf'<ui-combobox id="f-{box}" multiple>(.*?)</ui-combobox>\n', form, re.S)
+        assert m, box
+        body = m.group(1)
+        assert f"<ui-combobox-label>{label}</ui-combobox-label>" in body
+        assert re.search(r"<ui-combobox-chips>\s*<ui-combobox-input><input [^>]*></ui-combobox-input>\s*</ui-combobox-chips>", body)
+        assert "<ui-combobox-content hidden>" in body and "<ui-combobox-empty>" in body
+    # Description's list is virtualized: its rows sit in a scroller the form fills.
+    desc = re.search(r'<ui-combobox id="f-desc" multiple>(.*?)</ui-combobox>\n', form, re.S).group(1)
+    assert '<div class="vlist"><ui-combobox-list></ui-combobox-list></div>' in desc
+    # The old text boxes, suggestion lists and hand-made chip lists are gone.
+    for old in ("<datalist", 'id="type-chips"', 'id="desc-chips"', 'list="type-options"'):
+        assert old not in form, old
+
+
+@pytest.mark.parametrize("page", FORM_PAGES)
+def test_exclude_apply_and_reset_are_ui_sdk_parts(page):
+    """#187: an agent that can set a filter but cannot press Apply has done nothing, and
+    UI SDK's agent bridge sees only UI SDK parts."""
+    form = form_html(page)
+    assert '<label class="choice"><ui-checkbox id="f-desc-ex">' in form and "</ui-checkbox> Exclude these descriptions</label>" in form
+    assert '<ui-button><button type="submit" id="apply">Apply filters</button></ui-button>' in form
+    assert '<ui-button id="reset"><button type="button" class="secondary">Reset filters</button></ui-button>' in form
+    # Dates, Agency, Status and Print stay native in slice 1.
+    for native in ('<input type="date" id="f-start"', '<select id="f-agency"', '<select id="f-status"', '<button type="button" class="secondary" id="print">'):
+        assert native in form, native
+
+
+def test_ui_sdk_is_pinned_to_one_exact_version():
+    """#187 condition 1: one exact version on jsDelivr, like lib.js's DuckDB, never a tag
+    or a range (UI SDK's `latest` tag lags its `beta` tag)."""
+    vendor = json.loads((JS / "vendor-importmap.json").read_text())
+    urls = [*vendor["imports"].values()] + [u for scope in vendor["scopes"].values() for u in scope.values()]
+    versions = {UI_SDK_VERSION.search(u).group(1) for u in urls}
+    assert len(versions) == 1, versions
+    (version,) = versions
+    assert re.fullmatch(r"\d+\.\d+\.\d+(-[a-z]+\.\d+)?", version), version
+    assert all(u.startswith("https://cdn.jsdelivr.net/npm/@ui-sdk/") for u in urls)
+    for page in FORM_PAGES:
+        html = (SITE / page).read_text()
+        css = re.findall(r'href="(https://cdn.jsdelivr.net/npm/@ui-sdk/[^"]+)"', html)
+        assert css == [f"https://cdn.jsdelivr.net/npm/@ui-sdk/core@{version}/dist/web.css"], page
+
+
+@pytest.mark.parametrize("page", FORM_PAGES)
+def test_form_pages_load_ui_sdk_through_the_import_map(page):
+    """stamp_assets.py merges js/vendor-importmap.json into the page's one import map;
+    js/uisdk.js registers the parts; ui-theme.css comes after style.css, so its mapping wins."""
+    html = (SITE / page).read_text()
+    m = re.search(r'<script type="importmap">(.*?)</script>', html)
+    importmap = json.loads(m.group(1))
+    vendor = json.loads((JS / "vendor-importmap.json").read_text())
+    for spec, url in vendor["imports"].items():
+        assert importmap["imports"].get(spec) == url, (page, spec)
+    assert importmap["scopes"] == vendor["scopes"]
+    assert html.count('<script type="importmap">') == 1
+    assert re.search(r'<script type="module" src="js/uisdk.js(\?v=\w+)?"></script>', html)
+    order = [html.index("@ui-sdk/core@"), html.index('href="css/style.css'), html.index('href="css/ui-theme.css')]
+    assert order == sorted(order)
+    assert html.index("</script>", m.start()) < html.index('src="js/uisdk.js')
+
+
+def test_pages_wait_for_the_ui_sdk_parts_before_the_form():
+    """The form sets the parts' properties (value, items, checked), so it must not run
+    before they are defined, or the property would hide the element's own."""
+    for page in ("district.js", "fullmap.js"):
+        js = (JS / page).read_text()
+        assert js.index("await formPartsReady()") < js.index("createFilterForm({"), page

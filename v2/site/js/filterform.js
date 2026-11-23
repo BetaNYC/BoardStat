@@ -10,6 +10,11 @@
 //
 // The page supplies the lists to choose from (it knows where its rows are) and what to do
 // on Apply. The pure decisions are exported for v2/tests-js.
+//
+// Problem and Description are UI SDK comboboxes with several picks shown as chips,
+// Exclude is a UI SDK checkbox, and Apply and Reset are UI SDK buttons (#187;
+// js/uisdk.js loads them). The form follows their change events (valuechange,
+// checkedchange, action) into `draft`, and still applies nothing until Apply.
 import { el, fmtDate, fmtInt } from './lib.js';
 import { whereSql, DESC_SQL, NOT_CLOSED_SQL, lit } from './filtersql.js';
 import { copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED, describeFilters } from './filterstate.js';
@@ -28,6 +33,146 @@ export function applyCheck({ draft, applied, typed = false, lastFailed = false }
   if (draft.start > draft.end) return 'date-order';
   if (!typed && !lastFailed && changedFields(draft, applied).length === 0) return 'no-change';
   return 'apply';
+}
+
+/**
+ * Wait until the UI SDK parts the form uses are defined (js/uisdk.js), so their
+ * properties (value, items, checked) are set on the real elements. Resolves false if
+ * they have not loaded after `ms` (a dropped connection); the page then says so.
+ */
+export function formPartsReady(ms = 20000) {
+  if (typeof customElements === 'undefined') return Promise.resolve(true);
+  const parts = Promise.all(['ui-combobox', 'ui-checkbox', 'ui-button'].map((t) => customElements.whenDefined(t))).then(() => true);
+  return Promise.race([parts, new Promise((resolve) => setTimeout(() => resolve(false), ms))]);
+}
+
+export const PARTS_FAILED_MSG = 'The Problem and Description boxes did not load, so those filters, Exclude, Apply and Reset may not work. This can happen if the connection drops. Reload the page to try again.';
+
+/** Show PARTS_FAILED_MSG in the form's own warning line (#parts-failed), which the
+ *  status line's counts never overwrite, and which stays shown when the panel closes. */
+export function showPartsFailed($ = (id) => document.getElementById(id)) {
+  const node = $('parts-failed');
+  if (!node) return;
+  node.textContent = PARTS_FAILED_MSG;
+  node.hidden = false;
+}
+
+/**
+ * Names for a picker's chips row, chips and remove buttons (QA round 1). UI SDK names a
+ * remove button "Remove X", so a problem and a description with the same name (14 real
+ * names are both) gave two buttons one name, and it names the chips row like its
+ * combobox. Its own names are rewritten on every render, so a template cannot change
+ * them; an observer puts these back whenever UI SDK writes its own.
+ */
+export function chipNames(kind, exclude = false) {
+  const plural = kind === 'problem' ? 'problems' : 'descriptions';
+  return {
+    row: exclude ? `Excluded ${plural}` : `Chosen ${plural}`,
+    chip: (v) => `${exclude ? 'Excluded' : 'Chosen'} ${kind}: ${v}`,
+    remove: (v) => `Remove ${kind} filter ${v}`,
+  };
+}
+
+function nameChips(box, names) {
+  const row = box.querySelector('ui-combobox-chips');
+  if (!row) return () => {};
+  const set = (node, value) => { if (node && node.getAttribute('aria-label') !== value) node.setAttribute('aria-label', value); };
+  const apply = () => {
+    const n = names();
+    set(row, n.row);
+    if (row.hasAttribute('aria-labelledby')) row.removeAttribute('aria-labelledby');
+    for (const chip of row.querySelectorAll('ui-combobox-chip')) {
+      const value = chip.getAttribute('value') ?? '';
+      set(chip, n.chip(value));
+      set(chip.querySelector('ui-combobox-chip-remove > button'), n.remove(value));
+    }
+  };
+  new MutationObserver(apply).observe(row, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label', 'aria-labelledby'] });
+  apply();
+  return apply;
+}
+
+/** Whether two lists hold the same values in the same order. */
+const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/** A combobox's choices as UI SDK items: a name is both the value and the label. */
+export const asItems = (names) => names.map((n) => ({ value: n, label: n }));
+
+/** Description rows are this tall (css/ui-theme.css), so the list can place them by index. */
+export const ROW_PX = 40;
+
+/**
+ * Description's virtualized list (#187), the pattern in UI SDK's Combobox docs
+ * ("Virtualized"): the combobox gets every item as data, so filtering, the keyboard and
+ * an agent know them all, while only the rows near the scroll position are in the page.
+ * The text filter here matches UI SDK's default ("contains", ignoring case and accents),
+ * so the `highlight` event's index points at the same row.
+ */
+export function virtualList(box, { row = ROW_PX } = {}) {
+  const scroller = box.querySelector('.vlist');
+  const list = scroller.querySelector('ui-combobox-list');
+  const fold = (t) => String(t).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  let all = [];
+  let matches = [];
+  const rendered = new Map();
+  const filter = (text) => {
+    const needle = fold(text.trim());
+    matches = needle ? all.filter((item) => fold(item.label).includes(needle)) : all;
+  };
+  function render() {
+    list.style.height = `${matches.length * row}px`;
+    const height = scroller.clientHeight || 320;
+    const start = Math.max(0, Math.floor(scroller.scrollTop / row) - 4);
+    const end = Math.min(matches.length, Math.ceil((scroller.scrollTop + height) / row) + 4);
+    const visible = new Map(matches.slice(start, end).map((item, i) => [item.value, start + i]));
+    for (const [value, node] of rendered) {
+      if (!visible.has(value)) { node.remove(); rendered.delete(value); }
+    }
+    for (const [value, index] of visible) {
+      const node = rendered.get(value) ?? el('ui-combobox-item', { value, label: value },
+        el('span', { class: 'vlist-text', text: value }), el('ui-combobox-item-indicator', { 'aria-hidden': 'true' }));
+      node.setAttribute('index', String(index));
+      node.style.top = `${index * row}px`;
+      if (!rendered.has(value)) { list.append(node); rendered.set(value, node); }
+    }
+  }
+  let shownQuery = '';
+  /** Filter by the combobox's text as it is now. A querychange can still be cancelled
+   *  after this listener runs (bind() keeps unchosen text on click-away), so the list
+   *  waits a tick and reads `box.query` instead of trusting the event (QA round 1). */
+  function sync() {
+    const query = box.query ?? '';
+    filter(query);
+    if (query !== shownQuery) {
+      shownQuery = query;
+      // New matches start at the top. Left scrolled past the end of a shorter list, the
+      // window would hold no rows, and UI SDK would then draw every match itself.
+      scroller.scrollTop = 0;
+    }
+    render();
+  }
+  box.addEventListener('querychange', () => setTimeout(sync, 0));
+  box.addEventListener('openchange', () => requestAnimationFrame(sync));
+  box.addEventListener('highlight', (e) => {
+    const { index } = e.detail;
+    if (index < 0) return;
+    const top = index * row;
+    if (top < scroller.scrollTop) scroller.scrollTop = top;
+    else if (top + row > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = top + row - scroller.clientHeight;
+    render();
+  });
+  scroller.addEventListener('scroll', render);
+  return {
+    /** Replace the choices (names), keeping the combobox's selection. */
+    setItems(names) {
+      all = asItems(names);
+      filter(box.query ?? '');
+      for (const node of rendered.values()) node.remove();
+      rendered.clear();
+      render();
+      box.items = all;
+    },
+  };
 }
 
 /** The choice in `list` that `text` names, ignoring case and outer spaces, or undefined. */
@@ -139,6 +284,10 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   let knownStatuses = []; // what lists.statuses() returned: the data's statuses, and "Closed"
   let panel = null; // the open/close toggle (setupPanel): { mapPage, scrollTo }
   let formApplied = false; // the last change came from the form's own Apply or Reset
+  let descList = null; // Description's virtualized list (virtualList), made on first use
+  // The chips' names (chipNames); Description's change with Exclude.
+  const nameTypeChips = nameChips($('f-type'), () => chipNames('problem'));
+  const nameDescChips = nameChips($('f-desc'), () => chipNames('description', draft.descEx));
 
   /** Open or close the panel. When closed, only its status line stays, under the summary line. */
   function showPanel(open) {
@@ -157,14 +306,11 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
     if (panel && !panel.mapPage) node.hidden = !$('filters').classList.contains('is-collapsed');
   }
 
+  /** The chips are UI SDK's (ui-combobox-chips); this marks Exclude mode and the address. */
   function renderChips() {
-    $('type-chips').replaceChildren(...draft.types.map((t) => el('li', {},
-      el('button', { type: 'button', 'aria-label': `Remove problem filter ${t}`, onclick: () => { draft.types = draft.types.filter((x) => x !== t); changed(); } }, `${t} ×`))));
-    $('desc-chips').classList.toggle('exclude', draft.descEx);
-    $('desc-chips').setAttribute('aria-label', draft.descEx ? 'Excluded descriptions' : 'Selected descriptions');
-    $('desc-chips').replaceChildren(...draft.descs.map((d) => el('li', {},
-      el('button', { type: 'button', 'aria-label': `Remove description filter ${d}`, onclick: () => { draft.descs = draft.descs.filter((x) => x !== d); changed(); } },
-        `${draft.descEx ? 'Not: ' : ''}${d} ×`))));
+    $('f-desc').toggleAttribute('data-exclude', draft.descEx);
+    nameTypeChips();
+    nameDescChips();
     $('addr-filter').hidden = lockAddress || !draft.addr;
     $('addr-value').textContent = draft.addr;
   }
@@ -185,7 +331,11 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
     }
     $('f-agency').value = draft.agency;
     $('f-status').value = draft.status;
-    $('f-desc-ex').checked = draft.descEx;
+    // UI SDK parts: setting a property is an "imperative" change; the listeners in bind()
+    // copy it back into the draft, which already holds it.
+    if (!sameList($('f-type').value ?? [], draft.types)) $('f-type').value = [...draft.types];
+    if (!sameList($('f-desc').value ?? [], draft.descs)) $('f-desc').value = [...draft.descs];
+    if ($('f-desc-ex').checked !== draft.descEx) $('f-desc-ex').checked = draft.descEx;
   }
 
   /** Remove extra options (syncControls) other than `keep`. */
@@ -216,39 +366,37 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
     if (!listsReady || key === descKey) return;
     descKey = key;
     descs = await lists.descriptions(draft.types);
-    $('desc-options').replaceChildren(...descs.map((d) => el('option', { value: d })));
+    // Made on first use: a page may fill the lists before it calls bind().
+    descList ??= virtualList($('f-desc'));
+    descList.setItems(descs);
   }
 
   /** Text that matches no choice stays in the box, with a short status saying so. Returns false then. */
   function noMatch(box, kind, text) {
     setStatus(`No ${kind} named “${String(text).trim()}”. Choose one of the suggestions as you type, or clear the box.`);
-    $(box).focus();
+    $(box).api?.focus();
     return false;
   }
 
-  function addDesc(d) {
-    const match = findChoice(descs, d);
-    if (match === undefined) return noMatch('f-desc', 'description', d);
-    if (!draft.descs.includes(match)) { draft.descs = [...draft.descs, match]; changed(); }
-    $('f-desc').value = '';
-    return true;
-  }
-
-  function addType(t) {
-    const match = findChoice(problems, t);
-    if (match === undefined) return noMatch('f-type', 'problem', t);
-    if (!draft.types.includes(match)) { draft.types = [...draft.types, match]; changed(); }
-    $('f-type').value = '';
+  /** Typed text not yet chosen in a picker: added as a chip if it names a choice. */
+  function addTyped(id, kind, choices, key) {
+    const text = $(id).query ?? '';
+    if (!text.trim()) return true;
+    const match = findChoice(choices, text);
+    if (match === undefined) return noMatch(id, kind, text);
+    if (!draft[key].includes(match)) { draft[key] = [...draft[key], match]; changed(); }
+    $(id).query = '';
+    syncControls();
     return true;
   }
 
   /** Apply: copy the form's filters to the page, after the checks. */
   function apply() {
-    // Text typed but not yet added as a chip is added first, if it matches a choice.
-    // Text that matches nothing stops the Apply and says so, instead of vanishing.
-    const typed = Boolean($('f-type').value.trim() || $('f-desc').value.trim());
-    if ($('f-type').value.trim() && !addType($('f-type').value)) return;
-    if ($('f-desc').value.trim() && !addDesc($('f-desc').value)) return;
+    // Text typed but not yet chosen is added first, if it names a choice exactly. Text
+    // that matches nothing stops the Apply and says so, instead of vanishing.
+    const typed = Boolean(($('f-type').query ?? '').trim() || ($('f-desc').query ?? '').trim());
+    if (!addTyped('f-type', 'problem', problems, 'types')) return;
+    if (!addTyped('f-desc', 'description', descs, 'descs')) return;
     const check = applyCheck({ draft, applied, typed, lastFailed: lastFailed() });
     if (check === 'date-order') { setStatus(DATE_ORDER_MSG); $('f-start').focus(); return; }
     if (check === 'no-change') { setStatus(matchText()); return; }
@@ -261,8 +409,8 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   function reset() {
     applied = copyFilters(defaults());
     draft = copyFilters(applied);
-    $('f-type').value = '';
-    $('f-desc').value = '';
+    $('f-type').query = '';
+    $('f-desc').query = '';
     formApplied = true;
     onApply(copyFilters(applied));
   }
@@ -313,7 +461,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
     /** Fill the problem, agency and status lists (again after the page's rows changed). */
     async fillLists() {
       problems = await lists.problems();
-      $('type-options').replaceChildren(...problems.map((t) => el('option', { value: t })));
+      $('f-type').items = asItems(problems);
       // Keep the fixed first options ("All agencies", "Any status", "Not yet closed"); replace the rest.
       $('f-agency').replaceChildren($('f-agency').options[0], ...(await lists.agencies())
         .map((r) => el('option', { value: r.agency, text: `${r.agency}${r.label ? ` (${r.label})` : ''}` })));
@@ -354,22 +502,45 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
       $('filters-toggle').focus({ preventScroll: true });
     },
     /** Wire up the controls. Changing a control changes only the form (#142); Apply, or
-     *  Enter in a text or date box, runs the page's queries. */
+     *  Enter in a date box or an empty picker, runs the page's queries. */
     bind(min, max) {
       for (const id of ['f-start', 'f-end']) { $(id).min = min; $(id).max = max; }
       $('f-start').addEventListener('change', (e) => { if (e.target.value) { draft.start = e.target.value; changed(); } });
       $('f-end').addEventListener('change', (e) => { if (e.target.value) { draft.end = e.target.value; changed(); } });
       $('f-agency').addEventListener('change', (e) => { draft.agency = e.target.value; dropExtras('f-agency', draft.agency); changed(); });
       $('f-status').addEventListener('change', (e) => { draft.status = e.target.value; dropExtras('f-status', draft.status); changed(); });
-      // Enter with text in the box adds it as a chip; Enter in an empty box applies the filters.
-      $('f-type').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.value.trim()) { e.preventDefault(); addType(e.target.value); } });
-      $('f-type').addEventListener('change', (e) => { if (problems.includes(e.target.value)) addType(e.target.value); });
-      $('f-desc').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.value.trim()) { e.preventDefault(); addDesc(e.target.value); } });
-      $('f-desc').addEventListener('change', (e) => { if (descs.includes(e.target.value)) addDesc(e.target.value); });
-      $('f-desc-ex').addEventListener('change', (e) => { draft.descEx = e.target.checked; changed(); });
+      // The pickers keep their own chips; their valuechange says what is chosen now.
+      // A name is both an item's value and its label, so chips set from a link show
+      // before the lists load.
+      for (const [id, key] of [['f-type', 'types'], ['f-desc', 'descs']]) {
+        $(id).itemToLabel = (v) => String(v);
+        $(id).addEventListener('valuechange', (e) => {
+          const next = [...(e.detail.value ?? [])];
+          if (!sameList(next, draft[key])) { draft[key] = next; changed(); }
+        });
+        const [kind, choices] = key === 'types' ? ['problem', () => problems] : ['description', () => descs];
+        $(id).addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' || e.defaultPrevented) return;
+          const text = ($(id).query ?? '').trim();
+          // Enter in an empty, closed picker applies the filters, like Enter in a date box.
+          if (!text && !$(id).open) { e.preventDefault(); $('filters').requestSubmit(); return; }
+          // Enter after typing a whole name, with nothing highlighted, adds it (as before #187).
+          if (text && $(id).api?.getHighlighted() == null && findChoice(choices(), text) !== undefined) {
+            e.preventDefault();
+            addTyped(id, kind, choices(), key);
+          }
+        });
+        // UI SDK clears typed text that was never chosen when focus leaves. Keep it in the
+        // box instead, so Apply adds it if it names a choice, or stops and says it names
+        // nothing (#142's rule), rather than dropping it without a word.
+        $(id).addEventListener('querychange', (e) => {
+          if (e.detail.value === '' && ['focus-out', 'outside-press'].includes(e.detail.reason) && ($(id).query ?? '').trim()) e.preventDefault();
+        });
+      }
+      $('f-desc-ex').addEventListener('checkedchange', (e) => { draft.descEx = e.detail.value === true; changed(); });
       $('addr-clear').addEventListener('click', () => { draft.addr = ''; changed(); });
       $('filters').addEventListener('submit', (e) => { e.preventDefault(); apply(); });
-      $('reset').addEventListener('click', reset);
+      $('reset').addEventListener('action', reset);
     },
   };
 }

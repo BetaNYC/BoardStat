@@ -2,7 +2,7 @@
 
 The fixture is a small, real slice of the published build: Queens Joint Interest Area
 480 (8,273 requests, 2020 to the build date), the community district boundaries, the
-manifest, and only the rows of agg/month_type.parquet that the district page's Compare
+manifest, a changes.json stub, and only the rows of agg/month_type.parquet that the district page's Compare
 panel reads for that district (cd 480, Queens, the city).
 
 It never calls NYC Open Data and never runs the pipeline. The source folder holds files
@@ -47,6 +47,12 @@ def main(src: Path, out: Path) -> None:
         f"{BOROUGH} and the city."
     )
     (out / "manifest.json").write_text(json.dumps(manifest, indent=1) + "\n")
+    # The nightly job writes data/changes.json; a fixture has no night before it, so it
+    # gets a stub with nothing changed (format: lib.js renderChanges). Without it every
+    # page logs a 404 (QA round 1).
+    zero = {"new": 0, "updated": 0, "closed": 0}
+    changes = {"fixture": "stub: nothing changed", "since": manifest["generated_at"], "city": zero, "cd": {DISTRICT: zero}}
+    (out / "changes.json").write_text(json.dumps(changes, indent=1) + "\n")
     shutil.copyfile(Path(__file__).resolve().parents[2] / "LICENSE-DATA.md", out / "LICENSE.txt")
     for p in sorted(out.rglob("*")):
         if p.is_file():

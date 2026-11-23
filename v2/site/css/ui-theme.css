@@ -1,0 +1,131 @@
+/* UI SDK in the NYSDS look, in BetaNYC colors (#187).
+
+   Three layers, each with one job:
+   1. A custom NYSDS theme, "betanyc" (NYSDS "Creating a Custom Theme": override the seven
+      --nys-color-theme* tokens). BoardStat does not load NYSDS's own stylesheet, so the
+      tokens are set on :root too. Values are BetaNYC's brand blues, close to --bnyc-* in
+      style.css, so the form does not look patched.
+   2. UI SDK's --ui-* tokens (its default stylesheet, web.css) read the NYSDS tokens.
+      When BoardStat moves onto NYSDS, only layer 1 changes.
+   3. A few rules where BoardStat's own button and input styles (style.css, unlayered)
+      would otherwise win over web.css (in @layer ui-sdk), plus forced colors, which
+      web.css does not handle (checked in UI SDK 0.1.0-beta.14).
+
+   Contrast, by the WCAG 2.2 formula (computed 2026-11-22): --nys-color-theme #2359a8
+   and white 6.85:1; --nys-color-theme-strong #1b4583 and white 9.44:1; -stronger 13.1:1;
+   -mid #4a78c2 and white 4.41:1 (borders and fills only, never text); text #414141 on
+   -weaker 9.25:1 and on -weak 6.85:1. */
+
+:root,
+[data-theme="betanyc"],
+.nys-theme-betanyc {
+  --nys-color-theme-faint: #f9faff;    /* --bnyc-bg-blue-light */
+  --nys-color-theme-weaker: #eef4ff;   /* --bnyc-bg-blue */
+  --nys-color-theme-weak: #b8d6ff;     /* --bnyc-blue-secondary */
+  --nys-color-theme-mid: #4a78c2;
+  --nys-color-theme: #2359a8;          /* --bnyc-blue */
+  --nys-color-theme-strong: #1b4583;
+  --nys-color-theme-stronger: #12305c;
+}
+
+:root {
+  /* BoardStat is light only; web.css asks for light and dark. */
+  color-scheme: light;
+  --ui-background: var(--bnyc-white, #ffffff);
+  --ui-foreground: var(--bnyc-dark-gray, #414141);
+  --ui-muted: var(--nys-color-theme-weaker);
+  --ui-muted-foreground: #595959;      /* 7:1 on white */
+  --ui-border: var(--bnyc-border-gray, #949494);
+  --ui-input: var(--bnyc-border-gray, #949494);
+  --ui-primary: var(--nys-color-theme);
+  --ui-primary-foreground: #ffffff;
+  --ui-ring: var(--nys-color-theme);
+  --ui-ring-border: var(--nys-color-theme-strong);
+  --ui-radius: 4px;
+  --ui-font-sans: var(--font-body);
+  --ui-font-size: 1rem;
+}
+
+/* Apply and Reset (ui-button) look like BoardStat's other buttons (style.css): web.css's
+   fixed 32px height is the one rule style.css does not already replace. */
+#filters [data-slot="button"] { height: auto; min-height: 44px; }
+#filters .filter-actions > button { min-height: 44px; }
+
+/* The two pickers: label, chips and the text box, full width of their column. */
+#filters ui-combobox { display: block; }
+#filters ui-combobox-label { display: block; font-weight: 600; }
+#filters ui-combobox-chips {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+  min-height: 44px; padding: 0.25rem 0.4rem;
+  border: 1px solid var(--ui-input); border-radius: var(--ui-radius); background: var(--ui-background);
+}
+#filters ui-combobox-chips:focus-within { outline: 3px solid var(--nys-color-theme); outline-offset: 2px; }
+#filters ui-combobox-input { flex: 1 1 10rem; display: flex; }
+#filters ui-combobox-input input { width: 100%; min-width: 0; border: 0; padding: 0.35rem 0.25rem; background: transparent; }
+/* The chips box shows focus for the text box inside it. */
+#filters ui-combobox-input input:focus-visible { outline: none; box-shadow: none; }
+#filters ui-combobox-chip {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.1rem 0.15rem 0.1rem 0.5rem; font-size: 0.9rem;
+  background: var(--nys-color-theme-weaker); border: 1px solid var(--bnyc-border-gray); border-radius: 3px;
+}
+#filters ui-combobox-chip-remove button {
+  min-width: 32px; min-height: 32px; padding: 0 0.35rem; margin: 0;
+  background: transparent; color: var(--bnyc-dark-gray); border: 0; border-radius: 3px; font-size: 1.1rem; line-height: 1;
+}
+#filters ui-combobox-chip-remove button:hover { background: var(--nys-color-theme-weak); }
+/* Exclude mode: the chosen descriptions are the ones left out. */
+#f-desc[data-exclude] ui-combobox-chip { background: var(--bnyc-white); border-style: dashed; }
+#f-desc[data-exclude] ui-combobox-chip::before { content: "Not:"; font-weight: 600; }
+
+/* The open list. */
+#filters ui-combobox-content {
+  border: 1px solid var(--ui-border); border-radius: var(--ui-radius); background: var(--ui-background);
+  box-shadow: var(--ui-shadow); padding: 0.25rem; width: var(--anchor-width);
+  max-height: min(22rem, var(--available-height, 22rem)); overflow-y: auto;
+  font-size: 1rem; color: var(--ui-foreground);
+}
+#filters ui-combobox-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  min-height: 40px; padding: 0.25rem 0.6rem; border-radius: 3px; cursor: pointer;
+}
+#filters ui-combobox-item[data-highlighted] { background: var(--nys-color-theme-weaker); outline: 2px solid var(--nys-color-theme); outline-offset: -2px; }
+#filters ui-combobox-item[data-selected] { font-weight: 600; }
+#filters ui-combobox-item mark { background: var(--nys-color-theme-weak); color: inherit; font-weight: 600; }
+#filters ui-combobox-empty { display: block; padding: 0.5rem 0.6rem; }
+#filters ui-combobox-empty:not([data-empty]) { display: none; }
+
+/* Description's virtualized list: only the rows near the scroll position exist. Rows
+   are absolutely placed at index × row height (filterform.js virtualList, ROW_PX). */
+#f-desc ui-combobox-content { overflow: hidden; }
+#f-desc .vlist { max-height: min(20rem, var(--list-height, 20rem)); overflow-y: auto; }
+#f-desc ui-combobox-list { display: block; position: relative; }
+#f-desc ui-combobox-item { position: absolute; left: 0; right: 0; height: 40px; min-height: 0; }
+#f-desc .vlist-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Exclude these descriptions. */
+#filters ui-checkbox {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 1.25rem; height: 1.25rem; border: 2px solid var(--bnyc-dark-gray); border-radius: 3px; background: var(--bnyc-white);
+}
+#filters ui-checkbox[data-checked] { background: var(--nys-color-theme); border-color: var(--nys-color-theme); color: #ffffff; }
+#filters ui-checkbox-indicator { display: inline-flex; }
+#filters label.choice:has(ui-checkbox) { min-height: 44px; cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  #filters ui-combobox-content { transition: none; animation: none; }
+}
+
+/* Forced colors (Windows High Contrast): backgrounds are replaced by the system's, so
+   the highlighted option, a checked box and the chips need borders and system colors. */
+@media (forced-colors: active) {
+  #filters ui-combobox-chips, #filters ui-combobox-content, #filters ui-combobox-chip { border: 1px solid CanvasText; }
+  #filters ui-combobox-chips:focus-within { outline: 3px solid Highlight; }
+  #filters ui-combobox-item[data-highlighted] { outline: 2px solid Highlight; background: Highlight; color: HighlightText; forced-color-adjust: none; }
+  #filters ui-checkbox { border-color: ButtonText; }
+  #filters ui-checkbox[data-checked] { background: Highlight; border-color: Highlight; color: HighlightText; forced-color-adjust: none; }
+  #filters ui-checkbox-indicator { color: HighlightText; }
+  /* web.css draws check marks as a masked background, which forced colors repaints away. */
+  #filters ui-combobox-item-indicator::before { forced-color-adjust: none; background: CanvasText; }
+  #filters ui-combobox-item[data-highlighted] ui-combobox-item-indicator::before { background: HighlightText; }
+}

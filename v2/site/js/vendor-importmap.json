@@ -1,0 +1,21 @@
+{
+  "_comment": "UI SDK (#187), pinned to one exact version on jsDelivr. The page loads UI SDK's plain ES module files (dist/) instead of its one-file browser build, so the agent bridge (@ui-sdk/web/agent) and the components share one copy of @ui-sdk/core: the bridge finds components through a module-level registry. stamp_assets.py merges this file into every page's import map. Change the version in every URL at once; a test checks they match.",
+  "imports": {
+    "@ui-sdk/web/combobox": "https://cdn.jsdelivr.net/npm/@ui-sdk/web@0.1.0-beta.14/dist/entries/combobox.js",
+    "@ui-sdk/web/checkbox": "https://cdn.jsdelivr.net/npm/@ui-sdk/web@0.1.0-beta.14/dist/entries/checkbox.js",
+    "@ui-sdk/web/button": "https://cdn.jsdelivr.net/npm/@ui-sdk/web@0.1.0-beta.14/dist/entries/button.js",
+    "@ui-sdk/web/agent": "https://cdn.jsdelivr.net/npm/@ui-sdk/web@0.1.0-beta.14/dist/agent.js",
+    "@ui-sdk/core/agent": "https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/page/agent/agent.js",
+    "@ui-sdk/core/button": "https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/components/button/button.js",
+    "@ui-sdk/core/checkbox": "https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/components/checkbox/checkbox.js",
+    "@ui-sdk/core/combobox": "https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/components/combobox/combobox.js",
+    "@ui-sdk/core/renderer": "https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/renderer.js",
+    "@ui-sdk/core/switch": "https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/components/switch/switch.js"
+  },
+  "scopes": {
+    "https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/": {
+      "#dev": "https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/foundation/kernel/dev-stub.js",
+      "#name-check": "https://cdn.jsdelivr.net/npm/@ui-sdk/core@0.1.0-beta.14/dist/foundation/text/name-check-stub.js"
+    }
+  }
+}

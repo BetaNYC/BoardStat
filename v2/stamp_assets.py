@@ -11,6 +11,8 @@ What it does, for every site/*.html:
   ./js/<module>.js to ./js/<module>.js?v=<hash>. Modules import each other as
   './lib.js'; the browser resolves that to the same URL as the map key and then
   uses the stamped URL (https://html.spec.whatwg.org/multipage/webappapis.html#import-maps).
+- The pinned third-party entries in site/js/vendor-importmap.json (UI SDK, #187) are
+  merged into the same map: a page has one import map.
 
 Safe to run again: it replaces old stamps. Run it before every upload.
 Usage: python3 v2/stamp_assets.py
@@ -21,6 +23,7 @@ import re
 from pathlib import Path
 
 SITE = Path(__file__).resolve().parent / "site"
+VENDOR_MAP = SITE / "js" / "vendor-importmap.json"
 START, END = "<!-- importmap:start -->", "<!-- importmap:end -->"
 
 
@@ -32,7 +35,10 @@ def main() -> None:
     js = {p.name: short_hash(p) for p in sorted((SITE / "js").glob("*.js"))}
     css = {p.name: short_hash(p) for p in sorted((SITE / "css").glob("*.css"))}
     imports = {f"./js/{name}": f"./js/{name}?v={h}" for name, h in js.items()}
-    block = f'{START}\n  <script type="importmap">{json.dumps({"imports": imports}, separators=(",", ":"))}</script>\n  {END}'
+    vendor = json.loads(VENDOR_MAP.read_text()) if VENDOR_MAP.exists() else {}
+    imports.update(vendor.get("imports", {}))
+    importmap = {"imports": imports, **({"scopes": vendor["scopes"]} if vendor.get("scopes") else {})}
+    block = f'{START}\n  <script type="importmap">{json.dumps(importmap, separators=(",", ":"))}</script>\n  {END}'
 
     for page in sorted(SITE.glob("*.html")):
         html = page.read_text()

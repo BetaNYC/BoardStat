@@ -9,7 +9,7 @@ import {
   NOT_CLOSED, filtersFromParams, filtersToParams, describeFilters, keepKnownStatus, isLot, addressParams,
 } from './filterstate.js';
 import { whereSql, NOT_CLOSED_SQL, DESC_SQL, LOT_SQL } from './filtersql.js';
-import { createFilterForm, tableLists, DATE_ORDER_MSG, matchMsg } from './filterform.js';
+import { createFilterForm, tableLists, DATE_ORDER_MSG, matchMsg, formPartsReady, showPartsFailed } from './filterform.js';
 import { parsePlace, resolvePlace, sourceNames, sourceSql, boroughOfCd, boroughUrl, SLIM_COLUMNS, slimFileFor } from './place.js';
 import {
   periodFrom, priorFrom, priorCoverStart, createLoader, latestOnly, DataChangedError, filesNamedIn, freshnessCheck, loadFailedText,
@@ -1406,6 +1406,9 @@ async function main() {
   viewStart = manifest.window.default_start || manifest.window.start;
   window.boardstatTrack?.(ADDRESS_MODE ? 'address_viewed' : 'district_selected', { geo, district_id: geoId, page_type: ADDRESS_MODE ? 'address' : 'district' });
   state = readState();
+  // The Problem and Description boxes, Exclude, Apply and Reset are UI SDK parts (#187).
+  // The form sets their properties, so it waits until they are defined.
+  if (!(await formPartsReady())) showPartsFailed();
   form = createFilterForm({
     defaults: defaultFilters,
     lists: formLists,
