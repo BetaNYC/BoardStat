@@ -125,4 +125,7 @@
   #filters ui-checkbox { border-color: ButtonText; }
   #filters ui-checkbox[data-checked] { background: Highlight; border-color: Highlight; color: HighlightText; forced-color-adjust: none; }
   #filters ui-checkbox-indicator { color: HighlightText; }
+  /* web.css draws check marks as a masked background, which forced colors repaints away. */
+  #filters ui-combobox-item-indicator::before { forced-color-adjust: none; background: CanvasText; }
+  #filters ui-combobox-item[data-highlighted] ui-combobox-item-indicator::before { background: HighlightText; }
 }

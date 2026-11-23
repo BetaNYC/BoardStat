@@ -101,6 +101,10 @@ def test_forced_colors(page, base_url):
     assert item.text_content().strip() == "Lost Property"
     assert item.evaluate("e => getComputedStyle(e).outlineStyle") == "solid"
     assert item.evaluate("e => getComputedStyle(e).forcedColorAdjust") == "none"
+    # The chosen problem keeps its check mark (web.css draws it as a masked background).
+    page.keyboard.press("Enter")  # choose it; the list stays open with every item
+    mark = page.locator("#f-type ui-combobox-item[data-selected] ui-combobox-item-indicator").first
+    assert mark.evaluate("e => getComputedStyle(e, '::before').forcedColorAdjust") == "none"
     checked = page.locator("#f-desc-ex")
     assert checked.get_attribute("data-checked") == ""
     assert checked.evaluate("e => getComputedStyle(e).forcedColorAdjust") == "none"
