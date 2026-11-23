@@ -85,7 +85,8 @@ export function virtualList(box, { row = ROW_PX } = {}) {
       if (!visible.has(value)) { node.remove(); rendered.delete(value); }
     }
     for (const [value, index] of visible) {
-      const node = rendered.get(value) ?? el('ui-combobox-item', { value, label: value, text: value });
+      const node = rendered.get(value) ?? el('ui-combobox-item', { value, label: value },
+        el('span', { class: 'vlist-text', text: value }), el('ui-combobox-item-indicator', { 'aria-hidden': 'true' }));
       node.setAttribute('index', String(index));
       node.style.top = `${index * row}px`;
       if (!rendered.has(value)) { list.append(node); rendered.set(value, node); }
@@ -224,7 +225,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   let knownStatuses = []; // what lists.statuses() returned: the data's statuses, and "Closed"
   let panel = null; // the open/close toggle (setupPanel): { mapPage, scrollTo }
   let formApplied = false; // the last change came from the form's own Apply or Reset
-  let descList = null; // Description's virtualized list (virtualList), set up by bind()
+  let descList = null; // Description's virtualized list (virtualList), made on first use
 
   /** Open or close the panel. When closed, only its status line stays, under the summary line. */
   function showPanel(open) {
@@ -301,8 +302,9 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
     if (!listsReady || key === descKey) return;
     descKey = key;
     descs = await lists.descriptions(draft.types);
-    if (descList) descList.setItems(descs);
-    else $('f-desc').items = asItems(descs);
+    // Made on first use: a page may fill the lists before it calls bind().
+    descList ??= virtualList($('f-desc'));
+    descList.setItems(descs);
   }
 
   /** Text that matches no choice stays in the box, with a short status saying so. Returns false then. */
@@ -452,15 +454,25 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
           const next = [...(e.detail.value ?? [])];
           if (!sameList(next, draft[key])) { draft[key] = next; changed(); }
         });
-        // Enter in an empty, closed picker applies the filters, like Enter in a date box.
+        const [kind, choices] = key === 'types' ? ['problem', () => problems] : ['description', () => descs];
         $(id).addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && !e.defaultPrevented && !$(id).open && !($(id).query ?? '').trim()) {
+          if (e.key !== 'Enter' || e.defaultPrevented) return;
+          const text = ($(id).query ?? '').trim();
+          // Enter in an empty, closed picker applies the filters, like Enter in a date box.
+          if (!text && !$(id).open) { e.preventDefault(); $('filters').requestSubmit(); return; }
+          // Enter after typing a whole name, with nothing highlighted, adds it (as before #187).
+          if (text && $(id).api?.getHighlighted() == null && findChoice(choices(), text) !== undefined) {
             e.preventDefault();
-            $('filters').requestSubmit();
+            addTyped(id, kind, choices(), key);
           }
         });
+        // UI SDK clears typed text that was never chosen when focus leaves. Keep it in the
+        // box instead, so Apply adds it if it names a choice, or stops and says it names
+        // nothing (#142's rule), rather than dropping it without a word.
+        $(id).addEventListener('querychange', (e) => {
+          if (e.detail.value === '' && ['focus-out', 'outside-press'].includes(e.detail.reason) && ($(id).query ?? '').trim()) e.preventDefault();
+        });
       }
-      descList = virtualList($('f-desc'));
       $('f-desc-ex').addEventListener('checkedchange', (e) => { draft.descEx = e.detail.value === true; changed(); });
       $('addr-clear').addEventListener('click', () => { draft.addr = ''; changed(); });
       $('filters').addEventListener('submit', (e) => { e.preventDefault(); apply(); });

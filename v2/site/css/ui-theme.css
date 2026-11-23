@@ -100,10 +100,8 @@
 #f-desc ui-combobox-content { overflow: hidden; }
 #f-desc .vlist { max-height: min(20rem, var(--list-height, 20rem)); overflow-y: auto; }
 #f-desc ui-combobox-list { display: block; position: relative; }
-#f-desc ui-combobox-item {
-  position: absolute; left: 0; right: 0; height: 40px; min-height: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 32px;
-}
+#f-desc ui-combobox-item { position: absolute; left: 0; right: 0; height: 40px; min-height: 0; }
+#f-desc .vlist-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Exclude these descriptions. */
 #filters ui-checkbox {
