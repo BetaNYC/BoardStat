@@ -718,6 +718,37 @@ Tests (offline except for the one-time DuckDB spatial extension download):
 cd v2/pipeline && uv run pytest
 ```
 
+### Browser tests (#186)
+
+`v2/tests-browser/` tests the pages in a real browser, the way a person (or an AI agent)
+uses them, with [Playwright for Python](https://playwright.dev/python/). It is its own uv
+project, so `v2/pipeline`'s tests and the `node --test` suite are unchanged.
+
+```sh
+cd v2/tests-browser
+uv run playwright install chromium        # once: the browser Playwright drives
+BOARDSTAT_RECORD_VENDOR=1 uv run pytest   # once, online: caches the pinned libraries in .vendor/
+uv run pytest                             # every time after: offline
+```
+
+- **Offline.** The tests serve `v2/site` with `serve.py`'s own handler on 127.0.0.1, with
+  `tests-browser/fixture-data/` at `/data/`. Chromium starts with every host name resolving
+  to nothing but localhost, so nothing reaches NYC Open Data or any other service. The
+  pinned libraries from cdn.jsdelivr.net, and the Parquet extension DuckDB-WASM loads from
+  extensions.duckdb.org, are answered from `.vendor/` (git-ignored). A test fails if the
+  page asks for anything else, or if a library is missing from the cache (run the
+  `BOARDSTAT_RECORD_VENDOR=1` line again after changing a library version).
+- **The fixture** is a small, real slice of the published build: Queens Joint Interest Area
+  480 (8,273 requests), the community district boundaries, the manifest, and the rows of
+  `agg/month_type.parquet` its Compare panel reads. `make_fixture.py` rebuilds it from files
+  downloaded from https://www.beta.nyc/boardstat/data/; it never runs the pipeline.
+- **`serve.py --data DIR`** serves `DIR` at `/data/`, so the site can run on the fixture by
+  hand too: `python3 v2/serve.py --data v2/tests-browser/fixture-data`, then open
+  http://127.0.0.1:8000/district.html?geo=cd&id=480.
+- `test_filter_form.py`: the page loads the fixture; changing a filter changes only the form
+  until Apply, and Apply changes the counts and the link; and an accessibility-tree check
+  that every control on the filter form has a name and no two share one.
+
 ## Data sources
 
 | What | Dataset | Notes |
