@@ -77,3 +77,22 @@ def test_every_filter_control_has_a_unique_name(page, base_url):
     names = [name for _, name in controls]
     dupes = sorted({n for n in names if names.count(n) > 1})
     assert not dupes, f"names used by more than one control: {dupes}"
+
+
+def test_full_page_map_runs_the_same_form(page, base_url):
+    """#149: map.html has the district page's form. With the UI SDK pickers (#187), a
+    problem chosen there is applied to the map and its link."""
+    from conftest import MAP_PATH
+    page.goto(base_url + MAP_PATH)
+    page.wait_for_function("() => document.getElementById('f-type').items?.length > 0", timeout=60_000)
+    page.locator("#filters-toggle").click()  # the map's panel starts closed
+    page.locator("#fg-problem summary").click()
+    page.locator("#f-type input").click()
+    page.keyboard.type("lost")
+    page.keyboard.press("ArrowDown")
+    page.keyboard.press("Enter")
+    page.keyboard.press("Escape")
+    page.get_by_role("button", name="Apply filters").click()
+    page.wait_for_function("() => location.search.includes('type=Lost')")
+    assert parse_qs(urlsplit(page.url).query)["type"] == ["Lost Property"]
+    assert page.errors == []

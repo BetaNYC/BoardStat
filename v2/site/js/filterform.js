@@ -92,7 +92,14 @@ export function virtualList(box, { row = ROW_PX } = {}) {
       if (!rendered.has(value)) { list.append(node); rendered.set(value, node); }
     }
   }
-  box.addEventListener('querychange', (e) => { filter(e.detail.reason === 'input-change' ? e.detail.value : ''); render(); });
+  box.addEventListener('querychange', (e) => {
+    if (e.defaultPrevented) return;
+    filter(e.detail.reason === 'input-change' ? e.detail.value : '');
+    // New matches start at the top. Left scrolled past the end of a shorter list, the
+    // window would hold no rows, and UI SDK would then draw every match itself.
+    scroller.scrollTop = 0;
+    render();
+  });
   box.addEventListener('openchange', () => requestAnimationFrame(render));
   box.addEventListener('highlight', (e) => {
     const { index } = e.detail;

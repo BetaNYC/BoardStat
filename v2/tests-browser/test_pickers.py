@@ -171,3 +171,14 @@ def test_ui_sdk_download_size(district, network):
     print("\n" + report)
     assert not any(u.endswith("/agent.js") for u, _ in ui)
     assert gz(ui) < 250_000, report
+
+
+def test_typing_after_a_long_scroll_keeps_the_list_virtualized(district):
+    page = district
+    page.locator("#f-desc input").click()
+    for _ in range(60):
+        page.keyboard.press("ArrowDown")
+    page.keyboard.type("driver")
+    info = page.evaluate("""() => { const items = [...document.querySelectorAll('#f-desc ui-combobox-item')];
+      return { rendered: items.length, unindexed: items.filter((i) => !i.hasAttribute('index')).length }; }""")
+    assert info["rendered"] > 0 and info["unindexed"] == 0, info
