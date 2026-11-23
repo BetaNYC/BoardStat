@@ -1,0 +1,1679 @@
+{
+ "generated_at": "2026-11-22T10:43:19Z",
+ "generator": "boardstat_build (duckdb 2.0.0)",
+ "window": {
+  "start": "2020-01-01",
+  "end": "2026-11-22",
+  "default_start": "2025-11-01",
+  "first_created": "2020-01-01 00:00:00",
+  "last_created": "2026-11-21 02:21:27"
+ },
+ "sources": {
+  "service_requests": {
+   "id": "erm2-nwe9",
+   "name": "311 Service Requests from 2020 to Present",
+   "url": "https://data.cityofnewyork.us/d/erm2-nwe9",
+   "rowsUpdatedAt": 1795315032,
+   "rowsUpdatedAt_iso": "2026-11-22T02:37:12+00:00"
+  },
+  "community_districts": {
+   "id": "5crt-au7u",
+   "name": "Community Districts",
+   "url": "https://data.cityofnewyork.us/d/5crt-au7u",
+   "rowsUpdatedAt": 1793648400,
+   "rowsUpdatedAt_iso": "2026-11-02T19:40:00+00:00",
+   "version": "26c",
+   "features": 71
+  },
+  "council_districts": {
+   "id": "872g-cjhh",
+   "name": "City Council Districts",
+   "url": "https://data.cityofnewyork.us/d/872g-cjhh",
+   "rowsUpdatedAt": 1793648056,
+   "rowsUpdatedAt_iso": "2026-11-02T19:34:16+00:00",
+   "version": "26c",
+   "features": 51
+  }
+ },
+ "license": {
+  "name": "Open Database License (ODbL) 1.0",
+  "spdx": "ODbL-1.0",
+  "url": "https://opendatacommons.org/licenses/odbl/1-0/",
+  "attribution": "BoardStat by BetaNYC (https://www.beta.nyc/boardstat/), built from NYC Open Data. Data available under the Open Database License (ODbL) 1.0: https://opendatacommons.org/licenses/odbl/1-0/",
+  "source_terms": "Individual records come from NYC Open Data and remain subject to the City's terms of use.",
+  "notice": "LICENSE.txt"
+ },
+ "counts": {
+  "total": 23236258,
+  "with_coords": 22803561,
+  "without_coords": 432697,
+  "not_in_any_cd": 438184,
+  "not_in_any_cc": 438184,
+  "closed_before_created": 47605,
+  "closed_in_future": 2,
+  "no_close_date": 463121
+ },
+ "agreement": {
+  "council": {
+   "compared": 22679103,
+   "matches": 20981085,
+   "share": 0.9251,
+   "city_value_missing": 118971,
+   "by_month": [
+    {
+     "year_month": "2020-01",
+     "compared": 188259,
+     "share": 0.8491
+    },
+    {
+     "year_month": "2020-02",
+     "compared": 166858,
+     "share": 0.8489
+    },
+    {
+     "year_month": "2020-03",
+     "compared": 173995,
+     "share": 0.8507
+    },
+    {
+     "year_month": "2020-04",
+     "compared": 152837,
+     "share": 0.8503
+    },
+    {
+     "year_month": "2020-05",
+     "compared": 228289,
+     "share": 0.842
+    },
+    {
+     "year_month": "2020-06",
+     "compared": 306012,
+     "share": 0.8455
+    },
+    {
+     "year_month": "2020-07",
+     "compared": 309069,
+     "share": 0.8277
+    },
+    {
+     "year_month": "2020-08",
+     "compared": 338171,
+     "share": 0.8202
+    },
+    {
+     "year_month": "2020-09",
+     "compared": 280849,
+     "share": 0.8126
+    },
+    {
+     "year_month": "2020-10",
+     "compared": 263614,
+     "share": 0.8392
+    },
+    {
+     "year_month": "2020-11",
+     "compared": 228668,
+     "share": 0.8454
+    },
+    {
+     "year_month": "2020-12",
+     "compared": 225743,
+     "share": 0.8402
+    },
+    {
+     "year_month": "2021-01",
+     "compared": 222986,
+     "share": 0.8455
+    },
+    {
+     "year_month": "2021-02",
+     "compared": 190229,
+     "share": 0.8569
+    },
+    {
+     "year_month": "2021-03",
+     "compared": 241471,
+     "share": 0.8632
+    },
+    {
+     "year_month": "2021-04",
+     "compared": 233479,
+     "share": 0.8604
+    },
+    {
+     "year_month": "2021-05",
+     "compared": 268027,
+     "share": 0.8591
+    },
+    {
+     "year_month": "2021-06",
+     "compared": 293827,
+     "share": 0.8542
+    },
+    {
+     "year_month": "2021-07",
+     "compared": 294409,
+     "share": 0.8226
+    },
+    {
+     "year_month": "2021-08",
+     "compared": 273158,
+     "share": 0.8436
+    },
+    {
+     "year_month": "2021-09",
+     "compared": 307663,
+     "share": 0.8399
+    },
+    {
+     "year_month": "2021-10",
+     "compared": 298009,
+     "share": 0.8549
+    },
+    {
+     "year_month": "2021-11",
+     "compared": 262343,
+     "share": 0.8602
+    },
+    {
+     "year_month": "2021-12",
+     "compared": 242289,
+     "share": 0.8607
+    },
+    {
+     "year_month": "2022-01",
+     "compared": 273786,
+     "share": 0.8567
+    },
+    {
+     "year_month": "2022-02",
+     "compared": 237259,
+     "share": 0.8242
+    },
+    {
+     "year_month": "2022-03",
+     "compared": 245102,
+     "share": 0.8535
+    },
+    {
+     "year_month": "2022-04",
+     "compared": 229574,
+     "share": 0.8505
+    },
+    {
+     "year_month": "2022-05",
+     "compared": 269966,
+     "share": 0.8102
+    },
+    {
+     "year_month": "2022-06",
+     "compared": 265060,
+     "share": 0.8482
+    },
+    {
+     "year_month": "2022-07",
+     "compared": 288434,
+     "share": 0.7833
+    },
+    {
+     "year_month": "2022-08",
+     "compared": 262401,
+     "share": 0.8288
+    },
+    {
+     "year_month": "2022-09",
+     "compared": 264775,
+     "share": 0.7977
+    },
+    {
+     "year_month": "2022-10",
+     "compared": 259703,
+     "share": 0.8557
+    },
+    {
+     "year_month": "2022-11",
+     "compared": 240970,
+     "share": 0.8574
+    },
+    {
+     "year_month": "2022-12",
+     "compared": 255746,
+     "share": 0.8597
+    },
+    {
+     "year_month": "2023-01",
+     "compared": 236345,
+     "share": 0.9256
+    },
+    {
+     "year_month": "2023-02",
+     "compared": 220321,
+     "share": 0.9615
+    },
+    {
+     "year_month": "2023-03",
+     "compared": 246237,
+     "share": 0.9653
+    },
+    {
+     "year_month": "2023-04",
+     "compared": 242195,
+     "share": 0.9703
+    },
+    {
+     "year_month": "2023-05",
+     "compared": 274717,
+     "share": 0.9736
+    },
+    {
+     "year_month": "2023-06",
+     "compared": 261339,
+     "share": 0.9741
+    },
+    {
+     "year_month": "2023-07",
+     "compared": 283347,
+     "share": 0.9708
+    },
+    {
+     "year_month": "2023-08",
+     "compared": 276694,
+     "share": 0.9717
+    },
+    {
+     "year_month": "2023-09",
+     "compared": 274912,
+     "share": 0.9726
+    },
+    {
+     "year_month": "2023-10",
+     "compared": 296197,
+     "share": 0.9708
+    },
+    {
+     "year_month": "2023-11",
+     "compared": 274305,
+     "share": 0.9643
+    },
+    {
+     "year_month": "2023-12",
+     "compared": 266790,
+     "share": 0.9665
+    },
+    {
+     "year_month": "2024-01",
+     "compared": 281840,
+     "share": 0.9614
+    },
+    {
+     "year_month": "2024-02",
+     "compared": 235049,
+     "share": 0.9654
+    },
+    {
+     "year_month": "2024-03",
+     "compared": 259115,
+     "share": 0.9681
+    },
+    {
+     "year_month": "2024-04",
+     "compared": 260453,
+     "share": 0.9689
+    },
+    {
+     "year_month": "2024-05",
+     "compared": 277460,
+     "share": 0.974
+    },
+    {
+     "year_month": "2024-06",
+     "compared": 299746,
+     "share": 0.9756
+    },
+    {
+     "year_month": "2024-07",
+     "compared": 292823,
+     "share": 0.9727
+    },
+    {
+     "year_month": "2024-08",
+     "compared": 278835,
+     "share": 0.9717
+    },
+    {
+     "year_month": "2024-09",
+     "compared": 300939,
+     "share": 0.9764
+    },
+    {
+     "year_month": "2024-10",
+     "compared": 301429,
+     "share": 0.9729
+    },
+    {
+     "year_month": "2024-11",
+     "compared": 289122,
+     "share": 0.969
+    },
+    {
+     "year_month": "2024-12",
+     "compared": 309442,
+     "share": 0.9666
+    },
+    {
+     "year_month": "2025-01",
+     "compared": 343840,
+     "share": 0.9691
+    },
+    {
+     "year_month": "2025-02",
+     "compared": 250656,
+     "share": 0.9695
+    },
+    {
+     "year_month": "2025-03",
+     "compared": 275551,
+     "share": 0.9904
+    },
+    {
+     "year_month": "2025-04",
+     "compared": 266432,
+     "share": 0.9961
+    },
+    {
+     "year_month": "2025-05",
+     "compared": 288411,
+     "share": 0.9954
+    },
+    {
+     "year_month": "2025-06",
+     "compared": 299787,
+     "share": 0.9955
+    },
+    {
+     "year_month": "2025-07",
+     "compared": 309515,
+     "share": 0.9953
+    },
+    {
+     "year_month": "2025-08",
+     "compared": 298390,
+     "share": 0.9957
+    },
+    {
+     "year_month": "2025-09",
+     "compared": 297141,
+     "share": 0.9959
+    },
+    {
+     "year_month": "2025-10",
+     "compared": 331288,
+     "share": 0.9965
+    },
+    {
+     "year_month": "2025-11",
+     "compared": 300433,
+     "share": 0.9968
+    },
+    {
+     "year_month": "2025-12",
+     "compared": 327602,
+     "share": 0.9967
+    },
+    {
+     "year_month": "2026-01",
+     "compared": 342704,
+     "share": 0.9965
+    },
+    {
+     "year_month": "2026-02",
+     "compared": 327969,
+     "share": 0.9953
+    },
+    {
+     "year_month": "2026-03",
+     "compared": 322570,
+     "share": 0.994
+    },
+    {
+     "year_month": "2026-04",
+     "compared": 290703,
+     "share": 0.9952
+    },
+    {
+     "year_month": "2026-05",
+     "compared": 322531,
+     "share": 0.9958
+    },
+    {
+     "year_month": "2026-06",
+     "compared": 326271,
+     "share": 0.9954
+    },
+    {
+     "year_month": "2026-07",
+     "compared": 334858,
+     "share": 0.9947
+    },
+    {
+     "year_month": "2026-08",
+     "compared": 321009,
+     "share": 0.9952
+    },
+    {
+     "year_month": "2026-09",
+     "compared": 316193,
+     "share": 0.9961
+    },
+    {
+     "year_month": "2026-10",
+     "compared": 340273,
+     "share": 0.9962
+    },
+    {
+     "year_month": "2026-11",
+     "compared": 222294,
+     "share": 0.9968
+    }
+   ]
+  },
+  "community_district": {
+   "compared": 22667427,
+   "matches": 22583899,
+   "share": 0.9963,
+   "city_value_missing": 130647
+  }
+ },
+ "complaint_types": {
+  "groups": 261,
+  "unreviewed": 261
+ },
+ "districts": {
+  "cd": [
+   {
+    "id": 101,
+    "rows": 192568,
+    "file": "detail/cd/101.parquet",
+    "label": "Manhattan CD 1",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 1862
+   },
+   {
+    "id": 102,
+    "rows": 302550,
+    "file": "detail/cd/102.parquet",
+    "label": "Manhattan CD 2",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 1444
+   },
+   {
+    "id": 103,
+    "rows": 430921,
+    "file": "detail/cd/103.parquet",
+    "label": "Manhattan CD 3",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 1887
+   },
+   {
+    "id": 104,
+    "rows": 359093,
+    "file": "detail/cd/104.parquet",
+    "label": "Manhattan CD 4",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 1945
+   },
+   {
+    "id": 105,
+    "rows": 357700,
+    "file": "detail/cd/105.parquet",
+    "label": "Manhattan CD 5",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 2019
+   },
+   {
+    "id": 106,
+    "rows": 248615,
+    "file": "detail/cd/106.parquet",
+    "label": "Manhattan CD 6",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 1744
+   },
+   {
+    "id": 107,
+    "rows": 441652,
+    "file": "detail/cd/107.parquet",
+    "label": "Manhattan CD 7",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 2211
+   },
+   {
+    "id": 108,
+    "rows": 309934,
+    "file": "detail/cd/108.parquet",
+    "label": "Manhattan CD 8",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 2425
+   },
+   {
+    "id": 109,
+    "rows": 360087,
+    "file": "detail/cd/109.parquet",
+    "label": "Manhattan CD 9",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 1230
+   },
+   {
+    "id": 110,
+    "rows": 515292,
+    "file": "detail/cd/110.parquet",
+    "label": "Manhattan CD 10",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 1287
+   },
+   {
+    "id": 111,
+    "rows": 321691,
+    "file": "detail/cd/111.parquet",
+    "label": "Manhattan CD 11",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 1787
+   },
+   {
+    "id": 112,
+    "rows": 737025,
+    "file": "detail/cd/112.parquet",
+    "label": "Manhattan CD 12",
+    "jia": false,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 2245
+   },
+   {
+    "id": 164,
+    "rows": 26216,
+    "file": "detail/cd/164.parquet",
+    "label": "Manhattan Joint Interest Area 164",
+    "jia": true,
+    "borough": "Manhattan",
+    "unlocated_city_assigned": 142
+   },
+   {
+    "id": 201,
+    "rows": 276835,
+    "file": "detail/cd/201.parquet",
+    "label": "Bronx CD 1",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 1071
+   },
+   {
+    "id": 202,
+    "rows": 174622,
+    "file": "detail/cd/202.parquet",
+    "label": "Bronx CD 2",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 672
+   },
+   {
+    "id": 203,
+    "rows": 310086,
+    "file": "detail/cd/203.parquet",
+    "label": "Bronx CD 3",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 895
+   },
+   {
+    "id": 204,
+    "rows": 571245,
+    "file": "detail/cd/204.parquet",
+    "label": "Bronx CD 4",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 1759
+   },
+   {
+    "id": 205,
+    "rows": 501165,
+    "file": "detail/cd/205.parquet",
+    "label": "Bronx CD 5",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 1014
+   },
+   {
+    "id": 206,
+    "rows": 306948,
+    "file": "detail/cd/206.parquet",
+    "label": "Bronx CD 6",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 1155
+   },
+   {
+    "id": 207,
+    "rows": 523577,
+    "file": "detail/cd/207.parquet",
+    "label": "Bronx CD 7",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 1354
+   },
+   {
+    "id": 208,
+    "rows": 329931,
+    "file": "detail/cd/208.parquet",
+    "label": "Bronx CD 8",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 2387
+   },
+   {
+    "id": 209,
+    "rows": 426093,
+    "file": "detail/cd/209.parquet",
+    "label": "Bronx CD 9",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 2128
+   },
+   {
+    "id": 210,
+    "rows": 265518,
+    "file": "detail/cd/210.parquet",
+    "label": "Bronx CD 10",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 2558
+   },
+   {
+    "id": 211,
+    "rows": 325148,
+    "file": "detail/cd/211.parquet",
+    "label": "Bronx CD 11",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 2090
+   },
+   {
+    "id": 212,
+    "rows": 854705,
+    "file": "detail/cd/212.parquet",
+    "label": "Bronx CD 12",
+    "jia": false,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 3412
+   },
+   {
+    "id": 226,
+    "rows": 8049,
+    "file": "detail/cd/226.parquet",
+    "label": "Bronx Joint Interest Area 226",
+    "jia": true,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 38
+   },
+   {
+    "id": 227,
+    "rows": 2190,
+    "file": "detail/cd/227.parquet",
+    "label": "Bronx Joint Interest Area 227",
+    "jia": true,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 45
+   },
+   {
+    "id": 228,
+    "rows": 3984,
+    "file": "detail/cd/228.parquet",
+    "label": "Bronx Joint Interest Area 228",
+    "jia": true,
+    "borough": "Bronx",
+    "unlocated_city_assigned": 59
+   },
+   {
+    "id": 301,
+    "rows": 576290,
+    "file": "detail/cd/301.parquet",
+    "label": "Brooklyn CD 1",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 3210
+   },
+   {
+    "id": 302,
+    "rows": 448732,
+    "file": "detail/cd/302.parquet",
+    "label": "Brooklyn CD 2",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 1960
+   },
+   {
+    "id": 303,
+    "rows": 483956,
+    "file": "detail/cd/303.parquet",
+    "label": "Brooklyn CD 3",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 1903
+   },
+   {
+    "id": 304,
+    "rows": 370832,
+    "file": "detail/cd/304.parquet",
+    "label": "Brooklyn CD 4",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 1220
+   },
+   {
+    "id": 305,
+    "rows": 558777,
+    "file": "detail/cd/305.parquet",
+    "label": "Brooklyn CD 5",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 3383
+   },
+   {
+    "id": 306,
+    "rows": 343235,
+    "file": "detail/cd/306.parquet",
+    "label": "Brooklyn CD 6",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 1852
+   },
+   {
+    "id": 307,
+    "rows": 284254,
+    "file": "detail/cd/307.parquet",
+    "label": "Brooklyn CD 7",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 2211
+   },
+   {
+    "id": 308,
+    "rows": 363852,
+    "file": "detail/cd/308.parquet",
+    "label": "Brooklyn CD 8",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 1091
+   },
+   {
+    "id": 309,
+    "rows": 329140,
+    "file": "detail/cd/309.parquet",
+    "label": "Brooklyn CD 9",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 1167
+   },
+   {
+    "id": 310,
+    "rows": 323427,
+    "file": "detail/cd/310.parquet",
+    "label": "Brooklyn CD 10",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 2081
+   },
+   {
+    "id": 311,
+    "rows": 409063,
+    "file": "detail/cd/311.parquet",
+    "label": "Brooklyn CD 11",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 2025
+   },
+   {
+    "id": 312,
+    "rows": 341296,
+    "file": "detail/cd/312.parquet",
+    "label": "Brooklyn CD 12",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 2695
+   },
+   {
+    "id": 313,
+    "rows": 186283,
+    "file": "detail/cd/313.parquet",
+    "label": "Brooklyn CD 13",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 1191
+   },
+   {
+    "id": 314,
+    "rows": 466021,
+    "file": "detail/cd/314.parquet",
+    "label": "Brooklyn CD 14",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 1896
+   },
+   {
+    "id": 315,
+    "rows": 371155,
+    "file": "detail/cd/315.parquet",
+    "label": "Brooklyn CD 15",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 2804
+   },
+   {
+    "id": 316,
+    "rows": 222038,
+    "file": "detail/cd/316.parquet",
+    "label": "Brooklyn CD 16",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 983
+   },
+   {
+    "id": 317,
+    "rows": 428949,
+    "file": "detail/cd/317.parquet",
+    "label": "Brooklyn CD 17",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 2459
+   },
+   {
+    "id": 318,
+    "rows": 376004,
+    "file": "detail/cd/318.parquet",
+    "label": "Brooklyn CD 18",
+    "jia": false,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 3872
+   },
+   {
+    "id": 355,
+    "rows": 13011,
+    "file": "detail/cd/355.parquet",
+    "label": "Brooklyn Joint Interest Area 355",
+    "jia": true,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 107
+   },
+   {
+    "id": 356,
+    "rows": 1386,
+    "file": "detail/cd/356.parquet",
+    "label": "Brooklyn Joint Interest Area 356",
+    "jia": true,
+    "borough": "Brooklyn",
+    "unlocated_city_assigned": 67
+   },
+   {
+    "id": 401,
+    "rows": 545381,
+    "file": "detail/cd/401.parquet",
+    "label": "Queens CD 1",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 4395
+   },
+   {
+    "id": 402,
+    "rows": 351575,
+    "file": "detail/cd/402.parquet",
+    "label": "Queens CD 2",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 3561
+   },
+   {
+    "id": 403,
+    "rows": 353418,
+    "file": "detail/cd/403.parquet",
+    "label": "Queens CD 3",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 2938
+   },
+   {
+    "id": 404,
+    "rows": 310410,
+    "file": "detail/cd/404.parquet",
+    "label": "Queens CD 4",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 2074
+   },
+   {
+    "id": 405,
+    "rows": 537219,
+    "file": "detail/cd/405.parquet",
+    "label": "Queens CD 5",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 4780
+   },
+   {
+    "id": 406,
+    "rows": 231888,
+    "file": "detail/cd/406.parquet",
+    "label": "Queens CD 6",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 2628
+   },
+   {
+    "id": 407,
+    "rows": 496274,
+    "file": "detail/cd/407.parquet",
+    "label": "Queens CD 7",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 7022
+   },
+   {
+    "id": 408,
+    "rows": 419874,
+    "file": "detail/cd/408.parquet",
+    "label": "Queens CD 8",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 4195
+   },
+   {
+    "id": 409,
+    "rows": 395800,
+    "file": "detail/cd/409.parquet",
+    "label": "Queens CD 9",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 4077
+   },
+   {
+    "id": 410,
+    "rows": 402740,
+    "file": "detail/cd/410.parquet",
+    "label": "Queens CD 10",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 4659
+   },
+   {
+    "id": 411,
+    "rows": 222040,
+    "file": "detail/cd/411.parquet",
+    "label": "Queens CD 11",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 4927
+   },
+   {
+    "id": 412,
+    "rows": 555988,
+    "file": "detail/cd/412.parquet",
+    "label": "Queens CD 12",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 7547
+   },
+   {
+    "id": 413,
+    "rows": 355405,
+    "file": "detail/cd/413.parquet",
+    "label": "Queens CD 13",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 8828
+   },
+   {
+    "id": 414,
+    "rows": 241077,
+    "file": "detail/cd/414.parquet",
+    "label": "Queens CD 14",
+    "jia": false,
+    "borough": "Queens",
+    "unlocated_city_assigned": 2935
+   },
+   {
+    "id": 480,
+    "rows": 8273,
+    "file": "detail/cd/480.parquet",
+    "label": "Queens Joint Interest Area 480",
+    "jia": true,
+    "borough": "Queens",
+    "unlocated_city_assigned": 32
+   },
+   {
+    "id": 481,
+    "rows": 11738,
+    "file": "detail/cd/481.parquet",
+    "label": "Queens Joint Interest Area 481",
+    "jia": true,
+    "borough": "Queens",
+    "unlocated_city_assigned": 84
+   },
+   {
+    "id": 482,
+    "rows": 5852,
+    "file": "detail/cd/482.parquet",
+    "label": "Queens Joint Interest Area 482",
+    "jia": true,
+    "borough": "Queens",
+    "unlocated_city_assigned": 75
+   },
+   {
+    "id": 483,
+    "rows": 18710,
+    "file": "detail/cd/483.parquet",
+    "label": "Queens Joint Interest Area 483",
+    "jia": true,
+    "borough": "Queens",
+    "unlocated_city_assigned": 13
+   },
+   {
+    "id": 484,
+    "rows": 867,
+    "file": "detail/cd/484.parquet",
+    "label": "Queens Joint Interest Area 484",
+    "jia": true,
+    "borough": "Queens",
+    "unlocated_city_assigned": 126
+   },
+   {
+    "id": 501,
+    "rows": 394042,
+    "file": "detail/cd/501.parquet",
+    "label": "Staten Island CD 1",
+    "jia": false,
+    "borough": "Staten Island",
+    "unlocated_city_assigned": 3354
+   },
+   {
+    "id": 502,
+    "rows": 248079,
+    "file": "detail/cd/502.parquet",
+    "label": "Staten Island CD 2",
+    "jia": false,
+    "borough": "Staten Island",
+    "unlocated_city_assigned": 4144
+   },
+   {
+    "id": 503,
+    "rows": 307780,
+    "file": "detail/cd/503.parquet",
+    "label": "Staten Island CD 3",
+    "jia": false,
+    "borough": "Staten Island",
+    "unlocated_city_assigned": 5347
+   },
+   {
+    "id": 595,
+    "rows": 2503,
+    "file": "detail/cd/595.parquet",
+    "label": "Staten Island Joint Interest Area 595",
+    "jia": true,
+    "borough": "Staten Island",
+    "unlocated_city_assigned": 238
+   }
+  ],
+  "cc": [
+   {
+    "id": 1,
+    "rows": 467555,
+    "file": "detail/cc/1.parquet",
+    "label": "Council District 1",
+    "borough": "Manhattan"
+   },
+   {
+    "id": 2,
+    "rows": 499274,
+    "file": "detail/cc/2.parquet",
+    "label": "Council District 2",
+    "borough": "Manhattan"
+   },
+   {
+    "id": 3,
+    "rows": 587904,
+    "file": "detail/cc/3.parquet",
+    "label": "Council District 3",
+    "borough": "Manhattan"
+   },
+   {
+    "id": 4,
+    "rows": 356870,
+    "file": "detail/cc/4.parquet",
+    "label": "Council District 4",
+    "borough": "Manhattan"
+   },
+   {
+    "id": 5,
+    "rows": 221966,
+    "file": "detail/cc/5.parquet",
+    "label": "Council District 5",
+    "borough": "Manhattan"
+   },
+   {
+    "id": 6,
+    "rows": 378130,
+    "file": "detail/cc/6.parquet",
+    "label": "Council District 6",
+    "borough": "Manhattan"
+   },
+   {
+    "id": 7,
+    "rows": 481080,
+    "file": "detail/cc/7.parquet",
+    "label": "Council District 7",
+    "borough": "Manhattan"
+   },
+   {
+    "id": 8,
+    "rows": 445220,
+    "file": "detail/cc/8.parquet",
+    "label": "Council District 8",
+    "borough": "Manhattan"
+   },
+   {
+    "id": 9,
+    "rows": 676627,
+    "file": "detail/cc/9.parquet",
+    "label": "Council District 9",
+    "borough": "Manhattan"
+   },
+   {
+    "id": 10,
+    "rows": 721288,
+    "file": "detail/cc/10.parquet",
+    "label": "Council District 10",
+    "borough": "Manhattan"
+   },
+   {
+    "id": 11,
+    "rows": 945857,
+    "file": "detail/cc/11.parquet",
+    "label": "Council District 11",
+    "borough": "Bronx"
+   },
+   {
+    "id": 12,
+    "rows": 359685,
+    "file": "detail/cc/12.parquet",
+    "label": "Council District 12",
+    "borough": "Bronx"
+   },
+   {
+    "id": 13,
+    "rows": 475776,
+    "file": "detail/cc/13.parquet",
+    "label": "Council District 13",
+    "borough": "Bronx"
+   },
+   {
+    "id": 14,
+    "rows": 663428,
+    "file": "detail/cc/14.parquet",
+    "label": "Council District 14",
+    "borough": "Bronx"
+   },
+   {
+    "id": 15,
+    "rows": 641450,
+    "file": "detail/cc/15.parquet",
+    "label": "Council District 15",
+    "borough": "Bronx"
+   },
+   {
+    "id": 16,
+    "rows": 636154,
+    "file": "detail/cc/16.parquet",
+    "label": "Council District 16",
+    "borough": "Bronx"
+   },
+   {
+    "id": 17,
+    "rows": 542181,
+    "file": "detail/cc/17.parquet",
+    "label": "Council District 17",
+    "borough": "Bronx"
+   },
+   {
+    "id": 18,
+    "rows": 382999,
+    "file": "detail/cc/18.parquet",
+    "label": "Council District 18",
+    "borough": "Bronx"
+   },
+   {
+    "id": 19,
+    "rows": 363092,
+    "file": "detail/cc/19.parquet",
+    "label": "Council District 19",
+    "borough": "Queens"
+   },
+   {
+    "id": 20,
+    "rows": 281096,
+    "file": "detail/cc/20.parquet",
+    "label": "Council District 20",
+    "borough": "Queens"
+   },
+   {
+    "id": 21,
+    "rows": 352466,
+    "file": "detail/cc/21.parquet",
+    "label": "Council District 21",
+    "borough": "Queens"
+   },
+   {
+    "id": 22,
+    "rows": 455484,
+    "file": "detail/cc/22.parquet",
+    "label": "Council District 22",
+    "borough": "Queens"
+   },
+   {
+    "id": 23,
+    "rows": 269536,
+    "file": "detail/cc/23.parquet",
+    "label": "Council District 23",
+    "borough": "Queens"
+   },
+   {
+    "id": 24,
+    "rows": 433748,
+    "file": "detail/cc/24.parquet",
+    "label": "Council District 24",
+    "borough": "Queens"
+   },
+   {
+    "id": 25,
+    "rows": 305521,
+    "file": "detail/cc/25.parquet",
+    "label": "Council District 25",
+    "borough": "Queens"
+   },
+   {
+    "id": 26,
+    "rows": 444580,
+    "file": "detail/cc/26.parquet",
+    "label": "Council District 26",
+    "borough": "Queens"
+   },
+   {
+    "id": 27,
+    "rows": 362727,
+    "file": "detail/cc/27.parquet",
+    "label": "Council District 27",
+    "borough": "Queens"
+   },
+   {
+    "id": 28,
+    "rows": 445441,
+    "file": "detail/cc/28.parquet",
+    "label": "Council District 28",
+    "borough": "Queens"
+   },
+   {
+    "id": 29,
+    "rows": 387320,
+    "file": "detail/cc/29.parquet",
+    "label": "Council District 29",
+    "borough": "Queens"
+   },
+   {
+    "id": 30,
+    "rows": 465289,
+    "file": "detail/cc/30.parquet",
+    "label": "Council District 30",
+    "borough": "Queens"
+   },
+   {
+    "id": 31,
+    "rows": 326162,
+    "file": "detail/cc/31.parquet",
+    "label": "Council District 31",
+    "borough": "Queens"
+   },
+   {
+    "id": 32,
+    "rows": 472352,
+    "file": "detail/cc/32.parquet",
+    "label": "Council District 32",
+    "borough": "Queens"
+   },
+   {
+    "id": 33,
+    "rows": 501762,
+    "file": "detail/cc/33.parquet",
+    "label": "Council District 33",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 34,
+    "rows": 541166,
+    "file": "detail/cc/34.parquet",
+    "label": "Council District 34",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 35,
+    "rows": 563418,
+    "file": "detail/cc/35.parquet",
+    "label": "Council District 35",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 36,
+    "rows": 503018,
+    "file": "detail/cc/36.parquet",
+    "label": "Council District 36",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 37,
+    "rows": 506027,
+    "file": "detail/cc/37.parquet",
+    "label": "Council District 37",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 38,
+    "rows": 418948,
+    "file": "detail/cc/38.parquet",
+    "label": "Council District 38",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 39,
+    "rows": 465599,
+    "file": "detail/cc/39.parquet",
+    "label": "Council District 39",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 40,
+    "rows": 572583,
+    "file": "detail/cc/40.parquet",
+    "label": "Council District 40",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 41,
+    "rows": 403037,
+    "file": "detail/cc/41.parquet",
+    "label": "Council District 41",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 42,
+    "rows": 421730,
+    "file": "detail/cc/42.parquet",
+    "label": "Council District 42",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 43,
+    "rows": 308210,
+    "file": "detail/cc/43.parquet",
+    "label": "Council District 43",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 44,
+    "rows": 295729,
+    "file": "detail/cc/44.parquet",
+    "label": "Council District 44",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 45,
+    "rows": 398555,
+    "file": "detail/cc/45.parquet",
+    "label": "Council District 45",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 46,
+    "rows": 307570,
+    "file": "detail/cc/46.parquet",
+    "label": "Council District 46",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 47,
+    "rows": 397612,
+    "file": "detail/cc/47.parquet",
+    "label": "Council District 47",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 48,
+    "rows": 362993,
+    "file": "detail/cc/48.parquet",
+    "label": "Council District 48",
+    "borough": "Brooklyn"
+   },
+   {
+    "id": 49,
+    "rows": 350647,
+    "file": "detail/cc/49.parquet",
+    "label": "Council District 49",
+    "borough": "Staten Island"
+   },
+   {
+    "id": 50,
+    "rows": 319653,
+    "file": "detail/cc/50.parquet",
+    "label": "Council District 50",
+    "borough": "Staten Island"
+   },
+   {
+    "id": 51,
+    "rows": 311559,
+    "file": "detail/cc/51.parquet",
+    "label": "Council District 51",
+    "borough": "Staten Island"
+   }
+  ]
+ },
+ "boroughs": [
+  "Manhattan",
+  "Bronx",
+  "Brooklyn",
+  "Queens",
+  "Staten Island"
+ ],
+ "borough_files": {
+  "columns": [
+   "created_date",
+   "complaint_type",
+   "descriptor",
+   "agency",
+   "agency_name",
+   "status",
+   "days_to_close",
+   "year_month",
+   "is_closed"
+  ],
+  "files": {
+   "manhattan": {
+    "name": "Manhattan",
+    "file": "borough/manhattan.parquet",
+    "rows": 4603344
+   },
+   "bronx": {
+    "name": "Bronx",
+    "file": "borough/bronx.parquet",
+    "rows": 4880096
+   },
+   "brooklyn": {
+    "name": "Brooklyn",
+    "file": "borough/brooklyn.parquet",
+    "rows": 6897701
+   },
+   "queens": {
+    "name": "Queens",
+    "file": "borough/queens.parquet",
+    "rows": 5464529
+   },
+   "staten-island": {
+    "name": "Staten Island",
+    "file": "borough/staten-island.parquet",
+    "rows": 952404
+   }
+  }
+ },
+ "notes": [
+  "Every located request is assigned to a Community District and a Council District by our own point-in-polygon join against the current DCP boundaries listed in sources.",
+  "Requests without usable coordinates are counted but not placed in any district file.",
+  "311 counts reflect who reports problems and how, not only how many problems exist."
+ ],
+ "files": {
+  "addresses.parquet": 9021007,
+  "agg/month_type.parquet": 1595831,
+  "borough/bronx.parquet": 44646784,
+  "borough/brooklyn.parquet": 65597450,
+  "borough/manhattan.parquet": 44500852,
+  "borough/queens.parquet": 52887891,
+  "borough/staten-island.parquet": 9604368,
+  "boundaries/cc.geojson": 256030,
+  "boundaries/cd.geojson": 257396,
+  "detail/cc/1.parquet": 18464113,
+  "detail/cc/10.parquet": 24089850,
+  "detail/cc/11.parquet": 28275629,
+  "detail/cc/12.parquet": 14161693,
+  "detail/cc/13.parquet": 20003694,
+  "detail/cc/14.parquet": 22233745,
+  "detail/cc/15.parquet": 21980275,
+  "detail/cc/16.parquet": 20521035,
+  "detail/cc/17.parquet": 19809794,
+  "detail/cc/18.parquet": 14350145,
+  "detail/cc/19.parquet": 16219104,
+  "detail/cc/2.parquet": 19200188,
+  "detail/cc/20.parquet": 11708799,
+  "detail/cc/21.parquet": 13707557,
+  "detail/cc/22.parquet": 18361253,
+  "detail/cc/23.parquet": 12167953,
+  "detail/cc/24.parquet": 16285632,
+  "detail/cc/25.parquet": 11808895,
+  "detail/cc/26.parquet": 17773884,
+  "detail/cc/27.parquet": 15843413,
+  "detail/cc/28.parquet": 18945513,
+  "detail/cc/29.parquet": 16328797,
+  "detail/cc/3.parquet": 23114213,
+  "detail/cc/30.parquet": 20081712,
+  "detail/cc/31.parquet": 14059235,
+  "detail/cc/32.parquet": 20550285,
+  "detail/cc/33.parquet": 20337696,
+  "detail/cc/34.parquet": 22368067,
+  "detail/cc/35.parquet": 21768714,
+  "detail/cc/36.parquet": 19645003,
+  "detail/cc/37.parquet": 20305658,
+  "detail/cc/38.parquet": 17163553,
+  "detail/cc/39.parquet": 19680177,
+  "detail/cc/4.parquet": 14524101,
+  "detail/cc/40.parquet": 21269130,
+  "detail/cc/41.parquet": 15610068,
+  "detail/cc/42.parquet": 16128728,
+  "detail/cc/43.parquet": 12706754,
+  "detail/cc/44.parquet": 12383127,
+  "detail/cc/45.parquet": 16016772,
+  "detail/cc/46.parquet": 13414949,
+  "detail/cc/47.parquet": 16504404,
+  "detail/cc/48.parquet": 15359281,
+  "detail/cc/49.parquet": 15012283,
+  "detail/cc/5.parquet": 8196838,
+  "detail/cc/50.parquet": 14879863,
+  "detail/cc/51.parquet": 14262444,
+  "detail/cc/6.parquet": 13867049,
+  "detail/cc/7.parquet": 16433951,
+  "detail/cc/8.parquet": 16208321,
+  "detail/cc/9.parquet": 23657844,
+  "detail/cd/101.parquet": 6874739,
+  "detail/cd/102.parquet": 11786515,
+  "detail/cd/103.parquet": 15903224,
+  "detail/cd/104.parquet": 13222366,
+  "detail/cd/105.parquet": 13243772,
+  "detail/cd/106.parquet": 9068937,
+  "detail/cd/107.parquet": 16128892,
+  "detail/cd/108.parquet": 12043469,
+  "detail/cd/109.parquet": 11712713,
+  "detail/cd/110.parquet": 17459803,
+  "detail/cd/111.parquet": 11006895,
+  "detail/cd/112.parquet": 24434510,
+  "detail/cd/164.parquet": 761636,
+  "detail/cd/201.parquet": 9577313,
+  "detail/cd/202.parquet": 5774421,
+  "detail/cd/203.parquet": 10003583,
+  "detail/cd/204.parquet": 18328810,
+  "detail/cd/205.parquet": 16048857,
+  "detail/cd/206.parquet": 10010499,
+  "detail/cd/207.parquet": 17316961,
+  "detail/cd/208.parquet": 11522968,
+  "detail/cd/209.parquet": 15700253,
+  "detail/cd/210.parquet": 11043260,
+  "detail/cd/211.parquet": 12419514,
+  "detail/cd/212.parquet": 25461717,
+  "detail/cd/226.parquet": 279995,
+  "detail/cd/227.parquet": 99566,
+  "detail/cd/228.parquet": 146383,
+  "detail/cd/301.parquet": 23723862,
+  "detail/cd/302.parquet": 17269074,
+  "detail/cd/303.parquet": 18912412,
+  "detail/cd/304.parquet": 14436467,
+  "detail/cd/305.parquet": 21343718,
+  "detail/cd/306.parquet": 13843865,
+  "detail/cd/307.parquet": 11269256,
+  "detail/cd/308.parquet": 13411717,
+  "detail/cd/309.parquet": 11570729,
+  "detail/cd/310.parquet": 13079617,
+  "detail/cd/311.parquet": 16574322,
+  "detail/cd/312.parquet": 14004562,
+  "detail/cd/313.parquet": 7187085,
+  "detail/cd/314.parquet": 17439337,
+  "detail/cd/315.parquet": 15848824,
+  "detail/cd/316.parquet": 8311138,
+  "detail/cd/317.parquet": 16373974,
+  "detail/cd/318.parquet": 16278462,
+  "detail/cd/355.parquet": 446282,
+  "detail/cd/356.parquet": 68417,
+  "detail/cd/401.parquet": 22083866,
+  "detail/cd/402.parquet": 13635407,
+  "detail/cd/403.parquet": 13893176,
+  "detail/cd/404.parquet": 11906526,
+  "detail/cd/405.parquet": 23058755,
+  "detail/cd/406.parquet": 9003132,
+  "detail/cd/407.parquet": 21596788,
+  "detail/cd/408.parquet": 15870531,
+  "detail/cd/409.parquet": 16262660,
+  "detail/cd/410.parquet": 16805581,
+  "detail/cd/411.parquet": 9799580,
+  "detail/cd/412.parquet": 24431413,
+  "detail/cd/413.parquet": 16106891,
+  "detail/cd/414.parquet": 9711110,
+  "detail/cd/480.parquet": 227000,
+  "detail/cd/481.parquet": 378313,
+  "detail/cd/482.parquet": 205984,
+  "detail/cd/483.parquet": 424293,
+  "detail/cd/484.parquet": 52225,
+  "detail/cd/501.parquet": 17184829,
+  "detail/cd/502.parquet": 11126113,
+  "detail/cd/503.parquet": 14059955,
+  "detail/cd/595.parquet": 117786
+ },
+ "fixture": "Browser-test fixture (v2/tests-browser/make_fixture.py): only Queens Joint Interest Area 480 has a detail file here; agg/month_type.parquet holds only cd 480, Queens and the city."
+}

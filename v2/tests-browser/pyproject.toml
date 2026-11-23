@@ -1,0 +1,18 @@
+[project]
+name = "boardstat-browser-tests"
+version = "0.1.0"
+description = "BoardStat 2.0 browser tests (#186): Playwright against the pages served by v2/serve.py, offline."
+requires-python = ">=3.11,<3.16"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<10",
+    "playwright>=1.55,<2",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["."]

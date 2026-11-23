@@ -4,7 +4,10 @@
 small byte ranges of one large file, so it needs a server that answers 206 Partial
 Content (RFC 9110 section 14). Standard library only.
 
-Usage: python3 v2/serve.py [--port 8000] [--bind 127.0.0.1]
+Usage: python3 v2/serve.py [--port 8000] [--bind 127.0.0.1] [--data DIR]
+
+--data DIR serves DIR at /data/ instead of v2/site/data/, so the site can run on a
+small fixture (the browser tests, #186, use v2/tests-browser/fixture-data/).
 """
 import argparse
 import os
@@ -18,6 +21,21 @@ RANGE_RE = re.compile(r"^bytes=(\d*)-(\d*)$")
 
 
 class RangeHandler(SimpleHTTPRequestHandler):
+    data_dir = None  # set by make_handler: a folder served at /data/ instead of site/data
+
+    def translate_path(self, path):
+        if self.data_dir:
+            clean = path.split("?", 1)[0].split("#", 1)[0]
+            if clean == "/data" or clean.startswith("/data/"):
+                rest = clean[len("/data"):]
+                # The parent class maps a URL path onto `directory`; reuse it for the data folder.
+                saved, self.directory = self.directory, self.data_dir
+                try:
+                    return super().translate_path(rest or "/")
+                finally:
+                    self.directory = saved
+        return super().translate_path(path)
+
     def send_head(self):
         path = self.translate_path(self.path)
         match = RANGE_RE.match(self.headers.get("Range", "").strip())
@@ -66,14 +84,21 @@ class RangeHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
 
+def make_handler(site=SITE, data=None):
+    """The request handler for `site`, with `data` (a folder) served at /data/ when given."""
+    cls = type("Handler", (RangeHandler,), {"data_dir": os.path.abspath(data) if data else None})
+    return partial(cls, directory=site)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--bind", default="127.0.0.1")
+    ap.add_argument("--data", help="serve this folder at /data/ (default: v2/site/data)")
     args = ap.parse_args()
-    handler = partial(RangeHandler, directory=SITE)
+    handler = make_handler(SITE, args.data)
     with ThreadingHTTPServer((args.bind, args.port), handler) as httpd:
-        print(f"Serving {SITE} at http://{args.bind}:{args.port}/")
+        print(f"Serving {SITE} at http://{args.bind}:{args.port}/" + (f" with data from {args.data}" if args.data else ""))
         httpd.serve_forever()
 
 
