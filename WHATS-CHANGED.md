@@ -10,7 +10,7 @@ BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change re
 ## Unreleased: A new design for the Problem and Description boxes
 
 - **Tags:** Site
-- **What changed:** On district, council district, borough, address and full-page map pages, the Problem and Description boxes in the filter form have a new design. Type to narrow the list, then pick with the arrow keys and Enter, or with a click. Each pick shows as a chip with a remove button, and the list stays open, so you can pick several in a row. Exclude these descriptions, Apply filters and Reset filters have the new look and work as before.
+- **What changed:** On district, council district, borough, address and full-page map pages, the Problem and Description boxes in the filter form have a new design. Type to narrow the list, then pick with the arrow keys and Enter, or with a click. Each pick shows as a chip with a remove button, and the list stays open, so you can pick several in a row. The Exclude these descriptions box has a new look too. Apply filters and Reset filters work as before.
 - **Who it affects:** Anyone who filters by problem or description, including with only a keyboard. As before, nothing on the page changes until you press Apply filters.
 - **More detail:** [The change](https://github.com/BetaNYC/BoardStat/issues/187)
 
