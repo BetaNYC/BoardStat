@@ -139,26 +139,41 @@ def test_form_says_how_the_suggestions_are_ordered():
         assert f'aria-describedby="{box}-order {box}-help"' in form
 
 
-@pytest.mark.parametrize("page", FORM_PAGES)
+@pytest.mark.parametrize("page", PAGES)
 def test_every_page_has_the_panel_toggle_outside_the_form(page):
     """#149: the filter panel opens and closes on every page. The toggle and the summary
-    line are outside the form, so the form's markup stays the same on every page."""
+    line are outside the form, so the form's markup stays the same on every page. The
+    full-page map hides its whole blue panel instead (#193, test_map_panel_hides_...)."""
     html = (SITE / page).read_text()
     form_at = html.index('<form id="filters"')
     toggle = re.search(r'<button type="button" class="secondary" id="filters-toggle" aria-controls="filters" aria-expanded="(true|false)">(Hide|Change) filters</button>', html)
     assert toggle and toggle.start() < form_at
     assert html.index('id="filters-summary"') < form_at
     # The markup's starting state matches the wide-screen default (filterform.js panelStartsOpen).
-    assert toggle.group(1) == ("false" if page == "map.html" else "true")
+    assert toggle.group(1) == "true"
+
+
+def test_map_panel_hides_with_buttons_outside_the_form():
+    """#193: on the full-page map the form sits in a blue panel that hides whole ("Hide
+    panel »", "« Filters"), open on a wide screen and a full-screen sheet on a phone; the
+    form's own markup is untouched, so it has no toggle or summary line of its own."""
+    html = (SITE / "map.html").read_text()
+    form_at = html.index('<form id="filters"')
+    side = html.index('<aside class="fm-side" id="side"')
+    assert side < form_at < html.index("</aside>")
+    assert 'id="hide-side" aria-controls="side" aria-expanded="true">Hide panel »</button>' in html
+    assert 'id="show-side" aria-controls="side" aria-expanded="true">« Filters</button>' in html
+    assert "filters-toggle" not in html and "filters-summary" not in html
 
 
 def test_pages_set_up_the_panel_through_the_shared_module():
     district = (JS / "district.js").read_text()
     fullmap = (JS / "fullmap.js").read_text()
     assert "form.setupPanel({ scrollTo: $('filters-bar') });" in district
-    assert "form.setupPanel({ mapPage: true, scrollTo: $('main') });" in fullmap
-    for src in (district, fullmap):
-        assert "form.afterRedraw();" in src
+    assert "form.afterRedraw();" in district
+    # The map hides its whole panel itself (#193), so it uses neither.
+    assert "setupPanel" not in fullmap and "afterRedraw" not in fullmap
+    assert "showPart('noside', !isPhone(), false);" in fullmap
     # The open/close rules live in one place.
     assert "is-collapsed" not in district and "is-collapsed" not in fullmap
 

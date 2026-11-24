@@ -133,21 +133,24 @@ function showBasemapError(container) {
   box.append(p);
 }
 
-export async function makeMap(container, { bounds = NYC_BOUNDS } = {}) {
+/** A map in `container`. `padding` is fitBounds padding (pixels or { top, right, bottom, left });
+ *  `navPosition` where the zoom buttons go; `compass` adds MapLibre's compass, which also
+ *  shows the tilt and resets north (visualizePitch, NavigationControlOptions). */
+export async function makeMap(container, { bounds = NYC_BOUNDS, padding = 20, navPosition = 'top-right', compass = false } = {}) {
   const ml = await loadMapLibre();
   const { style, failed, base } = await basemapStyle(ml);
   const map = new ml.Map({
     container,
     style,
     bounds,
-    fitBoundsOptions: { padding: 20 },
+    fitBoundsOptions: { padding },
     // compact: false keeps the credits expanded at every width; OSMF asks that the
     // OpenStreetMap credit be visible without a click
     // (https://maplibre.org/maplibre-gl-js/docs/API/type-aliases/AttributionControlOptions/).
     attributionControl: { compact: false, customAttribution: 'Boundaries: NYC Department of City Planning' },
   });
   if (!failed) map.on('error', (e) => { if (isBasemapError(e, base)) showBasemapError(container); });
-  map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right');
+  map.addControl(new ml.NavigationControl({ showCompass: compass, visualizePitch: compass }), navPosition);
   await new Promise((resolve) => map.on('load', resolve));
   if (failed) showBasemapError(container);
   return { ml, map };

@@ -182,35 +182,17 @@ figure svg { max-width: 100%; height: auto; }
 .map-legend .swatch.line.selected { border-top: 3px solid var(--bnyc-blue); }
 .fullmap-open { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin: 0.75rem 0 0; }
 .fullmap-open .button { min-height: 44px; display: inline-flex; align-items: center; }
+/* The full-page map (map.html) has its own styles, in css/fullmap.css (#193). */
 
-/* Full-page map (map.html, #143): a short header, then a map that fills the rest of the window. */
-body.fullmap-page { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
-main.fullmap { flex: 1; display: flex; flex-direction: column; width: 100%; max-width: none; padding: 0.5rem 1rem 0.75rem; }
-.fullmap-bar { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.25rem 1.5rem; }
-.fullmap-head { flex: 1 1 28rem; min-width: 0; }
-.fullmap-head h1 { font-size: 1.5rem; margin: 0.1rem 0; }
-.fullmap-head p { margin: 0; }
-.fullmap-back { margin: 0.25rem 0; text-align: right; }
-.fullmap-back a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
-.fullmap-back .muted { display: block; }
-@media screen and (max-width: 640px) { .fullmap-back { text-align: left; } }
-main.fullmap .status { margin: 0.25rem 0; min-height: 0; }
-main.fullmap .status:empty { display: none; }
-.map.map-full { flex: 1; height: auto; min-height: 85vh; min-height: 85dvh; }
 /* The filter panel opens and closes (#149, filterform.js setupPanel): closed, only its
    status line shows, under the summary line and the "Change filters" button. */
 .filters-toggle-row { margin: 0.35rem 0 0; }
 .filters-toggle-row button { min-height: 44px; }
-main.fullmap #filters { margin: 0.5rem 0; }
-/* Print summary prints the district page; the map page has nothing to add. */
-main.fullmap #print { display: none; }
 #filters.is-collapsed { padding: 0; border: 0; background: none; box-shadow: none; margin: 0.25rem 0 0.75rem; }
 #filters.is-collapsed > :not(.status, .parts-failed:not([hidden])) { display: none; }
 .filters-bar { margin: 1rem 0 0.25rem; }
 .filters-bar p { margin: 0; }
 .filters-bar #filters-summary { margin-bottom: 0.25rem; }
-main.fullmap #filters.is-collapsed { margin: 0; }
-.fullmap-foot p { margin: 0.25rem 0; }
 
 .status { min-height: 1.5rem; font-style: italic; }
 .results { list-style: none; padding: 0; }
