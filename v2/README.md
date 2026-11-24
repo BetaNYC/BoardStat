@@ -48,15 +48,56 @@ internal reports, in Noel's private vault).
    with days open; CSV; print
 ```
 
-**Full-page map (`site/map.html`, #143).** The district map's "Open full-page map"
-button opens the same map as big as the window, for the same district, dates and
-filters. Everything is in the link (`geo`, `id`, `start`, `end`, `type`, `desc`,
-`descx`, `agency`, `status`, the same parameters as `district.html`), so the link
-can be shared, and "Back to the district page" carries them back. The two pages
-share code so they cannot drift: `js/filterstate.js` reads and writes the link
-(`filtersFromParams`, `filtersToParams`), `js/filtersql.js` builds the SQL filter
-(`whereSql`), and `js/requestmap.js` draws the map (lines, grouped circles, popups,
-the map key) and its "Showing ..." line, with the same 60,000 most-recent cap.
+**Full-page map (`site/map.html`, #143), in BetaNYC's shared map layout (#193, #194).**
+The district map's "Open full-page map" button opens the map as big as the window, for the
+same place (community district, council district or borough), dates and filters.
+Everything is in the link (`geo`, `id`, `start`, `end`, `type`, `desc`, `descx`, `agency`,
+`status`, the same parameters as `district.html`), so the link can be shared, and "Back to
+the district page" (or borough page) carries them back. The layout is the Manhattan POPS
+map's and SLAM's map2 (BetaNYC/SLAM#134), from a prototype Noel approved on 2026-11-24:
+
+- **The map fills the window**, with a small white header box top left (the BetaNYC logo,
+  "BoardStat · <place> · 311 Requests", and the back link), the self-hosted street map
+  (#141) and the place's lines (`placeShapes`, `addBoundaries`).
+- **A blue panel on the right** holds the shared filter form, restyled for the panel by
+  `css/fullmap.css`, which only `map.html` loads (the form's markup is unchanged). It starts
+  open on a wide screen; at 760 px or narrower it is a full-screen sheet behind a "Filters"
+  button, and closes after Apply or Reset. "Hide panel »" and "« Filters" hide and bring it
+  back; the map resizes into the space.
+- **A white stats bar along the bottom** (#194): 311 requests, not yet closed, and
+  addresses for the applied filters (the same count as the district page for the same
+  link); requests per month stacked by agency color, with months outside the applied dates
+  faded; the caveats ("311 counts are reports, not problems. Closed doesn't mean fixed." Not
+  an official City report. Data through <date>) and the agency color key. Each month is a
+  button (its label gives its total): a click, or Enter, applies that month through the
+  form (`form.applyNow`), so the form and the link follow. The chart starts at the first day
+  the table holds every request for (the From date, or earlier if it was loaded), since the
+  loader loads Closed requests only from the From date. "Hide stats" / "Show stats".
+- **Requests piled by address** (`js/piles.js`, no DOM, tested under Node). DuckDB groups
+  the matching requests by `address_norm` (else by point, to 5 decimals, and the address or
+  intersection 311 gave) and counts each agency group, so every matching request is
+  counted: the old 60,000-most-recent cap is gone. Below zoom 15.5 an address is one
+  circle, radius `min(26, 3 + √n)`, colored by its top agency. Zoomed in, each request is a
+  chip piled at its address (at most 25, each agency scaled to its share, a small agency
+  keeping one chip), with the total on piles of 10 or more. The 3D button tilts the map:
+  chips become discs (a `fill-extrusion` layer, at most 50 a column), with the total above
+  (`symbol-height-offset`). Zoomed in, only piles near the screen are drawn, so a borough
+  stays light. The chip, disc and tilt code is SLAM's `c311Display.js`, ported. Totals need
+  the street map's fonts; without the street map there are no labels (the popup still
+  gives every total). Colors: HPD, NYPD, DSNY, DEP, DOT, DOB, DOHMH and Parks have their own
+  (Okabe-Ito first), every other agency is gray; color is never the only signal.
+- **A pile's popup** (click, or Enter on the map for the pile nearest its middle; focus
+  moves to its heading): the address, its requests for the filters and how many are not yet
+  closed, the top 8 problems, and the latest 12 requests (date, problem and description,
+  agency, status, and the agency's `resolution_description`), plus "Open this address in
+  BoardStat" (`address.html` with the filters). The resolution text is not in the loaded
+  table (a borough page holds every district's rows); the popup reads it for its 12
+  requests from the data files (`unique_key IN (...)`, with a created-date range so DuckDB
+  skips row groups). The map page's own link still never carries an address.
+
+The district page keeps its clustered map (`js/requestmap.js`, with its 60,000 cap and map
+key); the two pages share `js/filterstate.js` (`filtersFromParams`, `filtersToParams`) and
+`js/filtersql.js` (`whereSql`), so they count the same requests.
 
 **Same filters on the full-page map (#149).** `map.html` has the district page's
 filter form: the same `<form id="filters">` markup (a test keeps `district.html`,
@@ -123,11 +164,11 @@ link made before #192 (one `agency=`) opens the same view, and `filtersql.js` us
   controls inside a closed `<details>` group (UI SDK 0.1.0-beta.14): a step naming one fails
   with "No component … on the page". Since #192 Agency sits in the same group as Problem and
   Description, and on a wide screen every group starts open, so an agent can set all three.
-  On a phone or the full-page map a group starts closed unless something in it is set, so
-  an agent there opens it first. `tests-browser/test_agent.py` pins both.
+  On a phone a group starts closed unless something in it is set, so an agent there opens
+  it first. `tests-browser/test_agent.py` pins both.
 
 **The filter panel opens and closes, on every page** (`setupPanel` in
-`js/filterform.js`). A "Hide filters" / "Change filters" button (`#filters-toggle`,
+`js/filterform.js`; the full-page map hides its whole blue panel instead, #193). A "Hide filters" / "Change filters" button (`#filters-toggle`,
 `aria-expanded`) and a one-line summary of the applied filters (`#filters-summary`)
 sit just outside the form, so the form's markup stays the same on every page.
 Closed, the panel shows only its status line, under the summary.
@@ -136,17 +177,19 @@ Closed, the panel shows only its status line, under the summary.
 |---|---|---|
 | District, borough, council district, address, wider than 640 px | open (summary hidden) | stays open |
 | Same pages, 640 px or narrower | closed | closes, focus on the toggle |
-| Full-page map, any width | closed (summary always shown) | closes, focus on the toggle |
+| Full-page map (#193) | its own blue panel: open on a wide screen, a sheet behind "Filters" at 760 px or less | stays open; the sheet closes, focus on "Filters" |
 
 Shortcut buttons elsewhere on a page (an agency, "Show these requests") apply at once
 whether the panel is open or closed, update the summary, and never open, close or
-move to the panel. On the map its groups start closed unless something in them is set.
+move to the panel. On the map, as on the other pages, every group starts open on a wide
+screen (`openGroups`), and on a phone only groups with something set.
 
 The map page loads its rows like the district page (`js/loadplan.js`): a table of
 the columns the map and the filters use, in the compressed in-memory database,
 Closed requests from the From date on plus every request not yet closed, so a change
 of filters reads nothing again and a From date moved earlier appends only what is
-missing. It never loads the year before (the map has no year-earlier series).
+missing. It never loads the year before (the map has no year-earlier series). Its columns
+add `unique_key` (for a popup's resolution text) and leave out `resolution_description`.
 
 **What the lists offer, on both pages.** A problem, description, agency or status is
 listed if it has a request created in the applied dates, or a request not yet closed
@@ -812,6 +855,13 @@ uv run pytest                             # every time after: offline
   that every control and chips row on the filter form has a name and no two share one
   (with "Derelict Vehicles" as both a problem and a description); the same form on the
   full-page map and the address page.
+- `test_full_map.py` (#193, #194): the full-page map counts what the district page counts
+  for the same link; a filter applied from the blue panel updates the counts and the link;
+  Enter on the map opens a pile's popup (focus on its heading, the agency named, the
+  agency's resolution text read from the data file); the panel and the stats bar hide and
+  come back and the map takes the room; Enter on a month applies it through the form; 3D
+  tilts the map; at phone width the panel is a sheet behind "« Filters" that closes after
+  Reset.
 - `test_agent.py` (#187): UI SDK's agent bridge, `createAgent` from `@ui-sdk/web/agent`
   (imported in the page through its import map), sees every setting in "Agency, problem and
   description", sets an agency, two problems, a description and Exclude, presses Apply, and the link

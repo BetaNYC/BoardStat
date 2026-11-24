@@ -127,8 +127,7 @@ def test_full_page_map_runs_the_same_form(page, base_url):
     from conftest import MAP_PATH
     page.goto(base_url + MAP_PATH)
     page.wait_for_function("() => document.getElementById('f-type').items?.length > 0", timeout=60_000)
-    page.locator("#filters-toggle").click()  # the map's panel starts closed
-    page.locator("#fg-problem summary").click()
+    # The map's blue panel starts open on a wide screen, with every group open (#193).
     page.locator("#f-type input").click()
     page.keyboard.type("lost")
     page.keyboard.press("ArrowDown")

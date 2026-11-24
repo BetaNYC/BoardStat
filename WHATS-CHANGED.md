@@ -7,7 +7,14 @@ This page lists the changes to BoardStat that a reader would notice: new pages, 
 
 BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change reaches the site at the next upload. Entries since November 2026 are dated by the day the change was merged on GitHub. BetaNYC's [nyc-311-mcp](https://github.com/BetaNYC/nyc-311-mcp) server reads BoardStat's data files, so a change to BoardStat's data can change its answers too. To report a bug or ask for a new feature, email [boardstat@beta.nyc](mailto:boardstat@beta.nyc) or [open an issue on GitHub](https://github.com/BetaNYC/BoardStat/issues).
 
-## Unreleased: Pick several agencies, by typing
+## 2026-11-24: A new full-page map
+
+- **Tags:** Site
+- **What changed:** "Open full-page map" on a district, council district or borough page now opens a new map, in the layout of BetaNYC's other maps. The map fills the window. The filter form sits in a blue panel on the right, and a bar along the bottom gives the number of requests, how many are not yet closed and how many addresses, with a chart of requests per month. Select a month in the chart to show just that month. Requests are grouped by address: zoomed out, each address is a circle, bigger for more requests and colored by the agency with the most. Zoomed in, each request is a chip, piled at its address, and the 3D button stands the piles up as columns. Select a pile to see its problems and its latest requests, with what the agency wrote when it closed each one. The panel and the bar can each be hidden. On a phone, the filters open from a Filters button.
+- **Who it affects:** Anyone who uses the full-page map. It now counts every request that matches the filters; before, it showed only the 60,000 most recent. The map's link still carries the same place, dates and filters, and never a street address.
+- **More detail:** [The new layout](https://github.com/BetaNYC/BoardStat/issues/193), [the stats bar](https://github.com/BetaNYC/BoardStat/issues/194)
+
+## 2026-11-24: Pick several agencies, by typing
 
 - **Tags:** Site
 - **What changed:** On district, council district, borough, address and full-page map pages, the Agency box in the filter form now works like the Problem and Description boxes. Type to narrow the list, and pick as many agencies as you need. Each pick shows as a chip with a remove button. The Problem list then shows only problems with requests for the agencies you picked, and the Description list follows both. The form has a new order: dates and status first, then agency, problem and description. A link to a page filtered to one agency still opens the same view.
