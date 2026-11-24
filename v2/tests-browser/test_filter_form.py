@@ -44,23 +44,52 @@ def test_page_loads_the_fixture_offline(district):
     assert district.errors == []
 
 
-def test_apply_changes_the_page_and_the_link(district):
+def pick(page, box: str, text: str, label: str) -> None:
+    """Type in a picker and click the choice whose text is exactly `label`."""
+    page.locator(f"#{box} input").click()
+    page.keyboard.type(text)
+    page.locator(f"#{box} ui-combobox-item", has_text=re.compile(rf"^\s*{re.escape(label)}\s*$")).first.click()
+
+
+def problem_list(page) -> set[str]:
+    return set(page.evaluate("() => document.getElementById('f-type').items.map((i) => i.value)"))
+
+
+def test_two_agencies_apply_to_the_page_and_the_link(district, base_url):
+    """#192: Agency takes several picks, and the link carries them all. Each old
+    one-agency link still opens, and the two counts add up to the two-agency count."""
     page = district
     before = count(page)
-    open_every_group(page)
-    agency = page.get_by_label("Agency (most requests in these dates first)")
-    # The first agency the data offers (the list puts the most requests first).
-    value = agency.locator("option").nth(1).get_attribute("value")
-    agency.select_option(value)
+    every_problem = problem_list(page)
+    pick(page, "f-agency", "DOT", "DOT (Department of Transportation)")
+    pick(page, "f-agency", "NYPD", "NYPD (New York City Police Department)")
+    page.keyboard.press("Escape")
+    assert page.evaluate("document.getElementById('f-agency').value") == ["DOT", "NYPD"]
     # Changing a control changes only the form (#142): the page waits for Apply.
     assert page.locator("#pending").text_content().startswith("Filters changed.")
     assert "agency=" not in page.url
+    # Problem now lists only those agencies' problems (in the fixture: DOT's and NYPD's, never TLC's).
+    page.wait_for_function("""() => { const v = document.getElementById('f-type').items.map((i) => i.value);
+        return v.includes('Illegal Parking') && v.includes('Traffic Signal Condition') && !v.includes('Taxi Complaint'); }""")
+    problems = problem_list(page)
+    assert {"Traffic Signal Condition", "Illegal Parking"} <= problems < every_problem
+    assert "Taxi Complaint" not in problems and "Lost Property" not in problems
     page.get_by_role("button", name="Apply filters").click()
     page.wait_for_function("() => !document.getElementById('pending').textContent")
     wait_for_data(page)
-    assert parse_qs(urlsplit(page.url).query)["agency"] == [value]
-    after = count(page)
-    assert 0 < after < before
+    assert parse_qs(urlsplit(page.url).query)["agency"] == ["DOT|NYPD"]
+    both = count(page)
+    assert 0 < both < before
+    # Links made before #192 carry one agency=; each opens with that agency chosen.
+    singles = []
+    for code in ("DOT", "NYPD"):
+        other = page.context.new_page()
+        other.goto(base_url + DISTRICT_PATH + f"&agency={code}")
+        wait_for_data(other)
+        assert other.evaluate("document.getElementById('f-agency').value") == [code]
+        singles.append(count(other))
+        other.close()
+    assert sum(singles) == both
     assert page.errors == []
 
 
@@ -70,13 +99,15 @@ def test_every_filter_control_has_a_unique_name(page, base_url):
     two problems and two descriptions, so their chips' remove buttons are checked too.
     "Derelict Vehicles" is both a problem and a description (14 real names are), which
     gave two buttons the same name before QA round 1."""
-    page.goto(base_url + DISTRICT_PATH + "&type=Taxi%20Complaint|Derelict%20Vehicles&desc=Derelict%20Vehicles|Bag%2FWallet")
+    page.goto(base_url + DISTRICT_PATH + "&agency=TLC|NYPD&type=Taxi%20Complaint|Derelict%20Vehicles&desc=Derelict%20Vehicles|Bag%2FWallet")
     wait_for_data(page)
     open_every_group(page)
     controls = form_controls(page)
     assert len(controls) >= 8, controls
     removes = [name for _, name in controls if name.lower().startswith("remove")]
-    assert len(removes) == 4, f"expected a remove button per chip: {controls}"
+    assert len(removes) == 6, f"expected a remove button per chip: {controls}"
+    assert ("button", "Remove agency filter TLC") in controls and ("button", "Remove agency filter NYPD") in controls
+    assert ("toolbar", "Chosen agencies") in controls
     assert ("button", "Remove problem filter Derelict Vehicles") in controls
     assert ("button", "Remove description filter Derelict Vehicles") in controls
     assert ("toolbar", "Chosen problems") in controls and ("toolbar", "Chosen descriptions") in controls

@@ -100,7 +100,7 @@ test('a borough link keeps its filters through the full-page map and back', () =
   assert.equal(mapLink, search);
   const back = filtersFromParams(new URLSearchParams(mapLink), defaults);
   assert.equal(whereSql(back), whereSql(s));
-  assert.match(whereSql(s), /agency = 'NYPD'/);
+  assert.match(whereSql(s), /agency IN \('NYPD'\)/);
 });
 
 test('the borough map highlights all of its district shapes on the community district lines', () => {
