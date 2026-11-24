@@ -39,7 +39,7 @@ let loadCount = 0;
 let listsKey = null; // the loads and dates the form's lists were made for
 
 /** The filters a link with no filters opens with (Reset's target). This page never has an address. */
-const defaultFilters = () => ({ ...defaults, types: [], descs: [], descEx: false, agency: '', status: '', addr: '', bbl: '' });
+const defaultFilters = () => ({ ...defaults, agencies: [], types: [], descs: [], descEx: false, status: '', addr: '', bbl: '' });
 
 /** The form's lists, from this page's rows, for the applied dates (filterform.js tableLists). */
 const formLists = tableLists(query, () => state);

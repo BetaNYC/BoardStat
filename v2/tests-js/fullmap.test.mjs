@@ -54,8 +54,10 @@ test('exclude is only written when there are descriptions', () => {
 
 test('quotes in filter values are escaped in the SQL', () => {
   assert.equal(lit("O'Brien"), "'O''Brien'");
-  const s = { ...filtersFromParams(new URLSearchParams(''), defaults), agency: "X' OR 1=1 --" };
-  assert.match(whereSql(s), /agency = 'X'' OR 1=1 --'/);
+  const s = { ...filtersFromParams(new URLSearchParams(''), defaults), agencies: ["X' OR 1=1 --"] };
+  assert.match(whereSql(s), /agency IN \('X'' OR 1=1 --'\)/);
+  // Several agencies: one IN list, each value quoted (#192).
+  assert.match(whereSql({ ...s, agencies: ['NYPD', "O'X"] }), /agency IN \('NYPD', 'O''X'\)/);
 });
 
 test('the filters in words, as the full-page map lists them', () => {

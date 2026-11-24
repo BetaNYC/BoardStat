@@ -39,8 +39,8 @@ internal reports, in Noel's private vault).
                   the dates the view needs (see "Loading only what the view needs")
    MapLibre GL ── self-hosted Protomaps street map, district boundaries, clustered points
    Observable Plot ── monthly line, agency × status, compare chart
-   Page features: filters (dates, problem, description with exclude, agency, status
-   incl. "not yet closed", address) in groups that open and close, run by an Apply
+   Page features: filters (dates, status incl. "not yet closed", agency, problem,
+   description with exclude, address) in groups that open and close, run by an Apply
    button and kept in the URL; at-a-glance numbers with the caveat "311
    counts are reports, not problems. Closed doesn't mean fixed."; top 10
    request types and descriptions; monthly chart; agency responsiveness table; older requests
@@ -78,7 +78,7 @@ removes the last one). Their items are the same DuckDB lists as before (`tableLi
 as data (`items`). Description's list is virtualized (UI SDK's documented pattern,
 `virtualList` in `js/filterform.js`): the combobox knows every item, but only the rows near
 the scroll position are in the page. "Exclude these descriptions" is a `ui-checkbox`;
-Apply and Reset are `ui-button`. Dates, Agency, Status and Print stay native until slice 2.
+Apply and Reset are `ui-button`. Dates, Status and Print stay native.
 The form still only edits its draft until Apply: it follows `valuechange` (pickers),
 `checkedchange` (Exclude) and `action` (Reset). Typed text that was never picked stays in
 the box (UI SDK would clear it when focus leaves), so Apply adds it if it names a choice
@@ -88,6 +88,21 @@ problem filter X" or "Remove description filter X", and each chips row "Chosen p
 gave two buttons one name when a problem and a description share a name, as 14 do. If UI
 SDK does not load, a warning (`#parts-failed`) stays above the status line, even with the
 panel closed.
+
+**Agency picks several, and the lists follow each other (#192, slice 2's Agency part).**
+Agency is the same `ui-combobox multiple`, with a plain template list like Problem (about
+15 to 20 agencies, so no virtualizing). Each item's value is the agency code and its label
+the code and name ("NYPD (New York City Police Department)"); typing either picks it, and
+chips are named "Remove agency filter NYPD" in a "Chosen agencies" row. The lists cascade:
+Problem lists only the chosen agencies' problems, and Description the chosen problems'
+and agencies' descriptions (`tableLists`), all of them when nothing is chosen. The form has
+two groups, in the order the new map panel uses: "Dates and status" (From, To, and Status,
+still one native choice) and "Agency, problem and description". In the filters, `agencies`
+is a list compared as a set, like `types`; the link writes it as `agency=DOT|NYPD`, so a
+link made before #192 (one `agency=`) opens the same view, and `filtersql.js` uses
+`agency IN (...)`. The district page's agency table buttons set a one-agency list
+("pressed" when the page shows that agency alone; selecting it again clears it), and
+"Older requests still open" sets one agency the same way.
 
 - **One pinned version, one copy of the core.** `js/vendor-importmap.json` maps the
   `@ui-sdk/web` and `@ui-sdk/core` entries to UI SDK **0.1.0-beta.14**'s plain ES module
@@ -103,11 +118,13 @@ panel closed.
 - **Size.** UI SDK adds 121 files, 736 KB, about 211 KB gzip to a form page (measured
   2026-11-22, `test_ui_sdk_download_size`), next to about 9.3 MB gzip of DuckDB-WASM, Plot
   and MapLibre. The agent bridge is not loaded by the page. Not yet measured on a phone.
-- **Agents.** `createAgent()` from `@ui-sdk/web/agent` sees Problem, Description, Exclude,
-  Apply and Reset (not the native controls). It does **not** see controls inside a closed
-  `<details>` group (UI SDK 0.1.0-beta.14): a step naming one fails with "No component …
-  on the page". Agency and status starts closed, and on a phone or the full-page map every
-  group does. `tests-browser/test_agent.py` pins both.
+- **Agents.** `createAgent()` from `@ui-sdk/web/agent` sees Agency, Problem, Description,
+  Exclude, Apply and Reset (not the native controls: dates and Status). It does **not** see
+  controls inside a closed `<details>` group (UI SDK 0.1.0-beta.14): a step naming one fails
+  with "No component … on the page". Since #192 Agency sits in the same group as Problem and
+  Description, and on a wide screen every group starts open, so an agent can set all three.
+  On a phone or the full-page map a group starts closed unless something in it is set, so
+  an agent there opens it first. `tests-browser/test_agent.py` pins both.
 
 **The filter panel opens and closes, on every page** (`setupPanel` in
 `js/filterform.js`). A "Hide filters" / "Change filters" button (`#filters-toggle`,
@@ -143,7 +160,7 @@ choice. A status filter from a link is kept only if the data has that status
 (`keepKnownStatus`, checked against the data's list, never against the menu); "Closed"
 is always kept, since a short period can have no Closed rows loaded, while every other
 status is on a request not yet closed, which is always loaded. An applied agency with
-no requests in the new dates stays selected, shown as an extra choice.
+no requests in the new dates stays a chip, named by its code.
 
 **Address filter.** It never goes into a link (see the analytics notes below), so
 it is never carried between the district page and the map, in either direction, and
@@ -789,14 +806,15 @@ uv run pytest                             # every time after: offline
 - **`serve.py --data DIR`** serves `DIR` at `/data/`, so the site can run on the fixture by
   hand too: `python3 v2/serve.py --data v2/tests-browser/fixture-data`, then open
   http://127.0.0.1:8000/district.html?geo=cd&id=480.
-- `test_filter_form.py`: the page loads the fixture; changing a filter changes only the form
-  until Apply, and Apply changes the counts and the link; an accessibility-tree check
+- `test_filter_form.py`: the page loads the fixture; picking two agencies changes only the
+  form (and narrows the Problem list to their problems) until Apply, and Apply writes
+  `agency=DOT|NYPD` to the link, with a count equal to the two one-agency links' counts; an accessibility-tree check
   that every control and chips row on the filter form has a name and no two share one
   (with "Derelict Vehicles" as both a problem and a description); the same form on the
   full-page map and the address page.
 - `test_agent.py` (#187): UI SDK's agent bridge, `createAgent` from `@ui-sdk/web/agent`
-  (imported in the page through its import map), sees every setting in "Problem and
-  description", sets two problems, a description and Exclude, presses Apply, and the link
+  (imported in the page through its import map), sees every setting in "Agency, problem and
+  description", sets an agency, two problems, a description and Exclude, presses Apply, and the link
   and counts match a fresh load of that link. Also: it cannot see controls in a closed group.
 - `test_pickers.py` (#187): keyboard (Tab, type, arrows, Enter, Escape, Backspace), click-away,
   visible focus, forced colors, a 390 px screen, the virtualized Description list, and UI

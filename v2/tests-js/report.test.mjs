@@ -137,10 +137,10 @@ test('page_url never contains whitespace', () => {
 // ---------------------------------------------------------------- the data pages' link (hand-off)
 
 const DEFAULTS = { start: '2025-11-01', end: '2026-11-15' };
-const NO_FILTERS = { ...DEFAULTS, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' };
+const NO_FILTERS = { ...DEFAULTS, types: [], descs: [], descEx: false, agencies: [], status: '', addr: '' };
 
 test('the link carries the page and the same parameters as the page\'s own links', () => {
-  const s = { ...NO_FILTERS, start: '2025-01-01', types: ['Noise - Residential'], agency: 'NYPD', status: 'not_closed' };
+  const s = { ...NO_FILTERS, start: '2025-01-01', types: ['Noise - Residential'], agencies: ['NYPD'], status: 'not_closed' };
   const p = filtersToParams('cd', '306', s, DEFAULTS);
   const href = reportLinkHref('district.html', p);
   assert.equal(href, `help.html?from=district.html&${p.toString()}#report-h`);
@@ -152,7 +152,7 @@ test('the link carries the page and the same parameters as the page\'s own links
 
 test('the address page\'s link carries the place and filters, never the address', () => {
   // The address page's state holds the address; filtersToParams leaves it out.
-  const s = { ...NO_FILTERS, addr: '114 NASSAU AVENUE, Brooklyn, 11222', agency: 'DOT' };
+  const s = { ...NO_FILTERS, addr: '114 NASSAU AVENUE, Brooklyn, 11222', agencies: ['DOT'] };
   const href = reportLinkHref('address.html', filtersToParams('cd', '301', s, DEFAULTS));
   assert.equal(href, 'help.html?from=address.html&geo=cd&id=301&agency=DOT#report-h');
   // Even if handed parameters with an address, coordinates or a search, only the report's survive.
@@ -169,7 +169,7 @@ test('an unknown page gets the plain link', () => {
 });
 
 test('the hand-off wins over the referrer, and is read back as the same page and filters', () => {
-  const p = filtersToParams('cd', '306', { ...NO_FILTERS, types: ['Noise - Residential'], agency: 'NYPD' }, DEFAULTS);
+  const p = filtersToParams('cd', '306', { ...NO_FILTERS, types: ['Noise - Residential'], agencies: ['NYPD'] }, DEFAULTS);
   const help = new URL(reportLinkHref('district.html', p), HELP).href;
   const got = choosePageUrl(help, 'https://www.beta.nyc/boardstat/map.html?geo=cd&id=101');
   assert.equal(got, 'https://www.beta.nyc/boardstat/district.html?geo=cd&id=306&type=Noise+-+Residential&agency=NYPD');

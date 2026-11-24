@@ -8,7 +8,7 @@ import { filtersFromParams, filtersToParams, copyFilters, patchBoth, keepKnownSt
 import { whereSql } from '../site/js/filtersql.js';
 
 const defaults = { start: '2025-11-01', end: '2026-11-13' };
-const base = { ...defaults, types: [], descs: [], descEx: false, agency: '', status: '', addr: '', bbl: '' };
+const base = { ...defaults, types: [], descs: [], descEx: false, agencies: [], status: '', addr: '', bbl: '' };
 const fmt = (d) => d;
 
 test('Apply checks the date order first, even with nothing changed (#142)', () => {
@@ -21,7 +21,7 @@ test('an Apply with nothing changed reruns nothing, unless text was typed or the
   assert.equal(applyCheck({ draft: base, applied: base }), 'no-change');
   assert.equal(applyCheck({ draft: base, applied: base, typed: true }), 'apply');
   assert.equal(applyCheck({ draft: base, applied: base, lastFailed: true }), 'apply');
-  assert.equal(applyCheck({ draft: { ...base, agency: 'NYPD' }, applied: base }), 'apply');
+  assert.equal(applyCheck({ draft: { ...base, agencies: ['NYPD'] }, applied: base }), 'apply');
   // Chip order does not count as a change.
   assert.equal(applyCheck({ draft: { ...base, types: ['A', 'B'] }, applied: { ...base, types: ['B', 'A'] } }), 'no-change');
 });
@@ -37,14 +37,16 @@ test('the form says what is not applied yet, per group', () => {
   const none = pendingSummary(base, base, base, fmt);
   assert.equal(none.pending, false);
   assert.equal(none.msg, '');
-  assert.deepEqual(none.counts, { dates: '(2025-11-01 to 2026-11-13)', problem: '', agency: '' });
-  const draft = { ...base, types: ['Noise - Residential'], agency: 'NYPD' };
+  assert.deepEqual(none.counts, { dates: '(2025-11-01 to 2026-11-13)', problem: '' });
+  const draft = { ...base, types: ['Noise - Residential'], agencies: ['NYPD'] };
   const s = pendingSummary(draft, base, base, fmt);
   assert.equal(s.pending, true);
   assert.equal(s.msg, PENDING_MSG);
-  assert.equal(s.counts.problem, '(1 chosen, not applied yet)');
-  assert.equal(s.counts.agency, '(1 chosen, not applied yet)');
-  assert.equal(pendingSummary(draft, draft, base, fmt).counts.agency, '(1 chosen)');
+  assert.equal(s.counts.problem, '(2 chosen, not applied yet)');
+  assert.equal(pendingSummary(draft, draft, base, fmt).counts.problem, '(2 chosen)');
+  // #192: status is in the Dates group, and says what it is.
+  const st = pendingSummary({ ...base, status: 'not_closed' }, base, base, fmt);
+  assert.equal(st.counts.dates, '(2025-11-01 to 2026-11-13, status: not yet closed, not applied yet)');
 });
 
 // ---- the round trip: what each page's links carry (fullmap.js writeLinks, district.js writeUrl)
@@ -60,7 +62,7 @@ for (const [geo, id] of [['cd', '306'], ['cc', '33'], ['boro', 'brooklyn']]) {
     const onMap = open(linkFor('map.html', geo, id, onDistrict));
     assert.deepEqual(onMap, onDistrict);
     // Change filters on the map and Apply (a draft copied to applied, as the form does).
-    const applied = copyFilters({ ...onMap, agency: 'NYPD', status: 'not_closed', end: '2026-10-31' });
+    const applied = copyFilters({ ...onMap, agencies: ['NYPD'], status: 'not_closed', end: '2026-10-31' });
     // The back link carries the map's filters; the district page opens with exactly them.
     const back = open(linkFor('district.html', geo, id, applied));
     assert.deepEqual(back, applied);
@@ -71,11 +73,11 @@ for (const [geo, id] of [['cd', '306'], ['cc', '33'], ['boro', 'brooklyn']]) {
 }
 
 test('an address filter is never carried: not into the map, not back', () => {
-  const withAddr = { ...base, agency: 'DSNY', addr: '100 MAIN STREET' };
+  const withAddr = { ...base, agencies: ['DSNY'], addr: '100 MAIN STREET' };
   const mapLink = linkFor('map.html', 'cd', '306', withAddr);
   assert.doesNotMatch(mapLink, /addr|MAIN/);
   assert.equal(open(mapLink).addr, '');
-  assert.equal(open(mapLink).agency, 'DSNY');
+  assert.deepEqual(open(mapLink).agencies, ['DSNY']);
   // Even a hand-made link with an address: the map page ignores it (fullmap.js sets addr: '').
   const onMap = { ...open('map.html?geo=cd&id=306&addr=100%20MAIN%20STREET'), addr: '' };
   assert.equal(onMap.addr, '');
@@ -83,10 +85,10 @@ test('an address filter is never carried: not into the map, not back', () => {
 
 test('a shortcut changes the applied filters and the form together, keeping other pending edits', () => {
   const draft = { ...base, status: 'Open' }; // edited in the form, not applied
-  const { applied, draft: d2 } = patchBoth(base, draft, () => ({ agency: 'HPD' }));
-  assert.equal(applied.agency, 'HPD');
+  const { applied, draft: d2 } = patchBoth(base, draft, () => ({ agencies: ['HPD'] }));
+  assert.deepEqual(applied.agencies, ['HPD']);
   assert.equal(applied.status, '');
-  assert.equal(d2.agency, 'HPD');
+  assert.deepEqual(d2.agencies, ['HPD']);
   assert.equal(d2.status, 'Open');
 });
 
@@ -119,6 +121,33 @@ test('the lists offer rows in the applied dates or not yet closed, most requests
   await lists.problems(); await lists.agencies(); await lists.descriptions(['Noise']);
   assert.deepEqual(await lists.statuses(), ['Open', 'Closed']);
   for (const sql of seen) { assert.ok(sql.includes(scope), sql); assert.ok(sql.includes(listOrderSql(s)), sql); }
+});
+
+test('Problem lists only the chosen agencies\' problems; Description follows both (#192)', async () => {
+  const { tableLists } = await import('../site/js/filterform.js');
+  const seen = [];
+  const lists = tableLists(async (sql) => { seen.push(sql); return []; }, () => ({ ...base }));
+  await lists.problems();
+  assert.doesNotMatch(seen.pop(), /agency IN/);
+  await lists.problems(['NYPD', "O'X"]);
+  assert.match(seen.pop(), /AND agency IN \('NYPD', 'O''X'\)/);
+  await lists.descriptions(['Noise'], ['NYPD']);
+  const d = seen.pop();
+  assert.match(d, /AND agency IN \('NYPD'\)/);
+  assert.match(d, /AND complaint_type IN \('Noise'\)/);
+});
+
+test('the Agency box lists code and name; typing either picks the code (#192)', async () => {
+  const { agencyItems, findItem, chipNames } = await import('../site/js/filterform.js');
+  const items = agencyItems([{ agency: 'NYPD', label: 'New York City Police Department' }, { agency: 'DOT', label: null }]);
+  assert.deepEqual(items, [{ value: 'NYPD', label: 'NYPD (New York City Police Department)' }, { value: 'DOT', label: 'DOT' }]);
+  assert.equal(findItem(items, ' nypd '), 'NYPD');
+  assert.equal(findItem(items, 'nypd (new york city police department)'), 'NYPD');
+  assert.equal(findItem(items, 'police'), undefined);
+  const n = chipNames('agency');
+  assert.equal(n.row, 'Chosen agencies');
+  assert.equal(n.remove('NYPD'), 'Remove agency filter NYPD');
+  assert.equal(n.chip('NYPD'), 'Chosen agency: NYPD');
 });
 
 test('the filter panel: open on a wide district page, closed on a phone and always on the map', async () => {

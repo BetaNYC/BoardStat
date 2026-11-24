@@ -39,18 +39,27 @@ def test_pages_run_the_form_through_the_shared_module(page):
 def test_filters_are_in_details_groups_with_one_submit_button(page):
     form = form_html(page)
     groups = re.findall(r'<details class="filter-group"[^>]*data-section="(\w+)"', form)
-    assert groups == ["dates", "problem", "agency"]
-    assert form.count("<summary>") == 3
+    # #192: two groups, "Dates and status" and "Agency, problem and description".
+    assert groups == ["dates", "problem"]
+    assert form.count("<summary>") == 2
     # Apply is the form's only submit button, so Enter in a text or date box applies.
     assert re.findall(r'<button type="submit"[^>]*>', form) == ['<button type="submit" id="apply">']
     assert 'id="pending"' in form and 'aria-live="polite"' in form
 
 
 @pytest.mark.parametrize("page", FORM_PAGES)
-def test_problem_and_description_sit_in_one_aligned_pair(page):
+def test_form_order_is_dates_status_agency_problem_description(page):
+    """#192: the order the new map panel uses. Dates and Status share the first group;
+    Agency, Problem and Description sit side by side in the second, in that order, because
+    each list follows the one before it."""
     form = form_html(page)
+    order = [form.index(f'id="{c}"') for c in ("f-start", "f-end", "f-status", "f-agency", "f-type", "f-desc")]
+    assert order == sorted(order)
+    dates = re.search(r'data-section="dates".*?</details>', form, re.DOTALL).group(0)
+    assert '<span class="fg-title">Dates and status</span>' in dates and 'id="f-status"' in dates
     m = re.search(r'data-section="problem".*?<div class="fg-body fg-pair">(.*?)</details>', form, re.DOTALL)
-    assert m and 'id="f-type"' in m.group(1) and 'id="f-desc"' in m.group(1)
+    assert m and all(f'id="{c}"' in m.group(1) for c in ("f-agency", "f-type", "f-desc"))
+    assert '<span class="fg-title">Agency, problem and description</span>' in form
 
 
 @pytest.mark.parametrize("page", PAGES)
@@ -71,7 +80,7 @@ def test_form_controls_do_not_refresh_on_change():
     listeners. Every one only updates the draft."""
     js = (JS / "filterform.js").read_text()
     bind = js[js.index("    bind(min, max) {"):]
-    for control in ["f-start", "f-end", "f-agency", "f-status", "addr-clear"]:
+    for control in ["f-start", "f-end", "f-status", "addr-clear"]:
         lines = re.findall(rf"\$\('{control}'\)\.addEventListener\(.*", bind)
         assert lines, control
         for line in lines:
@@ -119,14 +128,13 @@ def test_reset_clears_typed_text():
     """#187: a picker's typed text is its `query`; its `value` is the chosen list."""
     js = (JS / "filterform.js").read_text()
     m = re.search(r"function reset\(\) \{.*?\n  \}", js, re.DOTALL)
-    assert m and "$('f-type').query = ''" in m.group(0) and "$('f-desc').query = ''" in m.group(0)
+    assert m and all(f"$('{box}').query = ''" in m.group(0) for box in ("f-agency", "f-type", "f-desc"))
 
 
 def test_form_says_how_the_suggestions_are_ordered():
     """#149 QA round 2: the lists put the most requests in the applied dates first, and say so."""
     form = form_html("district.html")
-    assert '<label for="f-agency">Agency (most requests in these dates first)</label>' in form
-    for box in ("type", "desc"):
+    for box in ("agency", "type", "desc"):
         assert f'<p class="field-hint" id="{box}-order">Suggestions are listed with the most requests in these dates first.</p>' in form
         assert f'aria-describedby="{box}-order {box}-help"' in form
 
@@ -182,9 +190,9 @@ UI_SDK_VERSION = re.compile(r"@ui-sdk/(?:web|core)@([^/]+)/")
 
 @pytest.mark.parametrize("page", FORM_PAGES)
 def test_problem_and_description_are_ui_sdk_comboboxes(page):
-    """#187: several picks shown as chips, from UI SDK's Combobox, named by its label."""
+    """#187 (Agency in #192): several picks shown as chips, from UI SDK's Combobox, named by its label."""
     form = form_html(page)
-    for box, label in (("type", "Problem (formerly Complaint Type)"), ("desc", "Description (formerly Descriptor)")):
+    for box, label in (("agency", "Agency"), ("type", "Problem (formerly Complaint Type)"), ("desc", "Description (formerly Descriptor)")):
         m = re.search(rf'<ui-combobox id="f-{box}" multiple>(.*?)</ui-combobox>\n', form, re.S)
         assert m, box
         body = m.group(1)
@@ -207,9 +215,10 @@ def test_exclude_apply_and_reset_are_ui_sdk_parts(page):
     assert '<label class="choice"><ui-checkbox id="f-desc-ex">' in form and "</ui-checkbox> Exclude these descriptions</label>" in form
     assert '<ui-button><button type="submit" id="apply">Apply filters</button></ui-button>' in form
     assert '<ui-button id="reset"><button type="button" class="secondary">Reset filters</button></ui-button>' in form
-    # Dates, Agency, Status and Print stay native in slice 1.
-    for native in ('<input type="date" id="f-start"', '<select id="f-agency"', '<select id="f-status"', '<button type="button" class="secondary" id="print">'):
+    # Dates, Status and Print stay native; Agency became a combobox in #192.
+    for native in ('<input type="date" id="f-start"', '<select id="f-status"', '<button type="button" class="secondary" id="print">'):
         assert native in form, native
+    assert '<select id="f-agency"' not in form
 
 
 def test_ui_sdk_is_pinned_to_one_exact_version():

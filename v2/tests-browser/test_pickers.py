@@ -15,6 +15,8 @@ def test_keyboard_escape_and_click_away(district):
     page = district
     page.locator("#fg-problem summary").focus()
     page.keyboard.press("Tab")
+    assert page.evaluate(STATE)["focus"] == "f-agency"  # #192: Agency comes first
+    page.keyboard.press("Tab")
     assert page.evaluate(STATE)["focus"] == "f-type"
     page.keyboard.type("lost")
     s = page.evaluate(STATE)
@@ -69,10 +71,13 @@ def test_focus_is_visible(district):
     page = district
     page.locator("#fg-problem summary").focus()
     page.keyboard.press("Tab")
+    chips = page.locator("#f-agency ui-combobox-chips")
+    assert chips.evaluate("e => getComputedStyle(e).outlineStyle") == "solid"
+    page.keyboard.press("Tab")
     chips = page.locator("#f-type ui-combobox-chips")
     assert chips.evaluate("e => getComputedStyle(e).outlineStyle") == "solid"
     assert chips.evaluate("e => parseFloat(getComputedStyle(e).outlineWidth)") >= 2
-    # Tab on to Description, then Exclude, then (past Agency's closed heading) Apply.
+    # Tab on to Description, then Exclude.
     page.keyboard.press("Tab")
     assert page.evaluate("document.activeElement.closest('ui-combobox')?.id") == "f-desc"
     page.keyboard.press("Tab")
@@ -216,7 +221,7 @@ def test_parts_that_fail_to_load_leave_a_warning_that_stays(page, base_url, netw
     wait_for_data(page, timeout=60_000)  # formPartsReady waits 20 s first
     warning = page.locator("#parts-failed")
     assert warning.is_visible()
-    assert warning.text_content().startswith("The Problem and Description boxes did not load")
+    assert warning.text_content().startswith("The Agency, Problem and Description boxes did not load")
     assert page.get_by_role("alert").filter(has_text="did not load").count() == 1
     assert "match" in page.locator("#status").text_content()  # the rest of the page still drew
     page.locator("#filters-toggle").click()  # closed panel: the warning still shows

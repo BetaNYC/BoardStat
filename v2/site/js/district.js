@@ -399,7 +399,7 @@ let form = null;
 
 /** The filters a link with no filters opens with (the Reset button's target). */
 function defaultFilters() {
-  return { start: viewStart, end: manifest.window.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: ADDRESS_MODE ? state.addr : '', bbl: ADDRESS_MODE ? state.bbl : '' };
+  return { start: viewStart, end: manifest.window.end, agencies: [], types: [], descs: [], descEx: false, status: '', addr: ADDRESS_MODE ? state.addr : '', bbl: ADDRESS_MODE ? state.bbl : '' };
 }
 
 /** Shortcut buttons in the panels (an agency, a description, an address) apply at once. */
@@ -707,13 +707,15 @@ async function renderAgencyResponse() {
   $('agency-resp').replaceChildren(table(rows, [
     {
       key: 'agency', label: 'Agency',
-      render: (r) => el('span', {},
+      // Pressed when the page shows this agency alone; selecting it sets a one-agency
+      // list, or clears the agency filter when it is already that list (#192).
+      render: (r) => { const only = state.agencies.length === 1 && state.agencies[0] === r.agency; return el('span', {},
         el('button', {
-          type: 'button', class: 'link', 'aria-pressed': String(state.agency === r.agency),
-          'aria-label': state.agency === r.agency ? `Stop filtering to ${r.agency}` : `Filter the page to ${r.agency}`,
-          onclick: () => { const agency = state.agency === r.agency ? '' : r.agency; applyNow(() => ({ agency })); },
+          type: 'button', class: 'link', 'aria-pressed': String(only),
+          'aria-label': only ? `Stop filtering to ${r.agency}` : `Filter the page to ${r.agency}`,
+          onclick: () => applyNow(() => ({ agencies: only ? [] : [r.agency] })),
         }, r.agency),
-        r.agency_name ? el('span', { class: 'muted', text: ` ${r.agency_name}` }) : null),
+        r.agency_name ? el('span', { class: 'muted', text: ` ${r.agency_name}` }) : null); },
     },
     { key: 'n', label: 'Requests', num: true, fmt: fmtInt },
     { key: 'open_n', label: 'Not yet closed', num: true, fmt: fmtInt },
@@ -731,7 +733,7 @@ function dayBefore(iso) {
 
 /** Show the requests created before the From date that are still not closed. */
 function showBacklog(agency) {
-  const patch = { end: dayBefore(state.start), start: manifest.window.start, status: NOT_CLOSED, ...(agency ? { agency } : {}) };
+  const patch = { end: dayBefore(state.start), start: manifest.window.start, status: NOT_CLOSED, ...(agency ? { agencies: [agency] } : {}) };
   applyNow(() => patch);
   $('filters-bar').scrollIntoView({ block: 'start' });
 }
@@ -1216,7 +1218,7 @@ async function renderSameLot() {
 let lastTracked = null;
 let trackTimer = null;
 function trackFilters() {
-  const key = { dates: `${state.start}|${state.end}`, type: state.types.join('|'), desc: `${state.descs.join('|')}|${state.descEx}`, agency: state.agency, status: state.status, address: state.addr };
+  const key = { dates: `${state.start}|${state.end}`, type: state.types.join('|'), desc: `${state.descs.join('|')}|${state.descEx}`, agency: state.agencies.join('|'), status: state.status, address: state.addr };
   const prev = lastTracked;
   lastTracked = key;
   if (!prev) return; // the first render is the page view itself

@@ -11,7 +11,9 @@
 // The page supplies the lists to choose from (it knows where its rows are) and what to do
 // on Apply. The pure decisions are exported for v2/tests-js.
 //
-// Problem and Description are UI SDK comboboxes with several picks shown as chips,
+// Agency, Problem and Description are UI SDK comboboxes with several picks shown as
+// chips (#187; Agency in #192), and each list follows the one before it: Problem lists
+// the chosen agencies' problems, Description the chosen problems' descriptions.
 // Exclude is a UI SDK checkbox, and Apply and Reset are UI SDK buttons (#187;
 // js/uisdk.js loads them). The form follows their change events (valuechange,
 // checkedchange, action) into `draft`, and still applies nothing until Apply.
@@ -46,7 +48,7 @@ export function formPartsReady(ms = 20000) {
   return Promise.race([parts, new Promise((resolve) => setTimeout(() => resolve(false), ms))]);
 }
 
-export const PARTS_FAILED_MSG = 'The Problem and Description boxes did not load, so those filters, Exclude, Apply and Reset may not work. This can happen if the connection drops. Reload the page to try again.';
+export const PARTS_FAILED_MSG = 'The Agency, Problem and Description boxes did not load, so those filters, Exclude, Apply and Reset may not work. This can happen if the connection drops. Reload the page to try again.';
 
 /** Show PARTS_FAILED_MSG in the form's own warning line (#parts-failed), which the
  *  status line's counts never overwrite, and which stays shown when the panel closes. */
@@ -65,7 +67,7 @@ export function showPartsFailed($ = (id) => document.getElementById(id)) {
  * them; an observer puts these back whenever UI SDK writes its own.
  */
 export function chipNames(kind, exclude = false) {
-  const plural = kind === 'problem' ? 'problems' : 'descriptions';
+  const plural = { agency: 'agencies', problem: 'problems', description: 'descriptions' }[kind];
   return {
     row: exclude ? `Excluded ${plural}` : `Chosen ${plural}`,
     chip: (v) => `${exclude ? 'Excluded' : 'Chosen'} ${kind}: ${v}`,
@@ -181,6 +183,14 @@ export function findChoice(list, text) {
   return list.find((x) => String(x).toLowerCase() === t);
 }
 
+/** The value of the item (UI SDK { value, label }) whose value or label `text` names, or undefined. */
+export function findItem(items, text) {
+  return items.find((i) => findChoice([i.value, i.label], text) !== undefined)?.value;
+}
+
+/** An agency as the Agency box lists it: its code, then its name (#192). */
+export const agencyItems = (rows) => rows.map((r) => ({ value: r.agency, label: `${r.agency}${r.label ? ` (${r.label})` : ''}` }));
+
 /** The note under the buttons and the text after each group's heading. */
 export function pendingSummary(draft, applied, defaults, fmt = fmtDate) {
   const changed = changedFields(draft, applied);
@@ -189,8 +199,10 @@ export function pendingSummary(draft, applied, defaults, fmt = fmtDate) {
     const n = sectionCount(draft, defaults, section);
     const edited = changed.some((k) => SECTIONS[section].includes(k) || (section === 'problem' && k === 'descEx'));
     const parts = [];
-    if (section === 'dates') parts.push(`${fmt(draft.start)} to ${fmt(draft.end)}`);
-    else if (n) parts.push(`${n} chosen`);
+    if (section === 'dates') {
+      parts.push(`${fmt(draft.start)} to ${fmt(draft.end)}`);
+      if (draft.status) parts.push(`status: ${draft.status === NOT_CLOSED ? 'not yet closed' : draft.status}`);
+    } else if (n) parts.push(`${n} chosen`);
     if (edited) parts.push('not applied yet');
     counts[section] = parts.length ? `(${parts.join(', ')})` : '';
   }
@@ -204,7 +216,7 @@ export function pendingSummary(draft, applied, defaults, fmt = fmtDate) {
  * the district page and the full-page map offer the same choices for the same dates.
  */
 export function listScopeSql(s) {
-  const dates = whereSql({ start: s.start, end: s.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' });
+  const dates = whereSql({ start: s.start, end: s.end, agencies: [], types: [], descs: [], descEx: false, status: '', addr: '' });
   return `((${dates}) OR ${NOT_CLOSED_SQL})`;
 }
 
@@ -213,7 +225,7 @@ export function listScopeSql(s) {
  * form says so next to the Problem and Agency boxes.
  */
 export function listOrderSql(s) {
-  const dates = whereSql({ start: s.start, end: s.end, types: [], descs: [], descEx: false, agency: '', status: '', addr: '' });
+  const dates = whereSql({ start: s.start, end: s.end, agencies: [], types: [], descs: [], descEx: false, status: '', addr: '' });
   return `count(*) FILTER (WHERE ${dates}) DESC, count(*) DESC, 1`;
 }
 
@@ -224,11 +236,14 @@ export function listOrderSql(s) {
 export function tableLists(query, getState) {
   const scope = () => listScopeSql(getState());
   const order = () => listOrderSql(getState());
+  const among = (col, list) => (list.length ? `AND ${col} IN (${list.map(lit).join(', ')})` : '');
   return {
-    problems: async () => (await query(`SELECT complaint_type AS t FROM req WHERE ${scope()} GROUP BY 1 ORDER BY ${order()}`)).map((r) => r.t),
-    descriptions: async (types) => (await query(`
+    problems: async (agencies = []) => (await query(`
+      SELECT complaint_type AS t FROM req WHERE ${scope()} ${among('agency', agencies)}
+      GROUP BY 1 ORDER BY ${order()}`)).map((r) => r.t),
+    descriptions: async (types, agencies = []) => (await query(`
       SELECT ${DESC_SQL} AS d FROM req WHERE ${scope()}
-      ${types.length ? `AND complaint_type IN (${types.map(lit).join(', ')})` : ''}
+      ${among('agency', agencies)} ${among('complaint_type', types)}
       GROUP BY 1 ORDER BY ${order()}`)).map((r) => r.d),
     agencies: async () => query(`SELECT agency, any_value(agency_name) AS label FROM req WHERE ${scope()} GROUP BY 1 ORDER BY ${order()}`),
     statuses: async () => {
@@ -264,8 +279,8 @@ export function statusChoices(known) {
 /**
  * Run the form on this page.
  *   defaults()          the filters a link without filters opens with (Reset's target)
- *   lists.problems()    problem names, most common first
- *   lists.descriptions(types)  descriptions for those problems (all if none)
+ *   lists.problems(agencies)   problem names for those agencies (all if none), most common first
+ *   lists.descriptions(types, agencies)  descriptions for those problems and agencies (all if none)
  *   lists.agencies()    [{ agency, label }]
  *   lists.statuses()    status values
  *   onApply(applied)    the page redraws for these filters
@@ -277,8 +292,10 @@ export function statusChoices(known) {
 export function createFilterForm({ defaults, lists, onApply, lastFailed = () => false, matchText = () => '', setStatus, lockAddress = false, $ = (id) => document.getElementById(id) }) {
   let applied = copyFilters(defaults());
   let draft = copyFilters(applied);
+  let agencies = []; // UI SDK items: { value: code, label: "code (name)" }
   let problems = [];
   let descs = [];
+  let problemKey = null;
   let descKey = null;
   let listsReady = false; // the page has rows to list (fillLists has run)
   let knownStatuses = []; // what lists.statuses() returned: the data's statuses, and "Closed"
@@ -286,6 +303,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   let formApplied = false; // the last change came from the form's own Apply or Reset
   let descList = null; // Description's virtualized list (virtualList), made on first use
   // The chips' names (chipNames); Description's change with Exclude.
+  const nameAgencyChips = nameChips($('f-agency'), () => chipNames('agency'));
   const nameTypeChips = nameChips($('f-type'), () => chipNames('problem'));
   const nameDescChips = nameChips($('f-desc'), () => chipNames('description', draft.descEx));
 
@@ -309,6 +327,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   /** The chips are UI SDK's (ui-combobox-chips); this marks Exclude mode and the address. */
   function renderChips() {
     $('f-desc').toggleAttribute('data-exclude', draft.descEx);
+    nameAgencyChips();
     nameTypeChips();
     nameDescChips();
     $('addr-filter').hidden = lockAddress || !draft.addr;
@@ -319,20 +338,19 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   function syncControls() {
     $('f-start').value = draft.start;
     $('f-end').value = draft.end;
-    // A menu may lack the value in the form: before its list is filled (or after a failed
-    // first load), or an agency with no requests in the new dates. Show it as an extra
-    // option rather than "All agencies". A status is only shown that way before the list
-    // is filled; after that, one the data does not have is never offered (#149 QA).
-    for (const [id, v] of [['f-agency', draft.agency], ['f-status', draft.status]]) {
-      dropExtras(id, v);
-      if (!v || [...$(id).options].some((o) => o.value === v)) continue;
-      if (id === 'f-status' && listsReady && !knownStatuses.includes(v)) continue;
-      $(id).append(el('option', { value: v, text: v, 'data-extra': '' }));
+    // The status menu may lack the form's value before its list is filled (or after a
+    // failed first load): show it as an extra option rather than "Any status". After
+    // that, a status the data does not have is never offered (#149 QA).
+    const v = draft.status;
+    dropExtras('f-status', v);
+    if (v && ![...$('f-status').options].some((o) => o.value === v) && !(listsReady && !knownStatuses.includes(v))) {
+      $('f-status').append(el('option', { value: v, text: v, 'data-extra': '' }));
     }
-    $('f-agency').value = draft.agency;
-    $('f-status').value = draft.status;
+    $('f-status').value = v;
     // UI SDK parts: setting a property is an "imperative" change; the listeners in bind()
-    // copy it back into the draft, which already holds it.
+    // copy it back into the draft, which already holds it. A chosen agency with no
+    // requests in the new dates stays a chip (itemToLabel names it).
+    if (!sameList($('f-agency').value ?? [], draft.agencies)) $('f-agency').value = [...draft.agencies];
     if (!sameList($('f-type').value ?? [], draft.types)) $('f-type').value = [...draft.types];
     if (!sameList($('f-desc').value ?? [], draft.descs)) $('f-desc').value = [...draft.descs];
     if ($('f-desc-ex').checked !== draft.descEx) $('f-desc-ex').checked = draft.descEx;
@@ -357,15 +375,27 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   function changed() {
     renderChips();
     renderPending();
-    updateDescriptions().catch((err) => console.error(err));
+    updateLists().catch((err) => console.error(err));
   }
 
-  /** The Description list offers only descriptions of the selected problems (all if none). */
-  async function updateDescriptions() {
-    const key = draft.types.join('|');
-    if (!listsReady || key === descKey) return;
+  /** Problem lists only the chosen agencies' problems, and Description only the chosen
+   *  problems' (and agencies') descriptions; all of them when none is chosen (#192). */
+  async function updateLists() {
+    if (!listsReady) return;
+    const pKey = draft.agencies.join('|');
+    if (pKey !== problemKey) {
+      problemKey = pKey;
+      const list = await lists.problems(draft.agencies);
+      if (pKey !== problemKey) return; // a newer pick asked again; its answer wins
+      problems = list;
+      $('f-type').items = asItems(problems);
+    }
+    const key = `${pKey}||${draft.types.join('|')}`;
+    if (key === descKey) return;
     descKey = key;
-    descs = await lists.descriptions(draft.types);
+    const list = await lists.descriptions(draft.types, draft.agencies);
+    if (key !== descKey) return;
+    descs = list;
     // Made on first use: a page may fill the lists before it calls bind().
     descList ??= virtualList($('f-desc'));
     descList.setItems(descs);
@@ -378,11 +408,19 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
     return false;
   }
 
-  /** Typed text not yet chosen in a picker: added as a chip if it names a choice. */
-  function addTyped(id, kind, choices, key) {
+  /** A picker's choices as UI SDK items, its kind, and its key in the filters. */
+  const PICKERS = {
+    'f-agency': { kind: 'agency', key: 'agencies', items: () => agencies },
+    'f-type': { kind: 'problem', key: 'types', items: () => asItems(problems) },
+    'f-desc': { kind: 'description', key: 'descs', items: () => asItems(descs) },
+  };
+
+  /** Typed text not yet chosen in a picker: added as a chip if it names a choice (its code or its label). */
+  function addTyped(id) {
+    const { kind, key, items } = PICKERS[id];
     const text = $(id).query ?? '';
     if (!text.trim()) return true;
-    const match = findChoice(choices, text);
+    const match = findItem(items(), text);
     if (match === undefined) return noMatch(id, kind, text);
     if (!draft[key].includes(match)) { draft[key] = [...draft[key], match]; changed(); }
     $(id).query = '';
@@ -394,9 +432,8 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   function apply() {
     // Text typed but not yet chosen is added first, if it names a choice exactly. Text
     // that matches nothing stops the Apply and says so, instead of vanishing.
-    const typed = Boolean(($('f-type').query ?? '').trim() || ($('f-desc').query ?? '').trim());
-    if (!addTyped('f-type', 'problem', problems, 'types')) return;
-    if (!addTyped('f-desc', 'description', descs, 'descs')) return;
+    const typed = Object.keys(PICKERS).some((id) => ($(id).query ?? '').trim());
+    for (const id of Object.keys(PICKERS)) if (!addTyped(id)) return;
     const check = applyCheck({ draft, applied, typed, lastFailed: lastFailed() });
     if (check === 'date-order') { setStatus(DATE_ORDER_MSG); $('f-start').focus(); return; }
     if (check === 'no-change') { setStatus(matchText()); return; }
@@ -409,6 +446,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   function reset() {
     applied = copyFilters(defaults());
     draft = copyFilters(applied);
+    $('f-agency').query = '';
     $('f-type').query = '';
     $('f-desc').query = '';
     formApplied = true;
@@ -418,7 +456,8 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
   /**
    * Filter groups open and close with native <details>/<summary>, which keyboards and
    * screen readers already handle. On a phone only groups with something set start open.
-   * On a wider screen Dates and Problem start open, and Agency and status opens if set.
+   * On a wider screen every group starts open, so UI SDK's agent bridge, which cannot see
+   * inside a closed group, sees Agency, Problem and Description (#192).
    * `compact` (the full-page map, where the map needs the room) uses the phone rule on
    * every screen.
    */
@@ -427,7 +466,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
     const d0 = defaults();
     for (const d of document.querySelectorAll('#filters details.filter-group')) {
       const set = sectionCount(applied, d0, d.dataset.section) > 0;
-      d.open = set || (!phone && d.dataset.section !== 'agency');
+      d.open = set || !phone;
     }
     renderPending();
   }
@@ -447,7 +486,7 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
       renderChips();
       renderPending();
       renderSummary();
-      updateDescriptions().catch((err) => console.error(err));
+      updateLists().catch((err) => console.error(err));
     },
     /**
      * A shortcut button in the page (an agency, a description, an address) applies at
@@ -458,19 +497,18 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
       formApplied = false; // a shortcut elsewhere on the page never closes or moves to the panel
       onApply(copyFilters(applied));
     },
-    /** Fill the problem, agency and status lists (again after the page's rows changed). */
+    /** Fill the agency, problem, description and status lists (again after the page's rows changed). */
     async fillLists() {
-      problems = await lists.problems();
-      $('f-type').items = asItems(problems);
-      // Keep the fixed first options ("All agencies", "Any status", "Not yet closed"); replace the rest.
-      $('f-agency').replaceChildren($('f-agency').options[0], ...(await lists.agencies())
-        .map((r) => el('option', { value: r.agency, text: `${r.agency}${r.label ? ` (${r.label})` : ''}` })));
+      agencies = agencyItems(await lists.agencies());
+      $('f-agency').items = agencies;
+      // Keep the fixed first options ("Any status", "Not yet closed"); replace the rest.
       const fixedStatus = [...$('f-status').options].filter((o) => !o.hasAttribute('data-extra') && (o.value === '' || o.value === NOT_CLOSED));
       knownStatuses = await lists.statuses();
       $('f-status').replaceChildren(...fixedStatus, ...knownStatuses.map((v) => el('option', { value: v, text: v })));
+      problemKey = null;
       descKey = null;
       listsReady = true;
-      await updateDescriptions();
+      await updateLists();
       syncControls();
     },
     /** The status values the data allows (never what the menu happens to show). */
@@ -507,27 +545,26 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
       for (const id of ['f-start', 'f-end']) { $(id).min = min; $(id).max = max; }
       $('f-start').addEventListener('change', (e) => { if (e.target.value) { draft.start = e.target.value; changed(); } });
       $('f-end').addEventListener('change', (e) => { if (e.target.value) { draft.end = e.target.value; changed(); } });
-      $('f-agency').addEventListener('change', (e) => { draft.agency = e.target.value; dropExtras('f-agency', draft.agency); changed(); });
       $('f-status').addEventListener('change', (e) => { draft.status = e.target.value; dropExtras('f-status', draft.status); changed(); });
       // The pickers keep their own chips; their valuechange says what is chosen now.
-      // A name is both an item's value and its label, so chips set from a link show
-      // before the lists load.
-      for (const [id, key] of [['f-type', 'types'], ['f-desc', 'descs']]) {
-        $(id).itemToLabel = (v) => String(v);
+      // A problem or description name is both an item's value and its label, and an
+      // agency's chip shows its listed label, or its code before the lists load, so
+      // chips set from a link show at once.
+      for (const [id, { key }] of Object.entries(PICKERS)) {
+        $(id).itemToLabel = id === 'f-agency' ? (v) => agencies.find((i) => i.value === v)?.label ?? String(v) : (v) => String(v);
         $(id).addEventListener('valuechange', (e) => {
           const next = [...(e.detail.value ?? [])];
           if (!sameList(next, draft[key])) { draft[key] = next; changed(); }
         });
-        const [kind, choices] = key === 'types' ? ['problem', () => problems] : ['description', () => descs];
         $(id).addEventListener('keydown', (e) => {
           if (e.key !== 'Enter' || e.defaultPrevented) return;
           const text = ($(id).query ?? '').trim();
           // Enter in an empty, closed picker applies the filters, like Enter in a date box.
           if (!text && !$(id).open) { e.preventDefault(); $('filters').requestSubmit(); return; }
           // Enter after typing a whole name, with nothing highlighted, adds it (as before #187).
-          if (text && $(id).api?.getHighlighted() == null && findChoice(choices(), text) !== undefined) {
+          if (text && $(id).api?.getHighlighted() == null && findItem(PICKERS[id].items(), text) !== undefined) {
             e.preventDefault();
-            addTyped(id, kind, choices(), key);
+            addTyped(id);
           }
         });
         // UI SDK clears typed text that was never chosen when focus leaves. Keep it in the

@@ -7,6 +7,13 @@ This page lists the changes to BoardStat that a reader would notice: new pages, 
 
 BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change reaches the site at the next upload. Entries since November 2026 are dated by the day the change was merged on GitHub. BetaNYC's [nyc-311-mcp](https://github.com/BetaNYC/nyc-311-mcp) server reads BoardStat's data files, so a change to BoardStat's data can change its answers too. To report a bug or ask for a new feature, email [boardstat@beta.nyc](mailto:boardstat@beta.nyc) or [open an issue on GitHub](https://github.com/BetaNYC/BoardStat/issues).
 
+## Unreleased: Pick several agencies, by typing
+
+- **Tags:** Site
+- **What changed:** On district, council district, borough, address and full-page map pages, the Agency box in the filter form now works like the Problem and Description boxes. Type to narrow the list, and pick as many agencies as you need. Each pick shows as a chip with a remove button. The Problem list then shows only problems with requests for the agencies you picked, and the Description list follows both. The form has a new order: dates and status first, then agency, problem and description. A link to a page filtered to one agency still opens the same view.
+- **Who it affects:** Anyone who filters by agency. As before, nothing on the page changes until you press Apply filters.
+- **More detail:** [The change](https://github.com/BetaNYC/BoardStat/issues/192)
+
 ## 2026-11-23: A new design for the Problem and Description boxes
 
 - **Tags:** Site
