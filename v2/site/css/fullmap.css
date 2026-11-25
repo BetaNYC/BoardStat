@@ -59,6 +59,10 @@ body.noside .fm-side { display: none; }
 .fm-side .filter-group > summary { color: #fff; font-family: var(--font-body); font-weight: 500; text-transform: uppercase; font-size: 0.875rem; letter-spacing: 0.02em; }
 .fm-side .fg-count { text-transform: none; letter-spacing: 0; }
 .fm-side .fg-count, .fm-side .field-hint, .fm-side label, .fm-side ui-combobox-label { color: #fff; }
+.fm-side .list-order legend { color: #fff; }
+.fm-side .list-order .seg, .fm-side .list-order label + label { border-color: #fff; }
+.fm-side .list-order label { background: transparent; color: #fff; }
+.fm-side .list-order label:has(input:checked) { background: #fff; color: var(--fm-blue); }
 .fm-side .fg-body, .fm-side .fg-body.fg-pair { grid-template-columns: 1fr; padding-left: 0; gap: 0.6rem; }
 .fm-side #fg-dates .fg-body { grid-template-columns: 1fr 1fr; }
 .fm-side #fg-dates .fg-body > div:last-child { grid-column: 1 / -1; }

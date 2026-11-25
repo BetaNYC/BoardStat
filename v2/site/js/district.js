@@ -1419,6 +1419,7 @@ async function main() {
     matchText: () => matchMsg(total),
     setStatus: (msg) => setStatus($('status'), msg),
     lockAddress: ADDRESS_MODE,
+    onListOrder: writeUrl,
   });
   form.set(state);
   // Open on a wide screen, closed on a phone (filterform.js setupPanel, #149). Before the

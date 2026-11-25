@@ -120,6 +120,14 @@ as data (`items`). Description's list is virtualized (UI SDK's documented patter
 `virtualList` in `js/filterform.js`): the combobox knows every item, but only the rows near
 the scroll position are in the page. "Exclude these descriptions" is a `ui-checkbox`;
 Apply and Reset are `ui-button`. Dates, Status and Print stay native.
+
+**Sort suggestions (#199).** A two-way switch above Agency, Problem and Description (native
+radios styled as a pill) orders all three lists A to Z (the default; `localeCompare`,
+case-insensitive, in `tableLists`) or with the most requests in the applied dates first
+(`listOrderSql`). It changes only the lists, at once, without Apply, and is not a filter. The
+link carries it: `filtersToParams` writes `sort=count` for Most requests and nothing for A to
+Z (`listOrderFromParams`, `setListOrder` in `js/filterstate.js`), so the full-page map and
+its way back keep the choice.
 The form still only edits its draft until Apply: it follows `valuechange` (pickers),
 `checkedchange` (Exclude) and `action` (Reset). Typed text that was never picked stays in
 the box (UI SDK would clear it when focus leaves), so Apply adds it if it names a choice

@@ -445,6 +445,7 @@ async function main() {
     lastFailed: () => lastFailed,
     matchText: () => matchMsg(total),
     setStatus: (msg) => setStatus($('status'), msg),
+    onListOrder: writeLinks,
   });
   form.set(state);
   form.bind(manifest.window.start, manifest.window.end);

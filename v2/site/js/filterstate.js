@@ -123,6 +123,13 @@ export function addressParams(geo, id, s, defaults, addr, bbl = '') {
  * Never the address: a street address is never written into a link after a page loads
  * (see district.js writeUrl and analytics.js).
  */
+/** The form's "Sort suggestions" switch: A to Z (the default), or most requests first when
+ *  the link says sort=count. Not a filter, but every link a page writes carries it. */
+export const listOrderFromParams = (params) => (params.get('sort') === 'count' ? 'count' : 'az');
+let listOrder = typeof location === 'undefined' ? 'az' : listOrderFromParams(new URLSearchParams(location.search));
+export const getListOrder = () => listOrder;
+export const setListOrder = (v) => { listOrder = v === 'count' ? 'count' : 'az'; };
+
 export function filtersToParams(geo, id, s, defaults) {
   const p = new URLSearchParams({ geo, id: String(id) });
   if (s.start !== defaults.start) p.set('start', s.start);
@@ -132,6 +139,7 @@ export function filtersToParams(geo, id, s, defaults) {
   if (s.descs?.length && s.descEx) p.set('descx', '1');
   if (s.agencies?.length) p.set('agency', s.agencies.join('|'));
   if (s.status) p.set('status', s.status);
+  if (listOrder === 'count') p.set('sort', 'count');
   return p;
 }
 

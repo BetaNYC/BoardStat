@@ -39,9 +39,10 @@ def test_agent_sees_every_setting_in_the_group(district):
         "Apply filters": ["press"],
         "Reset filters": ["press"],
     }
-    # The choices come from the same DuckDB lists a person sees, most requests first.
+    # The choices come from the same DuckDB lists a person sees, A to Z (#199).
     found = agent(district, "return agent.query({ within: 'Problem', text: 'taxi' });")
-    assert found[0]["items"][0] == {"value": "Taxi Complaint", "label": "Taxi Complaint"}
+    taxi = [i["label"] for i in found[0]["items"]]
+    assert "Taxi Complaint" in taxi and taxi == sorted(taxi, key=str.casefold)
 
 
 def test_agent_sets_the_group_and_applies(district):

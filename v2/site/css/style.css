@@ -223,6 +223,15 @@ footer.site { border-top: 1px solid var(--bnyc-border-gray); padding: 1rem 1.25r
 button.link[aria-pressed="true"] { font-weight: 700; text-decoration-thickness: 2px; }
 .chips.exclude button { background: var(--bnyc-white); border-style: dashed; }
 .fg-body .choice { margin-top: 0.35rem; }
+/* "Sort suggestions": a two-way switch above Agency, Problem and Description. */
+.list-order { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; margin: 0; padding: 0; border: 0; font-size: 0.875rem; }
+.list-order legend { float: left; padding: 0; font-weight: 600; }
+.list-order .seg { display: inline-flex; border: 1px solid var(--bnyc-blue); border-radius: 999px; overflow: hidden; }
+.list-order label { position: relative; display: flex; align-items: center; margin: 0; padding: 0.15rem 0.75rem; line-height: 1.4; cursor: pointer; color: var(--bnyc-blue); background: #fff; }
+.list-order label + label { border-left: 1px solid var(--bnyc-blue); }
+.list-order input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.list-order label:has(input:checked) { background: var(--bnyc-blue); color: #fff; font-weight: 600; }
+.list-order label:has(input:focus-visible) { outline: 3px solid var(--bnyc-blue-secondary); outline-offset: 1px; z-index: 1; }
 
 /* Links to the About and Glossary pages at the bottom of each page. */
 .more-links { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }

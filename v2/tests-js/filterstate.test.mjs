@@ -2,7 +2,7 @@
 // Run: node --test v2/tests-js/   (also run by `uv run pytest` in v2/pipeline)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFilters, changedFields, patchBoth, sectionCount, filtersFromParams, filtersToParams, describeFilters } from '../site/js/filterstate.js';
+import { copyFilters, changedFields, patchBoth, sectionCount, filtersFromParams, filtersToParams, describeFilters, listOrderFromParams, setListOrder } from '../site/js/filterstate.js';
 import { whereSql } from '../site/js/filtersql.js';
 
 const base = { start: '2025-11-01', end: '2026-11-04', types: [], descs: [], descEx: false, agencies: [], status: '', addr: '' };
@@ -84,4 +84,15 @@ test('several agencies round-trip through a link; an old one-agency link opens t
   assert.doesNotMatch(whereSql({ ...base }), /agency/);
   assert.deepEqual(describeFilters(s, (d) => d).slice(1), ['agencies: NYPD, DSNY']);
   assert.deepEqual(describeFilters(opened, (d) => d).slice(1), ['agency: DSNY']);
+});
+
+test('the link carries Sort suggestions only when it is Most requests (#199)', () => {
+  const d = { start: '2025-11-01', end: '2026-11-24' };
+  const s = { ...d, types: [], descs: [], descEx: false, agencies: [], status: '' };
+  assert.equal(listOrderFromParams(new URLSearchParams('sort=count')), 'count');
+  for (const q of ['', 'sort=az', 'sort=junk']) assert.equal(listOrderFromParams(new URLSearchParams(q)), 'az');
+  setListOrder('count');
+  assert.equal(filtersToParams('cd', 309, s, d).toString(), 'geo=cd&id=309&sort=count');
+  setListOrder('az');
+  assert.equal(filtersToParams('cd', 309, s, d).toString(), 'geo=cd&id=309');
 });
