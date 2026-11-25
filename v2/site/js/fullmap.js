@@ -260,9 +260,12 @@ function popupBody(pile, types, latest, notes, notesFailed) {
 
 // ---------------------------------------------------------------- stats bar (#194)
 
+/** Only the agency groups the chart holds; one group (or none) needs no legend, so the chart takes its room. */
 function renderLegend() {
+  const used = P.GROUP_LABELS.map((g, i) => i).filter((i) => bars.some((b) => b.parts[i] > 0));
+  document.body.classList.toggle('one-group', used.length < 2);
   $('map-legend').replaceChildren(el('h2', { text: 'Agencies' }), el('ul', {},
-    P.GROUP_LABELS.map((g, i) => el('li', {}, el('span', { class: 'sw', 'aria-hidden': 'true', style: `background:${P.GCOL[i]}` }), g))));
+    used.map((i) => el('li', {}, el('span', { class: 'sw', 'aria-hidden': 'true', style: `background:${P.GCOL[i]}` }), P.GROUP_LABELS[i]))));
 }
 
 /** The monthly chart: bars stacked by agency group, months outside the applied dates faded. Each month is a button. */
@@ -277,6 +280,7 @@ function drawChart() {
   const bw = w / Math.max(1, bars.length);
   const last = manifest.window.last_created?.slice(0, 10);
   let out = '';
+  let labelEnd = -Infinity; // right edge of the last month label drawn, so labels never overlap
   bars.forEach((b, k) => {
     const op = inDates(b.m, state) ? 1 : 0.3;
     let top = h - pad;
@@ -286,11 +290,19 @@ function drawChart() {
     });
     if (bw > 30) out += `<text x="${k * bw + bw / 2}" y="${top - 3}" text-anchor="middle" aria-hidden="true">${fmtInt(b.total)}</text>`;
     const [y, m] = b.m.split('-').map(Number);
-    if (m % 3 === 1 || k === 0) out += `<text x="${k ? k * bw + bw / 2 : 2}" y="${h - 2}" text-anchor="${k ? 'middle' : 'start'}" aria-hidden="true">${monthLabel(b.m).split(' ')[0]}${m === 1 || k === 0 ? ` '${String(y).slice(2)}` : ''}</text>`;
+    if (m % 3 === 1 || k === 0) {
+      const text = `${monthLabel(b.m).split(' ')[0]}${m === 1 || k === 0 ? ` '${String(y).slice(2)}` : ''}`;
+      const tw = text.length * 6; // ponytail: estimated width at the 10px font; measure with getComputedTextLength if labels still collide
+      const x = k ? k * bw + bw / 2 : 2;
+      const left = k ? x - tw / 2 : x;
+      if (left > labelEnd + 4) { out += `<text x="${x}" y="${h - 2}" text-anchor="${k ? 'middle' : 'start'}" aria-hidden="true">${text}</text>`; labelEnd = left + tw; }
+    }
     const part = k === 0 && chartFrom.slice(8) !== '01' ? ` (from ${fmtDate(chartFrom)})` : k === bars.length - 1 && last ? ` (through ${fmtDate(last)})` : '';
     const label = `${monthLabel(b.m)}: ${fmtInt(b.total)} ${b.total === 1 ? 'request' : 'requests'}${part}${op === 1 ? ', in the dates shown' : ''}. Select to show this month.`;
     out += `<rect class="bar-hit" data-m="${b.m}" x="${k * bw}" y="0" width="${bw}" height="${h}" tabindex="0" role="button" aria-label="${label}"><title>${label}</title></rect>`;
   });
+  // A redraw replaces every month; keep keyboard focus on the month that had it.
+  if (svg.contains(document.activeElement)) focusMonth ??= document.activeElement.dataset.m;
   svg.innerHTML = out;
   if (focusMonth) { svg.querySelector(`[data-m="${focusMonth}"]`)?.focus(); focusMonth = null; }
 }
@@ -319,6 +331,7 @@ async function updateStats(where) {
   chartFrom = [loader.loadedFrom() ?? state.start, state.start].sort()[0];
   const months = monthsBetween(chartFrom, manifest.window.end);
   bars = monthBars(await query(monthlySql(state, chartFrom)), months);
+  renderLegend();
   if (!document.body.classList.contains('nobar')) drawChart();
 }
 
@@ -387,8 +400,8 @@ async function main() {
   $('chart').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickMonth(e.target, true); }
   });
-  window.addEventListener('resize', () => { if (bars.length && !document.body.classList.contains('nobar')) drawChart(); });
-  renderLegend();
+  // Redraw whenever the chart's own box changes: a window resize, or the panel opening or closing.
+  new ResizeObserver(() => { if (bars.length && !document.body.classList.contains('nobar')) drawChart(); }).observe($('chart'));
 
   try {
     manifest = await loadManifest();

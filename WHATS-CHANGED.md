@@ -7,6 +7,13 @@ This page lists the changes to BoardStat that a reader would notice: new pages, 
 
 BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change reaches the site at the next upload. Entries since November 2026 are dated by the day the change was merged on GitHub. BetaNYC's [nyc-311-mcp](https://github.com/BetaNYC/nyc-311-mcp) server reads BoardStat's data files, so a change to BoardStat's data can change its answers too. To report a bug or ask for a new feature, email [boardstat@beta.nyc](mailto:boardstat@beta.nyc) or [open an issue on GitHub](https://github.com/BetaNYC/BoardStat/issues).
 
+## 2026-11-24: Fixes to the full-page map's stats bar
+
+- **Tags:** Site
+- **What changed:** The chart of requests per month on the full-page map no longer runs off the bottom of the window. Its month labels no longer overlap when the chart is narrow. The list of agencies beside it now names only the agencies with requests in the results, and it is hidden when there is only one, so the chart gets the room.
+- **Who it affects:** Anyone who uses the full-page map.
+- **More detail:** [The fix](https://github.com/BetaNYC/BoardStat/issues/197)
+
 ## 2026-11-24: A new full-page map
 
 - **Tags:** Site

@@ -78,7 +78,7 @@ body.noside .fm-side { display: none; }
 /* The white stats bar, bottom. */
 .fm-bar {
   position: fixed; left: 0; right: var(--side); bottom: 0; height: var(--bar); z-index: 3;
-  display: grid; grid-template-columns: minmax(270px, 2fr) 5fr minmax(170px, 1.3fr); gap: 0 18px;
+  display: grid; grid-template-columns: minmax(270px, 2fr) 5fr minmax(170px, 1.3fr); grid-template-rows: minmax(0, 1fr); gap: 0 18px;
   padding: 8px 14px; background: #fff; border-top: 3px solid var(--fm-blue); font-size: 0.8125rem; line-height: 1.35;
 }
 body.nobar .fm-bar { display: none; }
@@ -87,13 +87,18 @@ body.nobar .fm-bar { display: none; }
 .fm-counts { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; border-top: 1px solid var(--bnyc-border-gray); padding-top: 4px; }
 .fm-counts b { display: block; font: 700 1.375rem var(--font-head); color: var(--fm-blue); }
 .fm-caveat { margin: 4px 0 0; }
-.fm-chart { min-width: 0; display: flex; flex-direction: column; }
-.fm-chart svg { display: block; width: 100%; flex: 1; min-height: 0; }
+/* The svg takes the height the bar leaves it, not its own default 150px (which ran off the screen). */
+.fm-chart { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.fm-chart svg { display: block; width: 100%; flex: 1 1 0; height: 0; min-height: 0; }
 .fm-chart .bar-hit { cursor: pointer; fill: transparent; }
 .fm-chart .bar-hit:focus { outline: none; }
 .fm-chart .bar-hit:focus-visible { stroke: var(--fm-blue); stroke-width: 3px; }
 .fm-chart text { font: 10px var(--font-body); fill: var(--bnyc-dark-gray); }
 .fm-legend { min-width: 0; overflow: hidden; padding-right: 0; }
+/* One agency: no legend; the chart takes its column and keeps clear of the Hide stats button. */
+body.one-group .fm-legend { display: none; }
+body.one-group .fm-bar { grid-template-columns: minmax(270px, 2fr) 6.3fr; }
+body.one-group .fm-chart h2 { margin-right: 96px; }
 .fm-legend h2 { margin-right: 96px; }
 .fm-legend ul { list-style: none; margin: 0; padding: 0; columns: 1; }
 .fm-legend li { display: flex; align-items: center; gap: 8px; margin-bottom: 1px; }
@@ -136,7 +141,7 @@ body.noside #show-side, body.nobar #show-bar { display: block; }
   .fm-totals h2 { margin-right: 96px; }
   #show-side { top: auto; right: 12px; bottom: calc(var(--bar) + 12px); min-height: 44px; }
   #show-bar { left: 50%; }
-  .fm-bar { grid-template-columns: 1fr; overflow-y: auto; }
+  .fm-bar, body.one-group .fm-bar { grid-template-columns: 1fr; grid-template-rows: none; overflow-y: auto; }
   .fm-chart svg { min-height: 90px; }
   .fm-legend ul { columns: 2; }
   .fm-hide, .fm-show { min-height: 44px; }
