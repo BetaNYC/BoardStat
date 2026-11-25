@@ -175,3 +175,18 @@ test('map note: one request reads singular (#180)', async () => {
   assert.match(mapNoteText(1, 1), /^Showing the 1 matching request\. /);
   assert.match(mapNoteText(2, 2), /^Showing all 2 matching requests\. /);
 });
+
+test('Sort suggestions: A to Z (case-insensitive) by default, as queried for Most requests (#199)', async () => {
+  const { tableLists } = await import('../site/js/filterform.js');
+  const { setListOrder } = await import('../site/js/filterstate.js');
+  const s = { start: '2026-06-01', end: '2026-11-13', agencies: [], types: [], descs: [], descEx: false, status: '', addr: '' };
+  const lists = tableLists(async (sql) => (sql.includes('agency_name')
+    ? [{ agency: 'NYPD' }, { agency: 'DOT' }, { agency: 'HPD' }]
+    : [{ t: 'Noise' }, { t: 'abandoned Bike' }, { t: 'HEAT/HOT WATER' }]), () => s);
+  setListOrder('az');
+  assert.deepEqual(await lists.problems(), ['abandoned Bike', 'HEAT/HOT WATER', 'Noise']);
+  assert.deepEqual((await lists.agencies()).map((r) => r.agency), ['DOT', 'HPD', 'NYPD']);
+  setListOrder('count');
+  assert.deepEqual(await lists.problems(), ['Noise', 'abandoned Bike', 'HEAT/HOT WATER']);
+  setListOrder('az');
+});

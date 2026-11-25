@@ -19,7 +19,7 @@
 // checkedchange, action) into `draft`, and still applies nothing until Apply.
 import { el, fmtDate, fmtInt } from './lib.js';
 import { whereSql, DESC_SQL, NOT_CLOSED_SQL, lit } from './filtersql.js';
-import { copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED, describeFilters } from './filterstate.js';
+import { copyFilters, changedFields, patchBoth, sectionCount, SECTIONS, NOT_CLOSED, describeFilters, getListOrder, setListOrder, listOrderFromParams } from './filterstate.js';
 
 export const DATE_ORDER_MSG = 'The From date is after the To date. Change one of them, then press Apply filters.';
 /** The status line after a page counts its requests: "1 request matches.", "2 requests match." */
@@ -237,15 +237,17 @@ export function tableLists(query, getState) {
   const scope = () => listScopeSql(getState());
   const order = () => listOrderSql(getState());
   const among = (col, list) => (list.length ? `AND ${col} IN (${list.map(lit).join(', ')})` : '');
+  // The form's "Sort suggestions" switch (filterstate.js): A to Z, or most requests first as queried.
+  const sorted = (list, key = (v) => v) => (getListOrder() === 'az' ? [...list].sort((a, b) => String(key(a)).localeCompare(String(key(b)), 'en', { sensitivity: 'base', numeric: true })) : list);
   return {
-    problems: async (agencies = []) => (await query(`
+    problems: async (agencies = []) => sorted((await query(`
       SELECT complaint_type AS t FROM req WHERE ${scope()} ${among('agency', agencies)}
-      GROUP BY 1 ORDER BY ${order()}`)).map((r) => r.t),
-    descriptions: async (types, agencies = []) => (await query(`
+      GROUP BY 1 ORDER BY ${order()}`)).map((r) => r.t)),
+    descriptions: async (types, agencies = []) => sorted((await query(`
       SELECT ${DESC_SQL} AS d FROM req WHERE ${scope()}
       ${among('agency', agencies)} ${among('complaint_type', types)}
-      GROUP BY 1 ORDER BY ${order()}`)).map((r) => r.d),
-    agencies: async () => query(`SELECT agency, any_value(agency_name) AS label FROM req WHERE ${scope()} GROUP BY 1 ORDER BY ${order()}`),
+      GROUP BY 1 ORDER BY ${order()}`)).map((r) => r.d)),
+    agencies: async () => sorted(await query(`SELECT agency, any_value(agency_name) AS label FROM req WHERE ${scope()} GROUP BY 1 ORDER BY ${order()}`), (r) => r.agency),
     statuses: async () => {
       const list = (await query(`SELECT status FROM req WHERE ${scope()} AND status IS NOT NULL GROUP BY 1 ORDER BY ${order()}`)).map((r) => r.status);
       return list.includes('Closed') ? list : [...list, 'Closed'];
@@ -289,7 +291,7 @@ export function statusChoices(known) {
  *   setStatus(msg)      the page's status line
  *   lockAddress         the address page: its address is fixed and not shown as a filter
  */
-export function createFilterForm({ defaults, lists, onApply, lastFailed = () => false, matchText = () => '', setStatus, lockAddress = false, $ = (id) => document.getElementById(id) }) {
+export function createFilterForm({ defaults, lists, onApply, lastFailed = () => false, matchText = () => '', setStatus, lockAddress = false, onListOrder = () => {}, $ = (id) => document.getElementById(id) }) {
   let applied = copyFilters(defaults());
   let draft = copyFilters(applied);
   let agencies = []; // UI SDK items: { value: code, label: "code (name)" }
@@ -542,6 +544,20 @@ export function createFilterForm({ defaults, lists, onApply, lastFailed = () => 
     /** Wire up the controls. Changing a control changes only the form (#142); Apply, or
      *  Enter in a date box or an empty picker, runs the page's queries. */
     bind(min, max) {
+      // "Sort suggestions": reorders the three lists at once, at once (no Apply). Not a
+      // filter; the link carries it (sort=count; A to Z, the default, adds nothing).
+      const ORDER_HINT = { count: 'Suggestions are listed with the most requests in these dates first.', az: 'Suggestions are listed A to Z.' };
+      const setOrder = (v, refill) => {
+        setListOrder(v);
+        if ($('list-order')) $('list-order').textContent = ORDER_HINT[v];
+        if (refill && listsReady) this.fillLists().catch((err) => console.error(err));
+      };
+      const fromLink = listOrderFromParams(new URLSearchParams(location.search));
+      for (const r of document.querySelectorAll('input[name="list-order"]')) {
+        r.checked = r.value === fromLink;
+        r.addEventListener('change', () => { if (r.checked) { setOrder(r.value, true); onListOrder(); } });
+      }
+      setOrder(fromLink, fromLink === 'count');
       for (const id of ['f-start', 'f-end']) { $(id).min = min; $(id).max = max; }
       $('f-start').addEventListener('change', (e) => { if (e.target.value) { draft.start = e.target.value; changed(); } });
       $('f-end').addEventListener('change', (e) => { if (e.target.value) { draft.end = e.target.value; changed(); } });

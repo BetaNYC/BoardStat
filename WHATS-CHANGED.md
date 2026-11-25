@@ -7,6 +7,13 @@ This page lists the changes to BoardStat that a reader would notice: new pages, 
 
 BetaNYC uploads BoardStat 2.0 to www.beta.nyc/boardstat/ by hand, so a change reaches the site at the next upload. Entries since November 2026 are dated by the day the change was merged on GitHub. BetaNYC's [nyc-311-mcp](https://github.com/BetaNYC/nyc-311-mcp) server reads BoardStat's data files, so a change to BoardStat's data can change its answers too. To report a bug or ask for a new feature, email [boardstat@beta.nyc](mailto:boardstat@beta.nyc) or [open an issue on GitHub](https://github.com/BetaNYC/BoardStat/issues).
 
+## 2026-11-24: Sort filter suggestions A to Z
+
+- **Tags:** Site
+- **What changed:** In the filter form on district, council district, borough, address and full-page map pages, the suggestions for Agency, Problem and Description are now listed A to Z. A new **Sort suggestions** switch above the three boxes changes them back to most requests in your dates first. The switch changes only the order of the lists, not the filters, and the page's link keeps your choice.
+- **Who it affects:** Anyone who filters by agency, problem or description.
+- **More detail:** [The change](https://github.com/BetaNYC/BoardStat/issues/199)
+
 ## 2026-11-24: Fixes to the full-page map's stats bar
 
 - **Tags:** Site

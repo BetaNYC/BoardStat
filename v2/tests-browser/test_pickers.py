@@ -14,6 +14,8 @@ STATE = """() => { const b = document.getElementById('f-type');
 def test_keyboard_escape_and_click_away(district):
     page = district
     page.locator("#fg-problem summary").focus()
+    page.keyboard.press("Tab")  # Sort suggestions (#199): one stop, on the checked choice
+    assert page.evaluate("document.activeElement.name") == "list-order"
     page.keyboard.press("Tab")
     assert page.evaluate(STATE)["focus"] == "f-agency"  # #192: Agency comes first
     page.keyboard.press("Tab")
@@ -70,6 +72,8 @@ def test_typed_text_that_names_nothing_stops_apply(district):
 def test_focus_is_visible(district):
     page = district
     page.locator("#fg-problem summary").focus()
+    page.keyboard.press("Tab")  # Sort suggestions (#199): one stop, on the checked choice
+    assert page.evaluate("document.activeElement.name") == "list-order"
     page.keyboard.press("Tab")
     chips = page.locator("#f-agency ui-combobox-chips")
     assert chips.evaluate("e => getComputedStyle(e).outlineStyle") == "solid"

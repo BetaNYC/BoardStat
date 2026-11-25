@@ -132,11 +132,15 @@ def test_reset_clears_typed_text():
 
 
 def test_form_says_how_the_suggestions_are_ordered():
-    """#149 QA round 2: the lists put the most requests in the applied dates first, and say so."""
+    """#199: one "Sort suggestions" switch, A to Z first and checked, then Most requests; each
+    box's input is described by the current order (#149 QA round 2 said it per box)."""
     form = form_html("district.html")
+    assert '<legend>Sort suggestions</legend>' in form
+    az = form.index('value="az" checked> A to Z')
+    assert az < form.index('value="count"> Most requests')
+    assert '<span class="sr-only" id="list-order">Suggestions are listed A to Z.</span>' in form
     for box in ("agency", "type", "desc"):
-        assert f'<p class="field-hint" id="{box}-order">Suggestions are listed with the most requests in these dates first.</p>' in form
-        assert f'aria-describedby="{box}-order {box}-help"' in form
+        assert f'aria-describedby="list-order {box}-help"' in form
 
 
 @pytest.mark.parametrize("page", PAGES)
